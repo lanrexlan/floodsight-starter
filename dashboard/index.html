@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FloodSight — Lagos Pilot Console</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="app">
+  <aside id="sidebar">
+    <header class="brand">
+      <div class="brand-mark">
+        <span id="beacon" class="beacon" data-level="none"></span>
+      </div>
+      <div>
+        <h1>FloodSight</h1>
+        <p class="brand-sub">Lagos Pilot Console</p>
+      </div>
+    </header>
+
+    <div id="data-source-banner" class="banner" hidden></div>
+
+    <section class="panel">
+      <h2>Query a location</h2>
+      <p class="hint">Click anywhere on the map, or enter coordinates.</p>
+      <div class="coord-row">
+        <label>Lat<input id="lat-input" type="number" step="0.0001" value="6.4500" /></label>
+        <label>Lon<input id="lon-input" type="number" step="0.0001" value="3.4200" /></label>
+      </div>
+      <button id="query-btn" class="btn-primary">Check this point</button>
+    </section>
+
+    <section class="panel">
+      <h2>Rainfall scenario</h2>
+      <p class="hint">Drive the alert engine with a hypothetical event.</p>
+      <label class="slider-label">
+        24h rainfall <span id="rain24-val" class="mono">40 mm</span>
+        <input id="rain24" type="range" min="0" max="200" value="40" />
+      </label>
+      <label class="slider-label">
+        72h rainfall <span id="rain72-val" class="mono">60 mm</span>
+        <input id="rain72" type="range" min="0" max="300" value="60" />
+      </label>
+    </section>
+
+    <section class="panel" id="result-panel" hidden>
+      <h2>Result</h2>
+      <div class="result-grid">
+        <div class="result-cell">
+          <span class="result-label">Risk class</span>
+          <span id="result-risk" class="result-value">—</span>
+        </div>
+        <div class="result-cell">
+          <span class="result-label">Alert level</span>
+          <span id="result-alert" class="result-value">—</span>
+        </div>
+        <div class="result-cell">
+          <span class="result-label">Elevation</span>
+          <span id="result-elev" class="result-value mono">—</span>
+        </div>
+        <div class="result-cell">
+          <span class="result-label">flood_score</span>
+          <span id="result-score" class="result-value mono">—</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Legend</h2>
+      <ul class="legend">
+        <li><span class="swatch" style="background:#2E7D5B"></span>Low</li>
+        <li><span class="swatch" style="background:#D9A441"></span>Moderate</li>
+        <li><span class="swatch" style="background:#D9622B"></span>High</li>
+        <li><span class="swatch" style="background:#C23B3B"></span>Very High</li>
+      </ul>
+    </section>
+
+    <footer class="api-footer">
+      <span id="api-status" class="mono">checking API…</span>
+    </footer>
+  </aside>
+
+  <main id="map"></main>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

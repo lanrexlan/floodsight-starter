@@ -1,0 +1,105 @@
+"""
+Provides the grid the API serves from. If you've run the full processing
+pipeline (scripts/02-04) and produced data/processed/scored_grid.gpkg,
+that real data is served. Otherwise this falls back to an in-memory
+synthetic demo grid covering the same AOI bbox, so `uvicorn api.main:app`
+works immediately on a fresh checkout with zero setup — useful for
+frontend/API development and for demoing the dashboard before the GIS
+pipeline has been run on your machine.
+
+The synthetic fallback is clearly flagged in every API response via the
+`data_source` field — never silently confused with real model output.
+"""
+
+from __future__ import annotations
+
+import logging
+
+import geopandas as gpd
+import numpy as np
+import pandas as pd
+from shapely.geometry import box
+
+from floodsight.config import AOI_BBOX, PROCESSED_DIR, WGS84, WORKING_CRS
+from floodsight.processing.susceptibility import compute_flood_score
+
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger(__name__)
+
+SCORED_GRID_PATH = PROCESSED_DIR / "scored_grid.gpkg"
+
+_cached_grid: gpd.GeoDataFrame | None = None
+_cached_source: str | None = None
+
+
+def _build_synthetic_demo_grid(n_cells_per_side: int = 35) -> gpd.GeoDataFrame:
+    """A small synthetic grid with plausible-looking (but fake) terrain
+    and population values, used only when no real processed grid exists
+    on disk yet."""
+    rng = np.random.default_rng(7)
+
+    lon_min, lat_min, lon_max, lat_max = AOI_BBOX
+    aoi = gpd.GeoDataFrame(geometry=[box(*AOI_BBOX)], crs=WGS84).to_crs(WORKING_CRS)
+    minx, miny, maxx, maxy = aoi.total_bounds
+
+    xs = np.linspace(minx, maxx, n_cells_per_side)
+    ys = np.linspace(miny, maxy, n_cells_per_side)
+    cell_w = (maxx - minx) / n_cells_per_side
+    cell_h = (maxy - miny) / n_cells_per_side
+
+    rows = []
+    for x in xs:
+        for y in ys:
+            rows.append(
+                {
+                    "geometry": box(x, y, x + cell_w, y + cell_h),
+                    "centroid_x": x + cell_w / 2,
+                    "centroid_y": y + cell_h / 2,
+                }
+            )
+    grid = gpd.GeoDataFrame(rows, crs=WORKING_CRS)
+    grid["cell_id"] = grid.index.astype(str)
+
+    # Fake a coastline gradient: cells with higher index (further from
+    # bbox origin, roughly "inland") get higher elevation/lower risk, so
+    # the demo grid at least *looks* like a coastal flood gradient.
+    n = len(grid)
+    norm_pos = (grid["centroid_x"] - minx) / (maxx - minx)
+    grid["elevation_m"] = (norm_pos * 12 + rng.normal(0, 1.0, n)).clip(0, None)
+    grid["slope_deg"] = rng.exponential(1.2, n).clip(0, 15)
+    grid["flow_accum"] = rng.exponential(150, n)
+    grid["hand_m"] = (grid["elevation_m"] * rng.uniform(0.2, 0.5, n)).clip(0, None)
+    grid["dist_to_water_m"] = (norm_pos * 1500 + rng.exponential(150, n))
+    grid["landcover_class"] = rng.choice([50, 50, 80, 90, 40], n)
+    grid["population_density"] = rng.exponential(4000, n)
+
+    grid = compute_flood_score(grid)
+    return grid
+
+
+def get_grid(force_reload: bool = False) -> tuple[gpd.GeoDataFrame, str]:
+    global _cached_grid, _cached_source
+    if _cached_grid is not None and not force_reload:
+        return _cached_grid, _cached_source
+
+    if SCORED_GRID_PATH.exists():
+        log.info("Loading real processed grid from %s", SCORED_GRID_PATH)
+        _cached_grid = gpd.read_file(SCORED_GRID_PATH)
+        _cached_source = "processed_pipeline"
+    else:
+        log.warning(
+            "No processed grid found at %s — serving a SYNTHETIC demo grid. "
+            "Run scripts/02-04 to generate real data.",
+            SCORED_GRID_PATH,
+        )
+        _cached_grid = _build_synthetic_demo_grid()
+        _cached_source = "synthetic_demo"
+
+    return _cached_grid, _cached_source
+
+
+def nearest_cell(lat: float, lon: float) -> pd.Series:
+    grid, _ = get_grid()
+    point = gpd.GeoSeries([gpd.points_from_xy([lon], [lat])[0]], crs=WGS84).to_crs(grid.crs)[0]
+    idx = grid.geometry.distance(point).idxmin()
+    return grid.loc[idx]

@@ -1,0 +1,52 @@
+name: floodsight
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  # numpy is pinned <2 because pysheds==0.3.5 (below) has numba-jitted
+  # internals that reference np.bool8, an alias NumPy 2.0 removed
+  # entirely — pysheds hasn't been updated for NumPy 2.x compatibility.
+  # If you ever drop pysheds or it ships a fix, this pin can go.
+  - numpy<2
+  # --- Core: API, ML, alerts ---
+  - pandas
+  - scikit-learn
+  - scipy
+  - joblib
+  - requests
+  - python-dotenv
+  - fastapi
+  - uvicorn
+  - pydantic
+  # --- Geospatial (the packages that are painful via plain pip on Windows
+  # because they need GDAL/PROJ binaries — conda-forge ships these
+  # precompiled, which is the whole reason to use conda here) ---
+  - geopandas
+  - rasterio
+  - shapely
+  - pyproj
+  - fiona
+  - gdal
+  # setuptools is pinned <82 because v82.0.0 (Feb 2026) removed the
+  # pkg_resources module entirely, which cdsapi==0.7.3 (below) still
+  # imports directly. If cdsapi ships a fix or you drop GloFAS, this pin
+  # can go.
+  - setuptools<82
+  # pyrosm depends on cykhash/pyrobuf, which build C extensions against
+  # outdated distutils APIs that current setuptools no longer provides —
+  # they fail to compile from source on Windows. conda-forge ships a
+  # prebuilt pyrosm binary instead, which sidesteps the build entirely.
+  - pyrosm
+  # --- Testing ---
+  - pytest
+  - pip
+  - pip:
+      # --- Terrain analysis (pure-Python/numba, fine via pip) ---
+      - pysheds==0.3.5
+      # --- Real-time data sources ---
+      - earthaccess==0.10.0
+      - cdsapi==0.7.3
+      # --- SAR labeling ---
+      - pystac-client==0.8.3
+      - planetary-computer==1.0.0
+      - rioxarray==0.17.0
