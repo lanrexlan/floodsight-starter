@@ -11,6 +11,11 @@ data/raw/**
 # Processed/generated outputs — regenerate with scripts/02-04
 data/processed/**
 !data/processed/.gitkeep
+# Exception: scored_grid.gpkg is what the deployed API serves (see
+# api/data_provider.py) — small enough (~20MB) to commit directly,
+# rather than requiring a Render deploy to regenerate the whole
+# pipeline from scratch.
+!data/processed/scored_grid.gpkg
 
 # Trained models — regenerate with floodsight/ml/train.py
 data/models/**
