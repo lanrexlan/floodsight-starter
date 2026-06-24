@@ -15,18 +15,23 @@ const RISK_COLORS = {
   "Very High": "#C23B3B",
 };
 
-// Pilot area: Eti-Osa / Lagos Island / Kosofe
-const PILOT_CENTER = [3.435, 6.475];
-const PILOT_ZOOM   = 12.5;
-const PILOT_PITCH  = 52;
+// Pilot grid actual bounds: lon 3.359–3.450, lat 6.439–6.620
+// Center on the middle of the real grid coverage
+const PILOT_CENTER  = [3.405, 6.530];
+const PILOT_ZOOM    = 11.5;
+const PILOT_PITCH   = 48;
 const PILOT_BEARING = -8;
 
 // ---------------------------------------------------------------------------
 // Map init — OpenFreeMap dark style (free, no API key)
 // ---------------------------------------------------------------------------
+// CARTO dark-matter is a 100%-free MapLibre vector style, no API key needed.
+// It includes building footprints we can extrude for 3D effect.
+const STYLE_URL = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+
 const map = new maplibregl.Map({
   container: "map",
-  style: "https://tiles.openfreemap.org/styles/dark",
+  style: STYLE_URL,
   center: PILOT_CENTER,
   zoom: PILOT_ZOOM,
   pitch: PILOT_PITCH,
@@ -49,15 +54,6 @@ setTimeout(() => {
 let queryMarker = null;
 
 map.on("load", () => {
-  // Atmosphere / fog for depth effect
-  map.setFog({
-    color: "#0B1620",
-    "high-color": "#122231",
-    "horizon-blend": 0.06,
-    "space-color": "#0a141d",
-    "star-intensity": 0.0,
-  });
-
   loadRiskGrid();
 });
 
@@ -154,11 +150,43 @@ function wireMapClick() {
 }
 
 // ---------------------------------------------------------------------------
+// Reverse geocode — turn lat/lon into a human-readable area name
+// ---------------------------------------------------------------------------
+async function reverseGeocode(lat, lon) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=14&accept-language=en`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": "FloodSight-Dashboard/1.0" },
+    });
+    const data = await res.json();
+    const a = data.address || {};
+    // Prefer the most specific named area available
+    return (
+      a.neighbourhood ||
+      a.suburb ||
+      a.city_district ||
+      a.town ||
+      a.village ||
+      a.county ||
+      data.display_name?.split(",")[0] ||
+      null
+    );
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Query point — risk + alert
 // ---------------------------------------------------------------------------
 async function queryPoint(lat, lon, locationName) {
   const rain24 = Number(document.getElementById("rain24").value);
   const rain72 = Number(document.getElementById("rain72").value);
+
+  // Reverse-geocode if the name wasn't supplied (map click)
+  if (!locationName) {
+    locationName = await reverseGeocode(lat, lon);
+  }
 
   try {
     const [riskRes, alertRes] = await Promise.all([
@@ -187,6 +215,16 @@ async function queryPoint(lat, lon, locationName) {
     document.getElementById("result-alert").style.color = alertColor(alert.alert_level);
     document.getElementById("result-elev").textContent  = `${risk.elevation_m.toFixed(1)} m`;
     document.getElementById("result-score").textContent = risk.flood_score.toFixed(3);
+
+    // Show a nudge if high-risk but no alert (rain below threshold)
+    const nudge = document.getElementById("alert-nudge");
+    const isHighRisk = ["High", "Very High"].includes(risk.risk_class);
+    if (alert.alert_level === "No Alert" && isHighRisk) {
+      nudge.hidden = false;
+      nudge.textContent = `⚠ ${risk.risk_class} risk — slide 24h rainfall above 50 mm for Watch, 100 mm for Warning.`;
+    } else {
+      nudge.hidden = true;
+    }
 
     setBeacon(alert.alert_level);
 

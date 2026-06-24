@@ -41,9 +41,12 @@
 
       <p class="hint" style="margin-top:12px">Or jump to a pilot LGA:</p>
       <div class="lga-row">
-        <button class="lga-btn" data-lat="6.4698" data-lon="3.5620" data-zoom="13">Eti-Osa</button>
-        <button class="lga-btn" data-lat="6.4530" data-lon="3.4060" data-zoom="13">Lagos Island</button>
-        <button class="lga-btn" data-lat="6.5580" data-lon="3.3990" data-zoom="12.5">Kosofe</button>
+        <!-- Eti-Osa: Victoria Island / Ikoyi — lon 3.41, well within grid (3.36–3.45) -->
+        <button class="lga-btn" data-lat="6.4450" data-lon="3.4150" data-zoom="12">Eti-Osa</button>
+        <!-- Lagos Island: central island — lon 3.40 -->
+        <button class="lga-btn" data-lat="6.4530" data-lon="3.4000" data-zoom="12">Lagos Island</button>
+        <!-- Kosofe: northern mainland — lon 3.39 -->
+        <button class="lga-btn" data-lat="6.5750" data-lon="3.3900" data-zoom="12">Kosofe</button>
       </div>
     </section>
 
@@ -65,6 +68,7 @@
     <section class="panel" id="result-panel" hidden>
       <h2>Result</h2>
       <div id="result-location" class="result-location"></div>
+      <div id="alert-nudge" class="alert-nudge" hidden></div>
       <div class="result-grid">
         <div class="result-cell">
           <span class="result-label">Risk class</span>
