@@ -16,10 +16,18 @@ data/processed/**
 # rather than requiring a Render deploy to regenerate the whole
 # pipeline from scratch.
 !data/processed/scored_grid.gpkg
+# Exception: real labeled training dataset — hard to regenerate (requires
+# HyP3 SAR processing + FwDET + manual event curation), small enough to
+# commit directly (~80KB).
+!data/processed/real_training_dataset.csv
 
 # Trained models — regenerate with floodsight/ml/train.py
 data/models/**
 !data/models/.gitkeep
+# Exception: real trained model — trained on real labeled events, commit
+# directly so Render serves real predictions without requiring a full
+# retrain (~644KB).
+!data/models/depth_model.joblib
 
 .pytest_cache/
 .DS_Store
