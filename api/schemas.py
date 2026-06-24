@@ -23,6 +23,11 @@ class DepthPredictionRequest(BaseModel):
     population_density: float
     rain_24h_mm: float
     rain_72h_mm: float
+    # Optional geo-reference — included in the prediction log so verifications
+    # can be matched back to specific predictions later.
+    lat: float | None = None
+    lon: float | None = None
+    cell_id: str | None = None
 
 
 class DepthPredictionResponse(BaseModel):
@@ -35,6 +40,38 @@ class DepthPredictionResponse(BaseModel):
     predicted_depth_m: float
     model_trained_on_synthetic_data: bool
     note: str | None = None
+
+
+class VerifyRequest(BaseModel):
+    """Field verification for a specific location after a flood event.
+
+    Submitted by community reporters or field partners to confirm/deny
+    whether a warned cell actually flooded. Used in Phase 6 to recalibrate
+    the model and susceptibility weights.
+    """
+
+    lat: float
+    lon: float
+    event_date: str = Field(description="ISO date of the flood event, e.g. '2025-07-15'")
+    observed_flooded: bool = Field(
+        description="True if the location was observed to be flooded"
+    )
+    observed_depth_m: float | None = Field(
+        default=None,
+        description="Estimated flood depth in metres (optional but valuable)",
+    )
+    reporter: str | None = Field(
+        default=None, description="Name or identifier of the person reporting"
+    )
+    notes: str | None = Field(
+        default=None, description="Free-text notes (photos, source, caveats)"
+    )
+
+
+class VerifyResponse(BaseModel):
+    status: str
+    message: str
+    verification_id: str
 
 
 class AlertRequest(BaseModel):
