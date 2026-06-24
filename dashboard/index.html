@@ -53,13 +53,14 @@
     <!-- Rainfall -->
     <section class="panel">
       <h2>Rainfall scenario</h2>
-      <p class="hint">Simulate a storm event to see how alert levels change.</p>
+      <div id="forecast-badge" class="forecast-badge" hidden></div>
+      <p id="rainfall-hint" class="hint">Loading live forecast…</p>
       <label class="slider-label">
-        24h rainfall <span id="rain24-val" class="mono">40 mm</span>
+        24h rainfall <span id="rain24-val" class="mono">— mm</span>
         <input id="rain24" type="range" min="0" max="200" value="40" />
       </label>
       <label class="slider-label">
-        72h rainfall <span id="rain72-val" class="mono">60 mm</span>
+        72h rainfall <span id="rain72-val" class="mono">— mm</span>
         <input id="rain72" type="range" min="0" max="300" value="60" />
       </label>
     </section>

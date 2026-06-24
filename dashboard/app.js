@@ -55,6 +55,7 @@ let queryMarker = null;
 
 map.on("load", () => {
   loadRiskGrid();
+  loadForecastRainfall(); // auto-populate sliders with live forecast
 });
 
 async function loadRiskGrid() {
@@ -365,10 +366,63 @@ const rain24Input = document.getElementById("rain24");
 const rain72Input = document.getElementById("rain72");
 rain24Input.addEventListener("input", () => {
   document.getElementById("rain24-val").textContent = `${rain24Input.value} mm`;
+  // Clear the "live" badge when user manually adjusts
+  const badge = document.getElementById("forecast-badge");
+  if (badge) badge.dataset.manual = "true";
 });
 rain72Input.addEventListener("input", () => {
   document.getElementById("rain72-val").textContent = `${rain72Input.value} mm`;
+  const badge = document.getElementById("forecast-badge");
+  if (badge) badge.dataset.manual = "true";
 });
+
+// ---------------------------------------------------------------------------
+// Live forecast — auto-populate sliders from Open-Meteo on page load
+// ---------------------------------------------------------------------------
+async function loadForecastRainfall() {
+  const badge  = document.getElementById("forecast-badge");
+  const hint   = document.getElementById("rainfall-hint");
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/forecast/rainfall`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const f = await res.json();
+
+    // Clamp to slider max values (200 mm / 300 mm)
+    const r24 = Math.min(Math.round(f.rain_24h_mm), 200);
+    const r72 = Math.min(Math.round(f.rain_72h_mm), 300);
+
+    rain24Input.value = r24;
+    rain72Input.value = r72;
+    document.getElementById("rain24-val").textContent = `${r24} mm`;
+    document.getElementById("rain72-val").textContent = `${r72} mm`;
+
+    // Format the fetch time as Lagos local time (UTC+1)
+    const fetchedAt = new Date(f.fetched_at);
+    const localTime = fetchedAt.toLocaleTimeString("en-NG", {
+      hour: "2-digit", minute: "2-digit", timeZone: "Africa/Lagos"
+    });
+
+    if (badge) {
+      badge.hidden = false;
+      badge.textContent = `🌧 Live forecast · updated ${localTime}`;
+      delete badge.dataset.manual;
+    }
+    if (hint) {
+      hint.textContent = "Sliders set to today's forecast. Drag to simulate scenarios.";
+    }
+  } catch (err) {
+    console.warn("Forecast unavailable, using manual sliders:", err);
+    // Set sensible defaults so the UI isn't stuck on "— mm"
+    rain24Input.value = 40;
+    rain72Input.value = 60;
+    document.getElementById("rain24-val").textContent = "40 mm";
+    document.getElementById("rain72-val").textContent = "60 mm";
+    if (hint) {
+      hint.textContent = "Forecast unavailable — drag sliders to simulate a storm event.";
+    }
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Status helpers
