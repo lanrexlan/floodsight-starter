@@ -26,6 +26,9 @@
 
     <div id="data-source-banner" class="banner" hidden></div>
 
+    <!-- City-wide alert summary — only visible when Watch/Warning active -->
+    <div id="city-alert" class="city-alert" hidden></div>
+
     <!-- Search -->
     <section class="panel">
       <h2>Search a location</h2>
@@ -92,14 +95,20 @@
 
     <!-- Legend -->
     <section class="panel">
-      <h2>Risk legend</h2>
+      <h2>Legend</h2>
+      <p class="hint" style="margin:0 0 8px">Active alerts override risk colours:</p>
       <ul class="legend">
-        <li><span class="swatch" style="background:#2E7D5B"></span><div><strong>Low</strong><span class="legend-hint">Flood score &lt; 0.25</span></div></li>
+        <li><span class="swatch swatch-pulse" style="background:#FF4040"></span><div><strong>Warning</strong><span class="legend-hint">High/Very High + heavy rain</span></div></li>
+        <li><span class="swatch" style="background:#F5A623"></span><div><strong>Watch</strong><span class="legend-hint">Elevated risk + moderate rain</span></div></li>
+      </ul>
+      <p class="hint" style="margin:10px 0 6px">Base risk class (no active alert):</p>
+      <ul class="legend">
+        <li><span class="swatch" style="background:#2E7D5B"></span><div><strong>Low</strong><span class="legend-hint">Score &lt; 0.25</span></div></li>
         <li><span class="swatch" style="background:#D9A441"></span><div><strong>Moderate</strong><span class="legend-hint">0.25 – 0.50</span></div></li>
         <li><span class="swatch" style="background:#D9622B"></span><div><strong>High</strong><span class="legend-hint">0.50 – 0.75</span></div></li>
         <li><span class="swatch" style="background:#C23B3B"></span><div><strong>Very High</strong><span class="legend-hint">&gt; 0.75 — taller columns</span></div></li>
       </ul>
-      <p class="hint" style="margin-top:10px">Column height = flood score. Click any cell for details.</p>
+      <p class="hint" style="margin-top:8px">Column height = flood score. Click any cell for details.</p>
     </section>
 
     <footer class="api-footer">

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // FloodSight Dashboard — MapLibre GL JS edition
-// 3D interactive map with place search, 3D risk columns, pilot LGA focus
+// 3D interactive map with live alert colors, place search, pilot LGA focus
 // ---------------------------------------------------------------------------
 
 const isLocalDev =
@@ -15,18 +15,21 @@ const RISK_COLORS = {
   "Very High": "#C23B3B",
 };
 
+// Alert colors override risk colors when forecasts fire
+const ALERT_COLORS = {
+  "Warning": "#FF4040",
+  "Watch":   "#F5A623",
+};
+
 // Pilot grid actual bounds: lon 3.359–3.450, lat 6.439–6.620
-// Center on the middle of the real grid coverage
 const PILOT_CENTER  = [3.405, 6.530];
 const PILOT_ZOOM    = 11.5;
 const PILOT_PITCH   = 48;
 const PILOT_BEARING = -8;
 
 // ---------------------------------------------------------------------------
-// Map init — OpenFreeMap dark style (free, no API key)
+// Map init — CARTO dark-matter (free, no API key)
 // ---------------------------------------------------------------------------
-// CARTO dark-matter is a 100%-free MapLibre vector style, no API key needed.
-// It includes building footprints we can extrude for 3D effect.
 const STYLE_URL = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 
 const map = new maplibregl.Map({
@@ -49,75 +52,58 @@ setTimeout(() => {
 }, 5000);
 
 // ---------------------------------------------------------------------------
-// Risk grid — loaded from API, rendered as 3D extrusion columns
+// Risk grid — loaded with live alert colours from /forecast/alerts
 // ---------------------------------------------------------------------------
 let queryMarker = null;
 
 map.on("load", () => {
-  loadRiskGrid();
-  loadForecastRainfall(); // auto-populate sliders with live forecast
+  loadForecastGrid();   // live alert colours + auto-populates sliders
 });
 
+// ---------------------------------------------------------------------------
+// loadForecastGrid — primary loader: hits /forecast/alerts
+// Each cell is coloured by its LIVE alert level (Warning > Watch > risk class)
+// Falls back to static risk grid if forecast endpoint is unreachable.
+// ---------------------------------------------------------------------------
+async function loadForecastGrid() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/forecast/alerts`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const geojson = await res.json();
+
+    applyGridLayers(geojson);
+
+    // Auto-populate sliders from embedded forecast data
+    if (geojson.forecast) {
+      updateForecastSliders(geojson.forecast);
+    }
+
+    // Compute & display city-wide alert summary
+    const features = geojson.features || [];
+    const warnCount  = features.filter(f => f.properties?.alert_level === "Warning").length;
+    const watchCount = features.filter(f => f.properties?.alert_level === "Watch").length;
+    updateCityAlert(warnCount, watchCount);
+
+    showDataSourceBanner(geojson.data_source);
+    setApiStatus(true);
+    wireMapClick();
+  } catch (err) {
+    console.warn("Forecast grid unavailable, falling back to static risk grid:", err);
+    loadRiskGrid();        // fallback
+    loadForecastRainfall(); // still try to set sliders
+  }
+}
+
+// ---------------------------------------------------------------------------
+// loadRiskGrid — fallback: static risk-class colours, no live alert data
+// ---------------------------------------------------------------------------
 async function loadRiskGrid() {
   try {
     const res = await fetch(`${API_BASE_URL}/risk/grid`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const geojson = await res.json();
 
-    // Remove existing layers/source if reloading
-    ["flood-risk-3d", "flood-risk-outline", "flood-risk-flat"].forEach(id => {
-      if (map.getLayer(id)) map.removeLayer(id);
-    });
-    if (map.getSource("risk-grid")) map.removeSource("risk-grid");
-
-    map.addSource("risk-grid", { type: "geojson", data: geojson });
-
-    // 3D extrusion columns — height proportional to flood_score
-    map.addLayer({
-      id: "flood-risk-3d",
-      type: "fill-extrusion",
-      source: "risk-grid",
-      paint: {
-        "fill-extrusion-color": [
-          "match", ["get", "risk_class"],
-          "Low",       "#2E7D5B",
-          "Moderate",  "#D9A441",
-          "High",      "#D9622B",
-          "Very High", "#C23B3B",
-          "#555"
-        ],
-        // Max height ~180 m for Very High (score ≈ 1.0)
-        "fill-extrusion-height": ["*", ["get", "flood_score"], 180],
-        "fill-extrusion-base": 0,
-        "fill-extrusion-opacity": [
-          "interpolate", ["linear"], ["zoom"],
-          10, 0.85,
-          15, 0.65
-        ],
-        "fill-extrusion-vertical-gradient": true,
-      },
-    });
-
-    // Flat fallback for when zoomed out far (no 3D distraction)
-    map.addLayer({
-      id: "flood-risk-flat",
-      type: "fill",
-      source: "risk-grid",
-      minzoom: 0,
-      maxzoom: 10,
-      paint: {
-        "fill-color": [
-          "match", ["get", "risk_class"],
-          "Low",       "#2E7D5B",
-          "Moderate",  "#D9A441",
-          "High",      "#D9622B",
-          "Very High", "#C23B3B",
-          "#555"
-        ],
-        "fill-opacity": 0.55,
-      },
-    });
-
+    applyGridLayers(geojson);
     showDataSourceBanner(geojson.data_source);
     setApiStatus(true);
     wireMapClick();
@@ -127,67 +113,144 @@ async function loadRiskGrid() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// applyGridLayers — shared layer builder used by both loaders
+// Colours: alert_level wins over risk_class when present.
+// Warning cells are 50% taller so they stand out at a glance.
+// ---------------------------------------------------------------------------
+function applyGridLayers(geojson) {
+  ["flood-risk-3d", "flood-risk-flat"].forEach(id => {
+    if (map.getLayer(id)) map.removeLayer(id);
+  });
+  if (map.getSource("risk-grid")) map.removeSource("risk-grid");
+
+  map.addSource("risk-grid", { type: "geojson", data: geojson });
+
+  // Colour expression: alert level overrides risk class
+  const colorExpr = [
+    "case",
+    ["==", ["get", "alert_level"], "Warning"], ALERT_COLORS["Warning"],
+    ["==", ["get", "alert_level"], "Watch"],   ALERT_COLORS["Watch"],
+    // No alert_level property (static grid) or "No Alert" → risk class colour
+    ["match", ["get", "risk_class"],
+      "Low",       RISK_COLORS["Low"],
+      "Moderate",  RISK_COLORS["Moderate"],
+      "High",      RISK_COLORS["High"],
+      "Very High", RISK_COLORS["Very High"],
+      "#555"
+    ]
+  ];
+
+  // Height: Warning cells 50% taller, Watch cells 15% taller
+  const heightExpr = [
+    "case",
+    ["==", ["get", "alert_level"], "Warning"], ["*", ["get", "flood_score"], 270],
+    ["==", ["get", "alert_level"], "Watch"],   ["*", ["get", "flood_score"], 207],
+    ["*", ["get", "flood_score"], 180]
+  ];
+
+  // 3D extrusion
+  map.addLayer({
+    id: "flood-risk-3d",
+    type: "fill-extrusion",
+    source: "risk-grid",
+    paint: {
+      "fill-extrusion-color":             colorExpr,
+      "fill-extrusion-height":            heightExpr,
+      "fill-extrusion-base":              0,
+      "fill-extrusion-opacity": [
+        "interpolate", ["linear"], ["zoom"],
+        10, 0.90,
+        15, 0.70
+      ],
+      "fill-extrusion-vertical-gradient": true,
+    },
+  });
+
+  // Flat fallback for zoomed-out view
+  map.addLayer({
+    id: "flood-risk-flat",
+    type: "fill",
+    source: "risk-grid",
+    minzoom: 0,
+    maxzoom: 10,
+    paint: {
+      "fill-color":   colorExpr,
+      "fill-opacity": 0.60,
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// City-wide alert summary — shown above result panel
+// ---------------------------------------------------------------------------
+function updateCityAlert(warnCount, watchCount) {
+  const el = document.getElementById("city-alert");
+  if (!el) return;
+
+  if (warnCount === 0 && watchCount === 0) {
+    el.hidden = true;
+    setBeacon("No Alert");
+    return;
+  }
+
+  el.hidden = false;
+  let level, msg;
+  if (warnCount > 0) {
+    level = "Warning";
+    msg = `${warnCount.toLocaleString()} cells at Warning`;
+    if (watchCount > 0) msg += `, ${watchCount.toLocaleString()} at Watch`;
+  } else {
+    level = "Watch";
+    msg = `${watchCount.toLocaleString()} cells at Watch`;
+  }
+  el.dataset.level = level;
+  el.innerHTML = `<strong>${level}</strong> · ${msg}`;
+  setBeacon(level);
+}
+
 function wireMapClick() {
   map.on("click", "flood-risk-3d", (e) => {
     const coords = e.lngLat;
     queryPoint(coords.lat, coords.lng, null);
   });
-
   map.on("mouseenter", "flood-risk-3d", () => {
     map.getCanvas().style.cursor = "crosshair";
   });
   map.on("mouseleave", "flood-risk-3d", () => {
     map.getCanvas().style.cursor = "";
   });
-
-  // Also allow clicking the background map
   map.on("click", (e) => {
-    // Only trigger if we didn't click a risk cell (those have their own handler)
     const features = map.queryRenderedFeatures(e.point, { layers: ["flood-risk-3d"] });
-    if (features.length === 0) {
-      queryPoint(e.lngLat.lat, e.lngLat.lng, null);
-    }
+    if (features.length === 0) queryPoint(e.lngLat.lat, e.lngLat.lng, null);
   });
 }
 
 // ---------------------------------------------------------------------------
-// Reverse geocode — turn lat/lon into a human-readable area name
+// Reverse geocode — lat/lon → human area name
 // ---------------------------------------------------------------------------
 async function reverseGeocode(lat, lon) {
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=14&accept-language=en`;
-    const res = await fetch(url, {
-      headers: { "User-Agent": "FloodSight-Dashboard/1.0" },
-    });
+    const res = await fetch(url, { headers: { "User-Agent": "FloodSight-Dashboard/1.0" } });
     const data = await res.json();
     const a = data.address || {};
-    // Prefer the most specific named area available
     return (
-      a.neighbourhood ||
-      a.suburb ||
-      a.city_district ||
-      a.town ||
-      a.village ||
-      a.county ||
-      data.display_name?.split(",")[0] ||
-      null
+      a.neighbourhood || a.suburb || a.city_district ||
+      a.town || a.village || a.county ||
+      data.display_name?.split(",")[0] || null
     );
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 // ---------------------------------------------------------------------------
-// Query point — risk + alert
+// Query point — risk + alert for clicked/searched location
 // ---------------------------------------------------------------------------
 async function queryPoint(lat, lon, locationName) {
   const rain24 = Number(document.getElementById("rain24").value);
   const rain72 = Number(document.getElementById("rain72").value);
 
-  // Reverse-geocode if the name wasn't supplied (map click)
-  if (!locationName) {
-    locationName = await reverseGeocode(lat, lon);
-  }
+  if (!locationName) locationName = await reverseGeocode(lat, lon);
 
   try {
     const [riskRes, alertRes] = await Promise.all([
@@ -198,27 +261,24 @@ async function queryPoint(lat, lon, locationName) {
         body: JSON.stringify({ lat, lon, rain_24h_mm: rain24, rain_72h_mm: rain72 }),
       }),
     ]);
-
     if (!riskRes.ok || !alertRes.ok) throw new Error("API error");
     const risk  = await riskRes.json();
     const alert = await alertRes.json();
 
-    // Update sidebar result panel
     const panel = document.getElementById("result-panel");
     panel.hidden = false;
 
-    const locEl = document.getElementById("result-location");
-    locEl.textContent = locationName || `${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E`;
+    document.getElementById("result-location").textContent =
+      locationName || `${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E`;
 
     document.getElementById("result-risk").textContent  = risk.risk_class;
     document.getElementById("result-risk").style.color  = RISK_COLORS[risk.risk_class] || "#fff";
     document.getElementById("result-alert").textContent = alert.alert_level;
-    document.getElementById("result-alert").style.color = alertColor(alert.alert_level);
+    document.getElementById("result-alert").style.color = alertResultColor(alert.alert_level);
     document.getElementById("result-elev").textContent  = `${risk.elevation_m.toFixed(1)} m`;
     document.getElementById("result-score").textContent = risk.flood_score.toFixed(3);
 
-    // Show a nudge if high-risk but no alert (rain below threshold)
-    const nudge = document.getElementById("alert-nudge");
+    const nudge      = document.getElementById("alert-nudge");
     const isHighRisk = ["High", "Very High"].includes(risk.risk_class);
     if (alert.alert_level === "No Alert" && isHighRisk) {
       nudge.hidden = false;
@@ -229,11 +289,11 @@ async function queryPoint(lat, lon, locationName) {
 
     setBeacon(alert.alert_level);
 
-    // Place / update marker
     if (queryMarker) queryMarker.remove();
     const el = document.createElement("div");
     el.className = "query-dot";
-    el.style.background = RISK_COLORS[risk.risk_class] || "#888";
+    el.style.background =
+      ALERT_COLORS[alert.alert_level] || RISK_COLORS[risk.risk_class] || "#888";
     queryMarker = new maplibregl.Marker({ element: el, anchor: "center" })
       .setLngLat([lon, lat])
       .setPopup(
@@ -253,12 +313,12 @@ async function queryPoint(lat, lon, locationName) {
   }
 }
 
-function alertColor(level) {
-  return level === "Warning" ? "#FF5A3C" : level === "Watch" ? "#D9A441" : "#2E7D5B";
+function alertResultColor(level) {
+  return level === "Warning" ? "#FF4040" : level === "Watch" ? "#F5A623" : "#2E7D5B";
 }
 
 // ---------------------------------------------------------------------------
-// Place search — Nominatim (OpenStreetMap geocoder, no API key)
+// Place search — Nominatim
 // ---------------------------------------------------------------------------
 const searchInput   = document.getElementById("search-input");
 const searchResults = document.getElementById("search-results");
@@ -272,22 +332,17 @@ searchInput.addEventListener("input", () => {
   if (q.length < 2) { hideDropdown(); return; }
   searchTimer = setTimeout(() => doSearch(q), 320);
 });
-
 searchInput.addEventListener("keydown", (e) => {
   if (e.key === "Escape") { hideDropdown(); searchInput.blur(); }
 });
-
 searchClear.addEventListener("click", () => {
   searchInput.value = "";
   searchClear.hidden = true;
   hideDropdown();
   searchInput.focus();
 });
-
 document.addEventListener("click", (e) => {
-  if (!e.target.closest(".search-wrap") && !e.target.closest(".search-dropdown")) {
-    hideDropdown();
-  }
+  if (!e.target.closest(".search-wrap") && !e.target.closest(".search-dropdown")) hideDropdown();
 });
 
 async function doSearch(query) {
@@ -299,12 +354,8 @@ async function doSearch(query) {
     const res = await fetch(url, {
       headers: { "User-Agent": "FloodSight-Dashboard/1.0 (flood intelligence, Lagos)" },
     });
-    const items = await res.json();
-    renderDropdown(items);
-  } catch (err) {
-    console.error("Search failed:", err);
-    hideDropdown();
-  }
+    renderDropdown(await res.json());
+  } catch (err) { console.error("Search failed:", err); hideDropdown(); }
 }
 
 function renderDropdown(items) {
@@ -321,13 +372,9 @@ function renderDropdown(items) {
     </li>`;
   }).join("");
   searchResults.hidden = false;
-
   searchResults.querySelectorAll(".result-item").forEach(li => {
     li.addEventListener("click", () => {
-      const lat = parseFloat(li.dataset.lat);
-      const lon = parseFloat(li.dataset.lon);
-      const name = decodeURIComponent(li.dataset.name);
-      selectPlace(lat, lon, name);
+      selectPlace(parseFloat(li.dataset.lat), parseFloat(li.dataset.lon), decodeURIComponent(li.dataset.name));
     });
   });
 }
@@ -339,11 +386,7 @@ function selectPlace(lat, lon, name) {
   map.flyTo({ center: [lon, lat], zoom: 15, pitch: PILOT_PITCH, bearing: PILOT_BEARING, duration: 1400, essential: true });
   queryPoint(lat, lon, name);
 }
-
-function hideDropdown() {
-  searchResults.hidden = true;
-  searchResults.innerHTML = "";
-}
+function hideDropdown() { searchResults.hidden = true; searchResults.innerHTML = ""; }
 
 // ---------------------------------------------------------------------------
 // LGA quick-jump buttons
@@ -353,9 +396,8 @@ document.querySelectorAll(".lga-btn").forEach(btn => {
     const lat  = parseFloat(btn.dataset.lat);
     const lon  = parseFloat(btn.dataset.lon);
     const zoom = parseFloat(btn.dataset.zoom);
-    const name = btn.textContent.trim();
     map.flyTo({ center: [lon, lat], zoom, pitch: PILOT_PITCH, bearing: PILOT_BEARING, duration: 1200, essential: true });
-    queryPoint(lat, lon, name);
+    queryPoint(lat, lon, btn.textContent.trim());
   });
 });
 
@@ -364,63 +406,61 @@ document.querySelectorAll(".lga-btn").forEach(btn => {
 // ---------------------------------------------------------------------------
 const rain24Input = document.getElementById("rain24");
 const rain72Input = document.getElementById("rain72");
+
 rain24Input.addEventListener("input", () => {
   document.getElementById("rain24-val").textContent = `${rain24Input.value} mm`;
-  // Clear the "live" badge when user manually adjusts
-  const badge = document.getElementById("forecast-badge");
-  if (badge) badge.dataset.manual = "true";
+  markManual();
 });
 rain72Input.addEventListener("input", () => {
   document.getElementById("rain72-val").textContent = `${rain72Input.value} mm`;
-  const badge = document.getElementById("forecast-badge");
-  if (badge) badge.dataset.manual = "true";
+  markManual();
 });
 
-// ---------------------------------------------------------------------------
-// Live forecast — auto-populate sliders from Open-Meteo on page load
-// ---------------------------------------------------------------------------
-async function loadForecastRainfall() {
-  const badge  = document.getElementById("forecast-badge");
-  const hint   = document.getElementById("rainfall-hint");
+function markManual() {
+  const badge = document.getElementById("forecast-badge");
+  if (badge) badge.dataset.manual = "true";
+  const hint = document.getElementById("rainfall-hint");
+  if (hint) hint.textContent = "Scenario mode — drag sliders to simulate storm events.";
+}
 
+// ---------------------------------------------------------------------------
+// Forecast slider auto-population (used by loadForecastGrid)
+// ---------------------------------------------------------------------------
+function updateForecastSliders(forecast) {
+  const r24 = Math.min(Math.round(forecast.rain_24h_mm), 200);
+  const r72 = Math.min(Math.round(forecast.rain_72h_mm), 300);
+  rain24Input.value = r24;
+  rain72Input.value = r72;
+  document.getElementById("rain24-val").textContent = `${r24} mm`;
+  document.getElementById("rain72-val").textContent = `${r72} mm`;
+
+  const badge = document.getElementById("forecast-badge");
+  if (badge) {
+    badge.hidden = false;
+    const fetchedAt = new Date(forecast.fetched_at);
+    const localTime = fetchedAt.toLocaleTimeString("en-NG", {
+      hour: "2-digit", minute: "2-digit", timeZone: "Africa/Lagos",
+    });
+    badge.textContent = `🌧 Live forecast · updated ${localTime}`;
+    delete badge.dataset.manual;
+  }
+  const hint = document.getElementById("rainfall-hint");
+  if (hint) hint.textContent = "Sliders set to today's forecast. Drag to simulate scenarios.";
+}
+
+// Standalone fallback — called if forecast grid itself fails
+async function loadForecastRainfall() {
   try {
     const res = await fetch(`${API_BASE_URL}/forecast/rainfall`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const f = await res.json();
-
-    // Clamp to slider max values (200 mm / 300 mm)
-    const r24 = Math.min(Math.round(f.rain_24h_mm), 200);
-    const r72 = Math.min(Math.round(f.rain_72h_mm), 300);
-
-    rain24Input.value = r24;
-    rain72Input.value = r72;
-    document.getElementById("rain24-val").textContent = `${r24} mm`;
-    document.getElementById("rain72-val").textContent = `${r72} mm`;
-
-    // Format the fetch time as Lagos local time (UTC+1)
-    const fetchedAt = new Date(f.fetched_at);
-    const localTime = fetchedAt.toLocaleTimeString("en-NG", {
-      hour: "2-digit", minute: "2-digit", timeZone: "Africa/Lagos"
-    });
-
-    if (badge) {
-      badge.hidden = false;
-      badge.textContent = `🌧 Live forecast · updated ${localTime}`;
-      delete badge.dataset.manual;
-    }
-    if (hint) {
-      hint.textContent = "Sliders set to today's forecast. Drag to simulate scenarios.";
-    }
-  } catch (err) {
-    console.warn("Forecast unavailable, using manual sliders:", err);
-    // Set sensible defaults so the UI isn't stuck on "— mm"
+    updateForecastSliders(await res.json());
+  } catch {
     rain24Input.value = 40;
     rain72Input.value = 60;
     document.getElementById("rain24-val").textContent = "40 mm";
     document.getElementById("rain72-val").textContent = "60 mm";
-    if (hint) {
-      hint.textContent = "Forecast unavailable — drag sliders to simulate a storm event.";
-    }
+    const hint = document.getElementById("rainfall-hint");
+    if (hint) hint.textContent = "Forecast unavailable — drag sliders to simulate a storm event.";
   }
 }
 
@@ -431,8 +471,7 @@ function showDataSourceBanner(source) {
   const banner = document.getElementById("data-source-banner");
   if (source === "synthetic_demo") {
     banner.hidden = false;
-    banner.textContent =
-      "Showing SYNTHETIC demo grid — run scripts/02-04 to serve real Lagos data.";
+    banner.textContent = "Showing SYNTHETIC demo grid — run scripts/02-04 to serve real Lagos data.";
   } else {
     banner.hidden = true;
   }

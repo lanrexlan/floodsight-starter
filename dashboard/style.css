@@ -364,6 +364,15 @@ input[type="range"] {
   margin-top: 2px;
 }
 
+/* Warning swatch pulses to draw the eye */
+.swatch-pulse {
+  animation: swatch-pulse 1.4s ease-in-out infinite;
+}
+@keyframes swatch-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,64,64,0.5); }
+  50%       { box-shadow: 0 0 0 5px rgba(255,64,64,0); }
+}
+
 .legend div {
   display: flex;
   flex-direction: column;
@@ -373,6 +382,31 @@ input[type="range"] {
 .legend-hint {
   font-size: 11px;
   color: var(--text-muted);
+}
+
+/* ── City-wide alert summary ── */
+.city-alert {
+  padding: 10px 13px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+.city-alert[data-level="Warning"] {
+  background: rgba(255, 64, 64, 0.12);
+  border: 1px solid rgba(255, 64, 64, 0.40);
+  color: #FF6B6B;
+  animation: alert-glow 2s ease-in-out infinite;
+}
+.city-alert[data-level="Watch"] {
+  background: rgba(245, 166, 35, 0.10);
+  border: 1px solid rgba(245, 166, 35, 0.40);
+  color: #F5A623;
+}
+@keyframes alert-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,64,64,0.15); }
+  50%       { box-shadow: 0 0 12px 2px rgba(255,64,64,0.25); }
 }
 
 /* ── Banner ── */
