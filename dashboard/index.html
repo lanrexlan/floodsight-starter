@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>FloodSight — Lagos Pilot Console</title>
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css" />
@@ -26,19 +26,31 @@
 
     <div id="data-source-banner" class="banner" hidden></div>
 
+    <!-- Search -->
     <section class="panel">
-      <h2>Query a location</h2>
-      <p class="hint">Click anywhere on the map, or enter coordinates.</p>
-      <div class="coord-row">
-        <label>Lat<input id="lat-input" type="number" step="0.0001" value="6.4500" /></label>
-        <label>Lon<input id="lon-input" type="number" step="0.0001" value="3.4200" /></label>
+      <h2>Search a location</h2>
+      <div class="search-wrap">
+        <svg class="search-icon" viewBox="0 0 20 20" fill="none">
+          <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M13 13l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+        <input id="search-input" type="text" placeholder="Try 'Lekki', 'Surulere', 'Yaba'…" autocomplete="off" />
+        <button id="search-clear" class="search-clear" hidden>✕</button>
       </div>
-      <button id="query-btn" class="btn-primary">Check this point</button>
+      <ul id="search-results" class="search-dropdown" hidden></ul>
+
+      <p class="hint" style="margin-top:12px">Or jump to a pilot LGA:</p>
+      <div class="lga-row">
+        <button class="lga-btn" data-lat="6.4698" data-lon="3.5620" data-zoom="13">Eti-Osa</button>
+        <button class="lga-btn" data-lat="6.4530" data-lon="3.4060" data-zoom="13">Lagos Island</button>
+        <button class="lga-btn" data-lat="6.5580" data-lon="3.3990" data-zoom="12.5">Kosofe</button>
+      </div>
     </section>
 
+    <!-- Rainfall -->
     <section class="panel">
       <h2>Rainfall scenario</h2>
-      <p class="hint">Drive the alert engine with a hypothetical event.</p>
+      <p class="hint">Simulate a storm event to see how alert levels change.</p>
       <label class="slider-label">
         24h rainfall <span id="rain24-val" class="mono">40 mm</span>
         <input id="rain24" type="range" min="0" max="200" value="40" />
@@ -49,8 +61,10 @@
       </label>
     </section>
 
+    <!-- Result -->
     <section class="panel" id="result-panel" hidden>
       <h2>Result</h2>
+      <div id="result-location" class="result-location"></div>
       <div class="result-grid">
         <div class="result-cell">
           <span class="result-label">Risk class</span>
@@ -65,31 +79,38 @@
           <span id="result-elev" class="result-value mono">—</span>
         </div>
         <div class="result-cell">
-          <span class="result-label">flood_score</span>
+          <span class="result-label">Flood score</span>
           <span id="result-score" class="result-value mono">—</span>
         </div>
       </div>
     </section>
 
+    <!-- Legend -->
     <section class="panel">
-      <h2>Legend</h2>
+      <h2>Risk legend</h2>
       <ul class="legend">
-        <li><span class="swatch" style="background:#2E7D5B"></span>Low</li>
-        <li><span class="swatch" style="background:#D9A441"></span>Moderate</li>
-        <li><span class="swatch" style="background:#D9622B"></span>High</li>
-        <li><span class="swatch" style="background:#C23B3B"></span>Very High</li>
+        <li><span class="swatch" style="background:#2E7D5B"></span><div><strong>Low</strong><span class="legend-hint">Flood score &lt; 0.25</span></div></li>
+        <li><span class="swatch" style="background:#D9A441"></span><div><strong>Moderate</strong><span class="legend-hint">0.25 – 0.50</span></div></li>
+        <li><span class="swatch" style="background:#D9622B"></span><div><strong>High</strong><span class="legend-hint">0.50 – 0.75</span></div></li>
+        <li><span class="swatch" style="background:#C23B3B"></span><div><strong>Very High</strong><span class="legend-hint">&gt; 0.75 — taller columns</span></div></li>
       </ul>
+      <p class="hint" style="margin-top:10px">Column height = flood score. Click any cell for details.</p>
     </section>
 
     <footer class="api-footer">
-      <span id="api-status" class="mono">checking API…</span>
+      <span id="api-status" class="mono">connecting…</span>
     </footer>
   </aside>
 
   <main id="map"></main>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- map controls overlay -->
+<div id="map-tip" class="map-tip">
+  🖱 Drag to pan · Scroll to zoom · Right-drag or Ctrl+drag to tilt &amp; rotate
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

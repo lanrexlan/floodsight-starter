@@ -1,39 +1,65 @@
-// Local development (opening dashboard/index.html directly via file://,
-// or via http://localhost) points at the local uvicorn dev server.
-// Once deployed (e.g. served by the same FastAPI app at /dashboard/ on
-// Render), an empty base URL means fetch() uses relative paths, which
-// resolve against the deployed domain automatically — no manual edit
-// needed after deploying.
+// ---------------------------------------------------------------------------
+// FloodSight Dashboard — MapLibre GL JS edition
+// 3D interactive map with place search, 3D risk columns, pilot LGA focus
+// ---------------------------------------------------------------------------
+
 const isLocalDev =
   window.location.protocol === "file:" ||
   ["localhost", "127.0.0.1"].includes(window.location.hostname);
-const API_BASE_URL = isLocalDev ? "http://localhost:8000" : "";
+const API_BASE_URL = isLocalDev ? "http://localhost:8080" : "";
 
 const RISK_COLORS = {
-  "Low": "#2E7D5B",
-  "Moderate": "#D9A441",
-  "High": "#D9622B",
+  "Low":       "#2E7D5B",
+  "Moderate":  "#D9A441",
+  "High":      "#D9622B",
   "Very High": "#C23B3B",
 };
 
-const map = L.map("map", { zoomControl: true }).setView([6.45, 3.42], 12);
+// Pilot area: Eti-Osa / Lagos Island / Kosofe
+const PILOT_CENTER = [3.435, 6.475];
+const PILOT_ZOOM   = 12.5;
+const PILOT_PITCH  = 52;
+const PILOT_BEARING = -8;
 
-L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-  attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-  maxZoom: 19,
-}).addTo(map);
+// ---------------------------------------------------------------------------
+// Map init — OpenFreeMap dark style (free, no API key)
+// ---------------------------------------------------------------------------
+const map = new maplibregl.Map({
+  container: "map",
+  style: "https://tiles.openfreemap.org/styles/dark",
+  center: PILOT_CENTER,
+  zoom: PILOT_ZOOM,
+  pitch: PILOT_PITCH,
+  bearing: PILOT_BEARING,
+  antialias: true,
+});
 
-let riskLayer = null;
+map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
+map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: "metric" }), "bottom-right");
+
+// Fade the map-tip after 5 s
+setTimeout(() => {
+  const tip = document.getElementById("map-tip");
+  if (tip) tip.style.opacity = "0";
+}, 5000);
+
+// ---------------------------------------------------------------------------
+// Risk grid — loaded from API, rendered as 3D extrusion columns
+// ---------------------------------------------------------------------------
 let queryMarker = null;
 
-function styleByRiskClass(feature) {
-  const cls = feature.properties.risk_class;
-  return {
-    fillColor: RISK_COLORS[cls] || "#555",
-    weight: 0,
-    fillOpacity: 0.55,
-  };
-}
+map.on("load", () => {
+  // Atmosphere / fog for depth effect
+  map.setFog({
+    color: "#0B1620",
+    "high-color": "#122231",
+    "horizon-blend": 0.06,
+    "space-color": "#0a141d",
+    "star-intensity": 0.0,
+  });
+
+  loadRiskGrid();
+});
 
 async function loadRiskGrid() {
   try {
@@ -41,85 +67,145 @@ async function loadRiskGrid() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const geojson = await res.json();
 
-    if (riskLayer) map.removeLayer(riskLayer);
-    riskLayer = L.geoJSON(geojson, {
-      style: styleByRiskClass,
-      onEachFeature: (feature, layer) => {
-        const p = feature.properties;
-        layer.bindPopup(
-          `<strong>${p.risk_class}</strong><br/>flood_score: ${Number(p.flood_score).toFixed(3)}`
-        );
-      },
-    }).addTo(map);
+    // Remove existing layers/source if reloading
+    ["flood-risk-3d", "flood-risk-outline", "flood-risk-flat"].forEach(id => {
+      if (map.getLayer(id)) map.removeLayer(id);
+    });
+    if (map.getSource("risk-grid")) map.removeSource("risk-grid");
 
-    if (geojson.features && geojson.features.length) {
-      map.fitBounds(riskLayer.getBounds(), { padding: [20, 20] });
-    }
+    map.addSource("risk-grid", { type: "geojson", data: geojson });
+
+    // 3D extrusion columns — height proportional to flood_score
+    map.addLayer({
+      id: "flood-risk-3d",
+      type: "fill-extrusion",
+      source: "risk-grid",
+      paint: {
+        "fill-extrusion-color": [
+          "match", ["get", "risk_class"],
+          "Low",       "#2E7D5B",
+          "Moderate",  "#D9A441",
+          "High",      "#D9622B",
+          "Very High", "#C23B3B",
+          "#555"
+        ],
+        // Max height ~180 m for Very High (score ≈ 1.0)
+        "fill-extrusion-height": ["*", ["get", "flood_score"], 180],
+        "fill-extrusion-base": 0,
+        "fill-extrusion-opacity": [
+          "interpolate", ["linear"], ["zoom"],
+          10, 0.85,
+          15, 0.65
+        ],
+        "fill-extrusion-vertical-gradient": true,
+      },
+    });
+
+    // Flat fallback for when zoomed out far (no 3D distraction)
+    map.addLayer({
+      id: "flood-risk-flat",
+      type: "fill",
+      source: "risk-grid",
+      minzoom: 0,
+      maxzoom: 10,
+      paint: {
+        "fill-color": [
+          "match", ["get", "risk_class"],
+          "Low",       "#2E7D5B",
+          "Moderate",  "#D9A441",
+          "High",      "#D9622B",
+          "Very High", "#C23B3B",
+          "#555"
+        ],
+        "fill-opacity": 0.55,
+      },
+    });
 
     showDataSourceBanner(geojson.data_source);
     setApiStatus(true);
+    wireMapClick();
   } catch (err) {
     console.error("Failed to load risk grid:", err);
     setApiStatus(false);
   }
 }
 
-function showDataSourceBanner(source) {
-  const banner = document.getElementById("data-source-banner");
-  if (source === "synthetic_demo") {
-    banner.hidden = false;
-    banner.textContent =
-      "Showing a SYNTHETIC demo grid — no processed pipeline output found yet. " +
-      "Run scripts/02-04 to serve real data.";
-  } else {
-    banner.hidden = true;
-  }
+function wireMapClick() {
+  map.on("click", "flood-risk-3d", (e) => {
+    const coords = e.lngLat;
+    queryPoint(coords.lat, coords.lng, null);
+  });
+
+  map.on("mouseenter", "flood-risk-3d", () => {
+    map.getCanvas().style.cursor = "crosshair";
+  });
+  map.on("mouseleave", "flood-risk-3d", () => {
+    map.getCanvas().style.cursor = "";
+  });
+
+  // Also allow clicking the background map
+  map.on("click", (e) => {
+    // Only trigger if we didn't click a risk cell (those have their own handler)
+    const features = map.queryRenderedFeatures(e.point, { layers: ["flood-risk-3d"] });
+    if (features.length === 0) {
+      queryPoint(e.lngLat.lat, e.lngLat.lng, null);
+    }
+  });
 }
 
-function setApiStatus(ok) {
-  const el = document.getElementById("api-status");
-  el.classList.toggle("ok", ok);
-  el.classList.toggle("err", !ok);
-  el.textContent = ok ? `connected · ${API_BASE_URL}` : `cannot reach API at ${API_BASE_URL}`;
-}
-
-function setBeacon(level) {
-  document.getElementById("beacon").dataset.level = level;
-}
-
-async function queryPoint(lat, lon) {
+// ---------------------------------------------------------------------------
+// Query point — risk + alert
+// ---------------------------------------------------------------------------
+async function queryPoint(lat, lon, locationName) {
   const rain24 = Number(document.getElementById("rain24").value);
   const rain72 = Number(document.getElementById("rain72").value);
 
   try {
-    const riskRes = await fetch(`${API_BASE_URL}/risk/point?lat=${lat}&lon=${lon}`);
-    if (!riskRes.ok) throw new Error(`HTTP ${riskRes.status}`);
-    const risk = await riskRes.json();
+    const [riskRes, alertRes] = await Promise.all([
+      fetch(`${API_BASE_URL}/risk/point?lat=${lat}&lon=${lon}`),
+      fetch(`${API_BASE_URL}/alerts/current`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lat, lon, rain_24h_mm: rain24, rain_72h_mm: rain72 }),
+      }),
+    ]);
 
-    const alertRes = await fetch(`${API_BASE_URL}/alerts/current`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lat, lon, rain_24h_mm: rain24, rain_72h_mm: rain72 }),
-    });
-    if (!alertRes.ok) throw new Error(`HTTP ${alertRes.status}`);
+    if (!riskRes.ok || !alertRes.ok) throw new Error("API error");
+    const risk  = await riskRes.json();
     const alert = await alertRes.json();
 
-    document.getElementById("result-panel").hidden = false;
-    document.getElementById("result-risk").textContent = risk.risk_class;
+    // Update sidebar result panel
+    const panel = document.getElementById("result-panel");
+    panel.hidden = false;
+
+    const locEl = document.getElementById("result-location");
+    locEl.textContent = locationName || `${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E`;
+
+    document.getElementById("result-risk").textContent  = risk.risk_class;
+    document.getElementById("result-risk").style.color  = RISK_COLORS[risk.risk_class] || "#fff";
     document.getElementById("result-alert").textContent = alert.alert_level;
-    document.getElementById("result-elev").textContent = `${risk.elevation_m.toFixed(1)} m`;
+    document.getElementById("result-alert").style.color = alertColor(alert.alert_level);
+    document.getElementById("result-elev").textContent  = `${risk.elevation_m.toFixed(1)} m`;
     document.getElementById("result-score").textContent = risk.flood_score.toFixed(3);
 
     setBeacon(alert.alert_level);
 
-    if (queryMarker) map.removeLayer(queryMarker);
-    queryMarker = L.circleMarker([lat, lon], {
-      radius: 8,
-      color: "#fff",
-      weight: 2,
-      fillColor: RISK_COLORS[risk.risk_class] || "#888",
-      fillOpacity: 0.9,
-    }).addTo(map);
+    // Place / update marker
+    if (queryMarker) queryMarker.remove();
+    const el = document.createElement("div");
+    el.className = "query-dot";
+    el.style.background = RISK_COLORS[risk.risk_class] || "#888";
+    queryMarker = new maplibregl.Marker({ element: el, anchor: "center" })
+      .setLngLat([lon, lat])
+      .setPopup(
+        new maplibregl.Popup({ offset: 14, className: "fs-popup" }).setHTML(
+          `<strong>${risk.risk_class} risk</strong><br/>
+           Alert: <em>${alert.alert_level}</em><br/>
+           Elev: ${risk.elevation_m.toFixed(1)} m &nbsp;|&nbsp; Score: ${risk.flood_score.toFixed(3)}`
+        )
+      )
+      .addTo(map);
+    queryMarker.getPopup().addTo(map);
 
     setApiStatus(true);
   } catch (err) {
@@ -128,19 +214,115 @@ async function queryPoint(lat, lon) {
   }
 }
 
-map.on("click", (e) => {
-  const { lat, lng } = e.latlng;
-  document.getElementById("lat-input").value = lat.toFixed(4);
-  document.getElementById("lon-input").value = lng.toFixed(4);
-  queryPoint(lat, lng);
+function alertColor(level) {
+  return level === "Warning" ? "#FF5A3C" : level === "Watch" ? "#D9A441" : "#2E7D5B";
+}
+
+// ---------------------------------------------------------------------------
+// Place search — Nominatim (OpenStreetMap geocoder, no API key)
+// ---------------------------------------------------------------------------
+const searchInput   = document.getElementById("search-input");
+const searchResults = document.getElementById("search-results");
+const searchClear   = document.getElementById("search-clear");
+let searchTimer = null;
+
+searchInput.addEventListener("input", () => {
+  const q = searchInput.value.trim();
+  searchClear.hidden = q.length === 0;
+  clearTimeout(searchTimer);
+  if (q.length < 2) { hideDropdown(); return; }
+  searchTimer = setTimeout(() => doSearch(q), 320);
 });
 
-document.getElementById("query-btn").addEventListener("click", () => {
-  const lat = Number(document.getElementById("lat-input").value);
-  const lon = Number(document.getElementById("lon-input").value);
-  queryPoint(lat, lon);
+searchInput.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { hideDropdown(); searchInput.blur(); }
 });
 
+searchClear.addEventListener("click", () => {
+  searchInput.value = "";
+  searchClear.hidden = true;
+  hideDropdown();
+  searchInput.focus();
+});
+
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".search-wrap") && !e.target.closest(".search-dropdown")) {
+    hideDropdown();
+  }
+});
+
+async function doSearch(query) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?` +
+      `q=${encodeURIComponent(query + ", Lagos, Nigeria")}` +
+      `&format=json&limit=7&accept-language=en` +
+      `&viewbox=3.05,6.75,3.80,6.30&bounded=0`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": "FloodSight-Dashboard/1.0 (flood intelligence, Lagos)" },
+    });
+    const items = await res.json();
+    renderDropdown(items);
+  } catch (err) {
+    console.error("Search failed:", err);
+    hideDropdown();
+  }
+}
+
+function renderDropdown(items) {
+  if (!items || items.length === 0) {
+    searchResults.innerHTML = `<li class="no-result">No places found in Lagos</li>`;
+    searchResults.hidden = false;
+    return;
+  }
+  searchResults.innerHTML = items.map((item, i) => {
+    const name = item.display_name.split(",").slice(0, 3).join(", ");
+    return `<li class="result-item" data-idx="${i}" data-lat="${item.lat}" data-lon="${item.lon}" data-name="${encodeURIComponent(name)}">
+      <svg class="result-pin" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="6" r="3"/><path d="M8 2C5.24 2 3 4.24 3 7c0 3.75 5 9 5 9s5-5.25 5-9c0-2.76-2.24-5-5-5z"/></svg>
+      <span>${name}</span>
+    </li>`;
+  }).join("");
+  searchResults.hidden = false;
+
+  searchResults.querySelectorAll(".result-item").forEach(li => {
+    li.addEventListener("click", () => {
+      const lat = parseFloat(li.dataset.lat);
+      const lon = parseFloat(li.dataset.lon);
+      const name = decodeURIComponent(li.dataset.name);
+      selectPlace(lat, lon, name);
+    });
+  });
+}
+
+function selectPlace(lat, lon, name) {
+  hideDropdown();
+  searchInput.value = name.split(",")[0];
+  searchClear.hidden = false;
+  map.flyTo({ center: [lon, lat], zoom: 15, pitch: PILOT_PITCH, bearing: PILOT_BEARING, duration: 1400, essential: true });
+  queryPoint(lat, lon, name);
+}
+
+function hideDropdown() {
+  searchResults.hidden = true;
+  searchResults.innerHTML = "";
+}
+
+// ---------------------------------------------------------------------------
+// LGA quick-jump buttons
+// ---------------------------------------------------------------------------
+document.querySelectorAll(".lga-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const lat  = parseFloat(btn.dataset.lat);
+    const lon  = parseFloat(btn.dataset.lon);
+    const zoom = parseFloat(btn.dataset.zoom);
+    const name = btn.textContent.trim();
+    map.flyTo({ center: [lon, lat], zoom, pitch: PILOT_PITCH, bearing: PILOT_BEARING, duration: 1200, essential: true });
+    queryPoint(lat, lon, name);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rainfall sliders
+// ---------------------------------------------------------------------------
 const rain24Input = document.getElementById("rain24");
 const rain72Input = document.getElementById("rain72");
 rain24Input.addEventListener("input", () => {
@@ -150,4 +332,29 @@ rain72Input.addEventListener("input", () => {
   document.getElementById("rain72-val").textContent = `${rain72Input.value} mm`;
 });
 
-loadRiskGrid();
+// ---------------------------------------------------------------------------
+// Status helpers
+// ---------------------------------------------------------------------------
+function showDataSourceBanner(source) {
+  const banner = document.getElementById("data-source-banner");
+  if (source === "synthetic_demo") {
+    banner.hidden = false;
+    banner.textContent =
+      "Showing SYNTHETIC demo grid — run scripts/02-04 to serve real Lagos data.";
+  } else {
+    banner.hidden = true;
+  }
+}
+
+function setApiStatus(ok) {
+  const el = document.getElementById("api-status");
+  el.classList.toggle("ok", ok);
+  el.classList.toggle("err", !ok);
+  el.textContent = ok
+    ? `API connected · ${API_BASE_URL || window.location.host}`
+    : `Cannot reach API at ${API_BASE_URL}`;
+}
+
+function setBeacon(level) {
+  document.getElementById("beacon").dataset.level = level;
+}
