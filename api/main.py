@@ -60,7 +60,7 @@ def root():
             "/depth/predict",
             "/alerts/current",
             "/verify", "/verify/summary",
-            "/forecast/rainfall", "/forecast/alerts",
+            "/forecast/rainfall", "/forecast/alerts", "/forecast/summary",
         ],
     }
 

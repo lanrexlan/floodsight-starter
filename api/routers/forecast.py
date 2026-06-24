@@ -1,6 +1,7 @@
 """
 GET /forecast/rainfall  — live 24h/72h precipitation forecast for a point.
 GET /forecast/alerts    — risk grid annotated with live alert levels.
+GET /forecast/summary   — lightweight alert counts (no geometry); for SMS briefings.
 
 Powered by Open-Meteo (free, no API key required).
 Results cached 30 min in-process.
@@ -104,3 +105,72 @@ def get_grid_alerts(
         "fetched_at": fc["fetched_at"],
     }
     return grid
+
+
+# ---------------------------------------------------------------------------
+# /forecast/summary  — lightweight counts for SMS briefings (no geometry)
+# ---------------------------------------------------------------------------
+
+@router.get("/summary")
+def get_alert_summary(
+    lat: float = Query(PILOT_LAT, description="Latitude  for forecast lookup"),
+    lon: float = Query(PILOT_LON, description="Longitude for forecast lookup"),
+):
+    """
+    Returns alert-level counts without the full GeoJSON geometry.
+    Intended for lightweight callers such as the morning SMS briefing.
+
+    Response shape:
+    {
+      "total_cells": 53075,
+      "alert_counts": {"Warning": 1234, "Watch": 5678, "No Alert": 46163},
+      "highest_alert": "Warning",
+      "forecast": {
+        "rain_24h_mm": 42.1,
+        "rain_72h_mm": 87.5,
+        "source": "open-meteo",
+        "fetched_at": "2025-06-01T05:00:00+00:00"
+      }
+    }
+    """
+    # 1. Live forecast
+    try:
+        from floodsight.forecast.openmeteo import fetch_forecast
+        fc = fetch_forecast(lat, lon)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    rain_24h = fc["rain_24h_mm"]
+    rain_72h = fc["rain_72h_mm"]
+
+    # 2. Load risk grid and count alert levels (no geometry mutation needed)
+    from api.data_provider import get_risk_geojson
+    from floodsight.alerts.engine import compute_alert_level
+
+    features = get_risk_geojson().get("features", [])
+
+    counts: dict[str, int] = {"Warning": 0, "Watch": 0, "No Alert": 0}
+    for feat in features:
+        risk_class = feat.get("properties", {}).get("risk_class", "Low")
+        level = compute_alert_level(risk_class, rain_24h, rain_72h)
+        counts[level] = counts.get(level, 0) + 1
+
+    # Determine highest alert (Warning > Watch > No Alert)
+    if counts.get("Warning", 0) > 0:
+        highest = "Warning"
+    elif counts.get("Watch", 0) > 0:
+        highest = "Watch"
+    else:
+        highest = "No Alert"
+
+    return {
+        "total_cells": len(features),
+        "alert_counts": counts,
+        "highest_alert": highest,
+        "forecast": {
+            "rain_24h_mm": rain_24h,
+            "rain_72h_mm": rain_72h,
+            "source": fc["forecast_source"],
+            "fetched_at": fc["fetched_at"],
+        },
+    }
