@@ -22,7 +22,9 @@ const ALERT_COLORS = {
 };
 
 // Pilot grid actual bounds: lon 3.359–3.450, lat 6.439–6.620
-const PILOT_CENTER  = [3.405, 6.530];
+// Two clusters: south (lat 6.44–6.48, Lagos Is.) and north (lat 6.53–6.62, Kosofe/Gbagada)
+// Default opens on northern cluster which holds 87% of cells
+const PILOT_CENTER  = [3.395, 6.575];
 const PILOT_ZOOM    = 11.5;
 const PILOT_PITCH   = 48;
 const PILOT_BEARING = -8;
