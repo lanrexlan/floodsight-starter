@@ -624,16 +624,17 @@ footer {
       <div class="status-divider"></div>
       <div class="rain-row">
         <div class="rain-box">
-          <div class="rain-label">Next 24 hours</div>
-          <div class="rain-value" id="rain-24-val"></div>
-          <div class="rain-plain" id="rain-24-plain"></div>
+          <div class="rain-label">Observed · past 24h</div>
+          <div class="rain-value" id="rain-obs-val"></div>
+          <div class="rain-plain" id="rain-obs-plain"></div>
         </div>
         <div class="rain-box">
-          <div class="rain-label">Next 3 days</div>
-          <div class="rain-value" id="rain-72-val"></div>
-          <div class="rain-plain" id="rain-72-plain"></div>
+          <div class="rain-label">Forecast · next 24h</div>
+          <div class="rain-value" id="rain-fc-val"></div>
+          <div class="rain-plain" id="rain-fc-plain"></div>
         </div>
       </div>
+      <div id="rain-72-note" style="font-size:12px;color:var(--muted);margin-top:12px;line-height:1.5;"></div>
       <div class="status-updated" id="status-updated"></div>
     </div>
   </div>
@@ -648,7 +649,8 @@ footer {
   <p class="section-lead">
     The map below shows flood risk across Lagos in real time. Taller columns
     mean higher risk. Red cells are under active flood warning right now.
-    Click any cell to see details for that exact location.
+    Alert colours factor in <em>both</em> observed rainfall from the last 24 hours
+    and the upcoming 48-hour forecast. Click any cell for details.
   </p>
   <div class="map-wrap">
     <iframe
@@ -792,10 +794,10 @@ footer {
       <div class="step-desc">A trained ML model scores each grid cell's inherent flood susceptibility — independent of any rainfall event.</div>
     </div>
     <div class="step">
-      <div class="step-icon">🌧</div>
+      <div class="step-icon">🛰</div>
       <div class="step-num">03 · INTEGRATE</div>
-      <div class="step-title">Live Forecast</div>
-      <div class="step-desc">We pull the latest rainfall forecast from a global weather model every 30 minutes and combine it with terrain risk.</div>
+      <div class="step-title">Dual-Stream Rainfall</div>
+      <div class="step-desc">We combine what has already fallen (last 24h, observed via satellite) with what is coming (72h forecast) — because saturated ground floods faster even in moderate rain.</div>
     </div>
     <div class="step">
       <div class="step-icon">📱</div>
@@ -884,7 +886,7 @@ footer {
       <span>Rankine Innovation Lab — Intelligence for a Liveable Future</span>
     </a>
     <div class="footer-note">
-      FloodSight Lagos Pilot · Data: <a href="https://open-meteo.com">Open-Meteo</a><br />
+      FloodSight Lagos Pilot · Data: <a href="https://open-meteo.com">Open-Meteo</a> (observed + forecast)<br />
       © 2026 Rankine Innovation Lab
     </div>
   </div>
@@ -896,14 +898,28 @@ footer {
 const API = 'https://floodsight-starter.onrender.com';
 
 // ── Rainfall plain-English labels ──────────────────────────────────
+// period: 'obs' (past 24h observed) | 24 (forecast 24h) | 72 (cumulative)
 function describeRain(mm, period) {
+  const isObs = period === 'obs';
   const isDay = period === 24;
-  if (mm < 5)   return isDay ? 'Barely any rain — a few drops at most' : 'Dry conditions overall';
-  if (mm < 20)  return isDay ? 'Light shower — brief but noticeable' : 'Light rainfall across the period';
-  if (mm < 40)  return isDay ? 'Steady rain — umbrella weather' : 'Moderate cumulative rainfall';
-  if (mm < 80)  return isDay ? 'Heavy downpour — drainage will struggle' : 'Significant rainfall — watch low areas';
-  if (mm < 150) return isDay ? 'Very heavy rain — flooding likely' : 'High cumulative rain — flooding risk elevated';
-  return isDay ? 'Extreme rainfall — severe flooding possible' : 'Extreme 3-day total — major flood risk';
+  if (mm < 5)   return isObs ? 'Dry — no significant rainfall recorded'
+                             : isDay ? 'Barely any rain — a few drops at most'
+                             : 'Dry conditions overall';
+  if (mm < 20)  return isObs ? 'Light rain fell — ground still mostly dry'
+                             : isDay ? 'Light shower — brief but noticeable'
+                             : 'Light rainfall across the period';
+  if (mm < 40)  return isObs ? 'Steady rain — ground is damp'
+                             : isDay ? 'Steady rain — umbrella weather'
+                             : 'Moderate cumulative rainfall';
+  if (mm < 80)  return isObs ? 'Heavy rain fell — drainage already stressed'
+                             : isDay ? 'Heavy downpour — drainage will struggle'
+                             : 'Significant rainfall — watch low areas';
+  if (mm < 150) return isObs ? 'Very heavy rain fell — soil likely saturated'
+                             : isDay ? 'Very heavy rain — flooding likely'
+                             : 'High cumulative rain — flooding risk elevated';
+  return isObs ? 'Extreme rain fell — flooding may already be underway'
+               : isDay ? 'Extreme rainfall — severe flooding possible'
+               : 'Extreme 3-day total — major flood risk';
 }
 
 function rainyLabel(mm) {
@@ -950,39 +966,56 @@ function renderStatus(data) {
   const level   = data.highest_alert;
   const counts  = data.alert_counts;
   const copy    = alertCopy(level, counts);
-  const r24     = Math.round(fc.rain_24h_mm);
-  const r72     = Math.round(fc.rain_72h_mm);
+
+  // Phase 11 dual-stream values (fall back gracefully to legacy fields)
+  const obs24  = Math.round(fc.observed_24h_mm ?? 0);
+  const fc24   = Math.round(fc.forecast_24h_mm ?? fc.rain_24h_mm ?? 0);
+  const fc48   = Math.round(fc.forecast_48h_mm ?? fc24 * 2);
+  const r72    = Math.round(fc.rain_72h_mm ?? 0);
+  const isDual = fc.data_mode === 'observed+forecast';
 
   // Alert bar
   const bar = document.getElementById('alert-bar');
   if (copy.barClass) {
-    bar.textContent  = copy.barText;
-    bar.className    = `alert-top-bar ${copy.barClass}`;
+    bar.textContent = copy.barText;
+    bar.className   = `alert-top-bar ${copy.barClass}`;
   }
 
   // Dot + label
-  document.getElementById('level-dot').className   = `level-dot ${copy.dotClass}`;
-  document.getElementById('level-label').className = `level-label ${copy.labelClass}`;
+  document.getElementById('level-dot').className     = `level-dot ${copy.dotClass}`;
+  document.getElementById('level-label').className   = `level-label ${copy.labelClass}`;
   document.getElementById('level-label').textContent = copy.label;
 
-  // Text
+  // Headline + summary
   document.getElementById('status-headline').textContent = copy.headline;
   document.getElementById('status-summary').textContent  = copy.summary;
 
-  // Rain boxes
-  document.getElementById('rain-24-val').textContent   = rainyLabel(r24);
-  document.getElementById('rain-24-plain').textContent = describeRain(r24, 24);
-  document.getElementById('rain-72-val').textContent   = rainyLabel(r72);
-  document.getElementById('rain-72-plain').textContent = describeRain(r72, 72);
+  // Rain boxes — Phase 11: observed 24h | forecast 24h
+  document.getElementById('rain-obs-val').textContent   = rainyLabel(obs24);
+  document.getElementById('rain-obs-plain').textContent = describeRain(obs24, 'obs');
+  document.getElementById('rain-fc-val').textContent    = rainyLabel(fc24);
+  document.getElementById('rain-fc-plain').textContent  = describeRain(fc24, 24);
+
+  // 72h combined note
+  const note72 = document.getElementById('rain-72-note');
+  if (note72 && isDual) {
+    note72.innerHTML =
+      `⟐ 72h risk window: <strong>${obs24} mm</strong> observed ` +
+      `+ <strong>${fc48} mm</strong> forecast = <strong>${r72} mm</strong> combined`;
+  } else if (note72) {
+    note72.innerHTML = `⟐ 72h forecast total: <strong>${r72} mm</strong>`;
+  }
 
   // Updated time
   const fetched = new Date(fc.fetched_at);
-  const timeStr = fetched.toLocaleTimeString('en-NG', { hour:'2-digit', minute:'2-digit', timeZone:'Africa/Lagos' });
-  document.getElementById('status-updated').textContent = `Last updated ${timeStr} Lagos time`;
+  const timeStr = fetched.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Lagos' });
+  document.getElementById('status-updated').textContent =
+    isDual ? `🛰 Dual-stream · observed + forecast · ${timeStr} Lagos time`
+           : `Last updated ${timeStr} Lagos time`;
 
-  // Show
-  document.getElementById('status-loading').style.display  = 'none';
-  document.getElementById('status-content').style.display  = 'block';
+  // Show content
+  document.getElementById('status-loading').style.display = 'none';
+  document.getElementById('status-content').style.display = 'block';
 }
 
 function renderError() {

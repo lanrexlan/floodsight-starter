@@ -427,10 +427,16 @@ function markManual() {
 
 // ---------------------------------------------------------------------------
 // Forecast slider auto-population (used by loadForecastGrid)
+// Phase 11: dual-stream — observed (past 24h) + forecast (next 72h)
+//   rain24 slider = forecast_24h (what's COMING in next 24h)
+//   rain72 slider = observed_24h + forecast_48h (true 72h risk window)
 // ---------------------------------------------------------------------------
 function updateForecastSliders(forecast) {
-  const r24 = Math.min(Math.round(forecast.rain_24h_mm), 200);
-  const r72 = Math.min(Math.round(forecast.rain_72h_mm), 300);
+  const obs24 = Math.round(forecast.observed_24h_mm ?? 0);
+  const fc24  = Math.round(forecast.forecast_24h_mm ?? forecast.rain_24h_mm ?? 0);
+  const r24   = Math.min(fc24, 200);
+  const r72   = Math.min(Math.round(forecast.rain_72h_mm), 300);
+
   rain24Input.value = r24;
   rain72Input.value = r72;
   document.getElementById("rain24-val").textContent = `${r24} mm`;
@@ -443,11 +449,24 @@ function updateForecastSliders(forecast) {
     const localTime = fetchedAt.toLocaleTimeString("en-NG", {
       hour: "2-digit", minute: "2-digit", timeZone: "Africa/Lagos",
     });
-    badge.textContent = `🌧 Live forecast · updated ${localTime}`;
+
+    if (forecast.data_mode === "observed+forecast") {
+      // Phase 11 dual-stream badge
+      badge.innerHTML =
+        `🛰 Dual-stream · ${localTime} Lagos time` +
+        `<br><small style="opacity:0.75;">Observed: ${obs24} mm &nbsp;·&nbsp; Forecast: ${fc24} mm (24 h)</small>`;
+    } else {
+      badge.textContent = `🌧 Live forecast · updated ${localTime}`;
+    }
     delete badge.dataset.manual;
   }
+
   const hint = document.getElementById("rainfall-hint");
-  if (hint) hint.textContent = "Sliders set to today's forecast. Drag to simulate scenarios.";
+  if (hint) {
+    hint.textContent = forecast.data_mode === "observed+forecast"
+      ? "72h slider = past 24h observed + next 48h forecast. Drag to simulate scenarios."
+      : "Sliders set to today's forecast. Drag to simulate scenarios.";
+  }
 }
 
 // Standalone fallback — called if forecast grid itself fails

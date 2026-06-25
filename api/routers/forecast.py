@@ -1,8 +1,9 @@
 """
-GET /forecast/rainfall  — live 24h/72h precipitation forecast for a point.
+GET /forecast/rainfall  — live observed + forecast precipitation for a point.
 GET /forecast/alerts    — risk grid annotated with live alert levels.
 GET /forecast/summary   — lightweight alert counts (no geometry); for SMS briefings.
 
+Phase 11: Dual-stream rainfall — observed (past 24 h) + forecast (next 72 h).
 Powered by Open-Meteo (free, no API key required).
 Results cached 30 min in-process.
 """
@@ -108,10 +109,18 @@ def get_grid_alerts(
         props["forecast_rain_72h_mm"] = rain_72h
 
     grid["forecast"] = {
-        "rain_24h_mm": rain_24h,
-        "rain_72h_mm": rain_72h,
-        "source": fc["forecast_source"],
-        "fetched_at": fc["fetched_at"],
+        # Phase 11 dual-stream fields
+        "observed_24h_mm":  fc.get("observed_24h_mm", 0.0),
+        "forecast_24h_mm":  fc.get("forecast_24h_mm", rain_24h),
+        "forecast_48h_mm":  fc.get("forecast_48h_mm", 0.0),
+        "forecast_72h_mm":  fc.get("forecast_72h_mm", rain_72h),
+        # Alert engine compat fields (unchanged names)
+        "rain_24h_mm":      rain_24h,
+        "rain_72h_mm":      rain_72h,
+        # Metadata
+        "source":           fc["forecast_source"],
+        "data_mode":        fc.get("data_mode", "forecast_only"),
+        "fetched_at":       fc["fetched_at"],
     }
     grid["data_source"] = source
     return grid
@@ -177,9 +186,17 @@ def get_alert_summary(
         "alert_counts": counts,
         "highest_alert": highest,
         "forecast": {
-            "rain_24h_mm": rain_24h,
-            "rain_72h_mm": rain_72h,
-            "source": fc["forecast_source"],
-            "fetched_at": fc["fetched_at"],
+            # Phase 11 dual-stream fields
+            "observed_24h_mm":  fc.get("observed_24h_mm", 0.0),
+            "forecast_24h_mm":  fc.get("forecast_24h_mm", rain_24h),
+            "forecast_48h_mm":  fc.get("forecast_48h_mm", 0.0),
+            "forecast_72h_mm":  fc.get("forecast_72h_mm", rain_72h),
+            # Alert engine compat (unchanged names)
+            "rain_24h_mm":      rain_24h,
+            "rain_72h_mm":      rain_72h,
+            # Metadata
+            "source":           fc["forecast_source"],
+            "data_mode":        fc.get("data_mode", "forecast_only"),
+            "fetched_at":       fc["fetched_at"],
         },
     }
