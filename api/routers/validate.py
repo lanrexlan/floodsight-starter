@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import urllib.request
 from datetime import date, timedelta
 
@@ -112,9 +113,11 @@ _cached_results: list[dict] | None = None
 
 # ── Open-Meteo archive fetch ──────────────────────────────────────────────
 
-def _fetch_rainfall_archive(peak_date: str) -> tuple[float, float]:
+def _fetch_rainfall_archive(peak_date: str, retries: int = 3) -> tuple[float, float]:
     """
     Fetch daily precipitation for 3 days ending on peak_date.
+    Retries up to `retries` times with exponential back-off to handle
+    transient connection resets (common on Windows / rate-limited endpoints).
 
     Returns (rain_24h_mm, rain_72h_mm).
     """
@@ -130,8 +133,20 @@ def _fetch_rainfall_archive(peak_date: str) -> tuple[float, float]:
         "&timezone=UTC"
     )
     req = urllib.request.Request(url, headers={"User-Agent": "FloodSight/1.0"})
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        data = json.loads(resp.read())
+
+    last_exc: Exception | None = None
+    for attempt in range(retries):
+        try:
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                data = json.loads(resp.read())
+            break
+        except Exception as exc:
+            last_exc = exc
+            wait = 2 ** attempt          # 1s, 2s, 4s
+            log.warning("Archive fetch attempt %d failed (%s) — retrying in %ds", attempt + 1, exc, wait)
+            time.sleep(wait)
+    else:
+        raise last_exc  # type: ignore[misc]
 
     daily = data["daily"]
     times  = daily["time"]
@@ -166,7 +181,9 @@ def _compute_results() -> list[dict]:
     gdf, _ = get_grid()
     results = []
 
-    for event in FLOOD_EVENTS:
+    for i, event in enumerate(FLOOD_EVENTS):
+        if i > 0:
+            time.sleep(1)   # be polite to Open-Meteo; avoids connection resets
         try:
             rain_24h, rain_72h = _fetch_rainfall_archive(event["peak_date"])
         except Exception as exc:
