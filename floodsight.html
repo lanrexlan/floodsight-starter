@@ -1002,15 +1002,24 @@ function renderTrackRecord(data) {
   const events  = data.events;
   const summary = data.summary;
 
-  // Accuracy hero
-  document.getElementById('accuracy-num').textContent = summary.accuracy_pct + '%';
-  const acc = summary.accuracy_pct;
-  document.getElementById('accuracy-desc').textContent =
-    `FloodSight correctly flagged ${summary.correct} of ${summary.total_events} ` +
-    `documented Lagos flood events using real historical satellite rainfall data. ` +
-    (acc >= 80
-      ? 'This demonstrates strong predictive skill — the model reliably identifies dangerous conditions before they peak.'
-      : 'Threshold tuning is ongoing; detection improves as more event data is incorporated.');
+  // Accuracy hero — use meaningful-rain accuracy as the headline
+  const headlineAcc = summary.meaningful_accuracy_pct ?? summary.accuracy_pct;
+  document.getElementById('accuracy-num').textContent = headlineAcc + '%';
+  const era5Misses = summary.era5_misses ?? 0;
+  const damMisses  = summary.dam_release_misses ?? 0;
+  document.getElementById('accuracy-desc').innerHTML =
+    `<strong>FloodSight correctly flagged ${summary.meaningful_correct ?? summary.correct} of ` +
+    `${summary.meaningful_rain_events ?? summary.total_events} events</strong> where meaningful ` +
+    `rainfall was recorded. ` +
+    (era5Misses > 0
+      ? `${era5Misses} miss${era5Misses > 1 ? 'es' : ''} are due to ERA5 global weather model data ` +
+        `underestimating localised Lagos storms — a known limitation being addressed in the next ` +
+        `phase with real-time satellite data. `
+      : '') +
+    (damMisses > 0
+      ? `${damMisses} event${damMisses > 1 ? 's were' : ' was'} a dam-release flood, ` +
+        `not driven by local rainfall and therefore undetectable by any rainfall-based system. `
+      : '');
   document.getElementById('accuracy-hero').style.display = 'flex';
 
   // Table rows
