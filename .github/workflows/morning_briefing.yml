@@ -26,9 +26,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: |
-          pip install -r requirements-scripts.txt
-          pip install -e . --no-deps
+        run: pip install -r requirements-scripts.txt
 
       - name: Send morning briefing
         env:
