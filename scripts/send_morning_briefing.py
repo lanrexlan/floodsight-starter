@@ -34,6 +34,11 @@ import logging
 import os
 import sys
 import urllib.request
+from pathlib import Path
+
+# Make `floodsight` importable when the script is run directly
+# (Python adds scripts/ to sys.path, not the project root)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from datetime import datetime, timezone
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
