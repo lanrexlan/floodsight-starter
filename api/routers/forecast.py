@@ -10,13 +10,11 @@ Results cached 30 min in-process.
 
 from __future__ import annotations
 
-import json
 import logging
 
 from fastapi import APIRouter, HTTPException, Query
 
-from api.data_provider import get_grid
-from floodsight.config import WGS84
+from api.data_provider import get_grid, get_grid_geojson
 
 log = logging.getLogger(__name__)
 
@@ -28,12 +26,8 @@ router = APIRouter(prefix="/forecast", tags=["forecast"])
 
 
 def _load_grid_geojson() -> tuple[dict, str]:
-    """Load the risk grid as a plain GeoJSON dict (WGS84).
-    Returns (geojson_dict, data_source)."""
-    grid, source = get_grid()
-    grid_wgs84 = grid.to_crs(WGS84)
-    geojson = json.loads(grid_wgs84.to_json())
-    return geojson, source
+    """Returns the cached WGS84 GeoJSON dict (read-only — do not mutate)."""
+    return get_grid_geojson()
 
 
 # ---------------------------------------------------------------------------
@@ -76,15 +70,27 @@ def get_grid_alerts(
     lon: float = Query(PILOT_LON, description="Longitude for forecast lookup"),
 ):
     """
-    Fetches the live rainfall forecast and applies the alert engine to every
-    cell in the risk grid.  Returns a GeoJSON FeatureCollection identical to
-    /risk/grid but with an extra ``alert_level`` property on each feature.
+    Returns a **compact** alert payload — no geometry, just one alert-level
+    string per grid cell in the same order as ``/risk/grid`` features.
 
-    Because Lagos is a small region (~20 × 10 km) a single forecast point is
-    used for all cells; the dominant error source is the ML model, not
-    spatial rainfall variability at this scale.
+    The dashboard loads ``/risk/grid`` for geometry and ``/forecast/alerts``
+    for alert levels, then merges them client-side.  This split keeps each
+    response small and avoids serialising the full 54 k-cell GeoJSON twice
+    per page load — which was OOM-killing Render's 512 MB free tier.
+
+    Response shape::
+
+        {
+          "alert_levels":  ["No Alert", "Watch", "Warning", ...],  // 54 k items
+          "alert_counts":  {"Warning": 1234, "Watch": 5678, "No Alert": 46163},
+          "highest_alert": "Warning",
+          "total_cells":   54115,
+          "forecast": {
+            "observed_24h_mm": 5.2, "forecast_24h_mm": 18.0, ...
+          }
+        }
     """
-    # 1. Get live forecast
+    # 1. Live forecast
     try:
         from floodsight.forecast.openmeteo import fetch_forecast
         fc = fetch_forecast(lat, lon)
@@ -94,36 +100,47 @@ def get_grid_alerts(
     rain_24h = fc["rain_24h_mm"]
     rain_72h = fc["rain_72h_mm"]
 
-    # 2. Load risk grid
+    # 2. Compute alert levels by iterating the GeoDataFrame column directly —
+    #    no GeoJSON serialisation; this is the same O(n) loop used by /summary.
     from floodsight.alerts.engine import compute_alert_level
 
-    grid, source = _load_grid_geojson()
-    features = grid.get("features", [])
+    gdf, _ = get_grid()
+    alert_levels = [
+        compute_alert_level(rc, rain_24h, rain_72h)
+        for rc in gdf["risk_class"]
+    ]
 
-    # 3. Annotate each feature with alert_level
-    for feat in features:
-        props = feat.get("properties", {})
-        risk_class = props.get("risk_class", "Low")
-        props["alert_level"] = compute_alert_level(risk_class, rain_24h, rain_72h)
-        props["forecast_rain_24h_mm"] = rain_24h
-        props["forecast_rain_72h_mm"] = rain_72h
+    # 3. Count levels
+    counts: dict[str, int] = {"Warning": 0, "Watch": 0, "No Alert": 0}
+    for level in alert_levels:
+        counts[level] = counts.get(level, 0) + 1
 
-    grid["forecast"] = {
-        # Phase 11 dual-stream fields
-        "observed_24h_mm":  fc.get("observed_24h_mm", 0.0),
-        "forecast_24h_mm":  fc.get("forecast_24h_mm", rain_24h),
-        "forecast_48h_mm":  fc.get("forecast_48h_mm", 0.0),
-        "forecast_72h_mm":  fc.get("forecast_72h_mm", rain_72h),
-        # Alert engine compat fields (unchanged names)
-        "rain_24h_mm":      rain_24h,
-        "rain_72h_mm":      rain_72h,
-        # Metadata
-        "source":           fc["forecast_source"],
-        "data_mode":        fc.get("data_mode", "forecast_only"),
-        "fetched_at":       fc["fetched_at"],
+    highest = (
+        "Warning" if counts["Warning"] > 0
+        else "Watch" if counts["Watch"] > 0
+        else "No Alert"
+    )
+
+    return {
+        "alert_levels":  alert_levels,
+        "alert_counts":  counts,
+        "highest_alert": highest,
+        "total_cells":   len(gdf),
+        "forecast": {
+            # Phase 11 dual-stream fields
+            "observed_24h_mm":  fc.get("observed_24h_mm", 0.0),
+            "forecast_24h_mm":  fc.get("forecast_24h_mm", rain_24h),
+            "forecast_48h_mm":  fc.get("forecast_48h_mm", 0.0),
+            "forecast_72h_mm":  fc.get("forecast_72h_mm", rain_72h),
+            # Alert engine compat (unchanged names)
+            "rain_24h_mm":      rain_24h,
+            "rain_72h_mm":      rain_72h,
+            # Metadata
+            "source":           fc["forecast_source"],
+            "data_mode":        fc.get("data_mode", "forecast_only"),
+            "fetched_at":       fc["fetched_at"],
+        },
     }
-    grid["data_source"] = source
-    return grid
 
 
 # ---------------------------------------------------------------------------

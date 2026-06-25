@@ -63,36 +63,57 @@ map.on("load", () => {
 });
 
 // ---------------------------------------------------------------------------
-// loadForecastGrid — primary loader: hits /forecast/alerts
-// Each cell is coloured by its LIVE alert level (Warning > Watch > risk class)
-// Falls back to static risk grid if forecast endpoint is unreachable.
+// loadForecastGrid — primary loader
+//
+// Loads /risk/grid (geometry, cached on server) and /forecast/alerts
+// (compact alert-level array, no geometry) in parallel, then merges them
+// client-side.  This split avoids serialising the full 54 k-cell GeoJSON
+// twice per page-load, which was OOM-killing Render's 512 MB free tier.
 // ---------------------------------------------------------------------------
 async function loadForecastGrid() {
   try {
-    const res = await fetch(`${API_BASE_URL}/forecast/alerts`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const geojson = await res.json();
+    const [gridRes, alertRes] = await Promise.all([
+      fetch(`${API_BASE_URL}/risk/grid`),
+      fetch(`${API_BASE_URL}/forecast/alerts`),
+    ]);
+    if (!gridRes.ok)  throw new Error(`grid HTTP ${gridRes.status}`);
+    if (!alertRes.ok) throw new Error(`alerts HTTP ${alertRes.status}`);
+
+    const geojson    = await gridRes.json();
+    const alertData  = await alertRes.json();
+
+    // Merge compact alert_levels into grid features (same order guaranteed)
+    const levels = alertData.alert_levels || [];
+    (geojson.features || []).forEach((feat, i) => {
+      const level = levels[i];
+      if (level && level !== "No Alert") {
+        feat.properties.alert_level = level;
+      }
+      // Expose rain values for popup display
+      const fc = alertData.forecast || {};
+      feat.properties.forecast_rain_24h_mm = fc.rain_24h_mm ?? 0;
+      feat.properties.forecast_rain_72h_mm = fc.rain_72h_mm ?? 0;
+    });
+
+    // Attach forecast to geojson so updateForecastSliders can read it
+    geojson.forecast = alertData.forecast;
 
     applyGridLayers(geojson);
 
-    // Auto-populate sliders from embedded forecast data
     if (geojson.forecast) {
       updateForecastSliders(geojson.forecast);
     }
 
-    // Compute & display city-wide alert summary
-    const features = geojson.features || [];
-    const warnCount  = features.filter(f => f.properties?.alert_level === "Warning").length;
-    const watchCount = features.filter(f => f.properties?.alert_level === "Watch").length;
-    updateCityAlert(warnCount, watchCount);
+    const counts = alertData.alert_counts || {};
+    updateCityAlert(counts.Warning || 0, counts.Watch || 0);
 
     showDataSourceBanner(geojson.data_source);
     setApiStatus(true);
     wireMapClick();
   } catch (err) {
     console.warn("Forecast grid unavailable, falling back to static risk grid:", err);
-    loadRiskGrid();        // fallback
-    loadForecastRainfall(); // still try to set sliders
+    loadRiskGrid();
+    loadForecastRainfall();
   }
 }
 

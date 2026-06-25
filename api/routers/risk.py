@@ -1,24 +1,21 @@
 from __future__ import annotations
 
-import json
-
 from fastapi import APIRouter, HTTPException
 
-from api.data_provider import get_grid, nearest_cell
+from api.data_provider import get_grid, get_grid_geojson, nearest_cell
 from api.schemas import RiskAtPoint
-from floodsight.config import WGS84
 
 router = APIRouter(prefix="/risk", tags=["risk"])
 
 
 @router.get("/grid")
 def risk_grid():
-    """Full grid as GeoJSON (risk_class, flood_score per cell) — what the
-    dashboard's Leaflet layer fetches directly."""
-    grid, source = get_grid()
-    grid_wgs84 = grid.to_crs(WGS84)
-    geojson = json.loads(grid_wgs84.to_json())
-    geojson["data_source"] = source
+    """Full grid as GeoJSON (risk_class, flood_score per cell).
+
+    Returns the cached WGS84 GeoJSON dict — serialisation only happens once
+    per process lifetime (see data_provider.get_grid_geojson).
+    """
+    geojson, _ = get_grid_geojson()
     return geojson
 
 
