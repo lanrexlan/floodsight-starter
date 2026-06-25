@@ -57,7 +57,7 @@ def fetch_summary(api_base: str) -> dict:
         url, headers={"User-Agent": "FloodSight-Briefing/1.0"}
     )
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=60) as resp:
             return json.loads(resp.read())
     except Exception as exc:
         raise RuntimeError(f"Failed to fetch forecast summary: {exc}") from exc

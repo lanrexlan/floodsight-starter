@@ -153,15 +153,14 @@ def get_alert_summary(
     rain_24h = fc["rain_24h_mm"]
     rain_72h = fc["rain_72h_mm"]
 
-    # 2. Load risk grid and count alert levels (no geometry needed)
+    # 2. Load risk grid and count alert levels directly from the GeoDataFrame
+    #    (avoids the slow JSON serialisation that /alerts does for the full grid)
     from floodsight.alerts.engine import compute_alert_level
 
-    grid, _ = _load_grid_geojson()
-    features = grid.get("features", [])
+    gdf, _ = get_grid()
 
     counts: dict = {"Warning": 0, "Watch": 0, "No Alert": 0}
-    for feat in features:
-        risk_class = feat.get("properties", {}).get("risk_class", "Low")
+    for risk_class in gdf["risk_class"]:
         level = compute_alert_level(risk_class, rain_24h, rain_72h)
         counts[level] = counts.get(level, 0) + 1
 
@@ -174,7 +173,7 @@ def get_alert_summary(
         highest = "No Alert"
 
     return {
-        "total_cells": len(features),
+        "total_cells": len(gdf),
         "alert_counts": counts,
         "highest_alert": highest,
         "forecast": {
