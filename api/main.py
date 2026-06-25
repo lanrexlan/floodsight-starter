@@ -25,7 +25,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from api.routers import alerts, depth, forecast, risk, verify
+from api.routers import alerts, depth, forecast, risk, validate, verify
 
 app = FastAPI(
     title="FloodSight API",
@@ -46,6 +46,7 @@ app.include_router(depth.router)
 app.include_router(alerts.router)
 app.include_router(verify.router)
 app.include_router(forecast.router)
+app.include_router(validate.router)
 
 
 @app.get("/")
@@ -61,6 +62,7 @@ def root():
             "/alerts/current",
             "/verify", "/verify/summary",
             "/forecast/rainfall", "/forecast/alerts", "/forecast/summary",
+            "/validate/events",
         ],
     }
 
