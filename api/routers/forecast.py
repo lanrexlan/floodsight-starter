@@ -9,9 +9,13 @@ Results cached 30 min in-process.
 
 from __future__ import annotations
 
+import json
 import logging
 
 from fastapi import APIRouter, HTTPException, Query
+
+from api.data_provider import get_grid
+from floodsight.config import WGS84
 
 log = logging.getLogger(__name__)
 
@@ -20,6 +24,15 @@ PILOT_LAT = 6.530
 PILOT_LON = 3.405
 
 router = APIRouter(prefix="/forecast", tags=["forecast"])
+
+
+def _load_grid_geojson() -> tuple[dict, str]:
+    """Load the risk grid as a plain GeoJSON dict (WGS84).
+    Returns (geojson_dict, data_source)."""
+    grid, source = get_grid()
+    grid_wgs84 = grid.to_crs(WGS84)
+    geojson = json.loads(grid_wgs84.to_json())
+    return geojson, source
 
 
 # ---------------------------------------------------------------------------
@@ -46,10 +59,7 @@ def get_rainfall_forecast(
         return fetch_forecast(lat, lon)
     except RuntimeError as exc:
         log.warning("Forecast fetch failed: %s", exc)
-        raise HTTPException(
-            status_code=503,
-            detail=str(exc),
-        ) from exc
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
         log.error("Unexpected error in forecast endpoint: %s", exc)
         raise HTTPException(status_code=500, detail="Internal forecast error") from exc
@@ -84,10 +94,9 @@ def get_grid_alerts(
     rain_72h = fc["rain_72h_mm"]
 
     # 2. Load risk grid
-    from api.data_provider import get_risk_geojson
     from floodsight.alerts.engine import compute_alert_level
 
-    grid = get_risk_geojson()
+    grid, source = _load_grid_geojson()
     features = grid.get("features", [])
 
     # 3. Annotate each feature with alert_level
@@ -104,6 +113,7 @@ def get_grid_alerts(
         "source": fc["forecast_source"],
         "fetched_at": fc["fetched_at"],
     }
+    grid["data_source"] = source
     return grid
 
 
@@ -143,13 +153,13 @@ def get_alert_summary(
     rain_24h = fc["rain_24h_mm"]
     rain_72h = fc["rain_72h_mm"]
 
-    # 2. Load risk grid and count alert levels (no geometry mutation needed)
-    from api.data_provider import get_risk_geojson
+    # 2. Load risk grid and count alert levels (no geometry needed)
     from floodsight.alerts.engine import compute_alert_level
 
-    features = get_risk_geojson().get("features", [])
+    grid, _ = _load_grid_geojson()
+    features = grid.get("features", [])
 
-    counts: dict[str, int] = {"Warning": 0, "Watch": 0, "No Alert": 0}
+    counts: dict = {"Warning": 0, "Watch": 0, "No Alert": 0}
     for feat in features:
         risk_class = feat.get("properties", {}).get("risk_class", "Low")
         level = compute_alert_level(risk_class, rain_24h, rain_72h)
