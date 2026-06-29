@@ -178,6 +178,43 @@ def get_grid_geojson() -> tuple[dict, str]:
     return _cached_grid_geojson
 
 
+STREETS_RISK_PATH = PROCESSED_DIR / "streets_risk.gpkg"
+_cached_streets_geojson: tuple[dict, str] | None = None
+
+
+def get_streets_geojson() -> tuple[dict | None, str]:
+    """
+    Returns (geojson_dict, source) for the tagged street network in WGS84.
+
+    Returns (None, 'not_found') if streets_risk.gpkg hasn't been generated
+    yet — the /risk/streets endpoint returns 404 in that case.
+
+    Cached for the process lifetime (like get_grid_geojson).
+    Run scripts/05_tag_street_risk.py to generate the file.
+    """
+    global _cached_streets_geojson
+    if _cached_streets_geojson is not None:
+        return _cached_streets_geojson
+
+    if not STREETS_RISK_PATH.exists():
+        log.info(
+            "streets_risk.gpkg not found at %s — run scripts/05_tag_street_risk.py",
+            STREETS_RISK_PATH,
+        )
+        return None, "not_found"
+
+    log.info("Loading streets risk from %s …", STREETS_RISK_PATH)
+    gdf = gpd.read_file(STREETS_RISK_PATH)
+    # Script always saves in WGS84 — no reprojection needed here
+    geojson = json.loads(gdf.to_json())
+    geojson["data_source"] = "osm_risk_tagged"
+    _cached_streets_geojson = (geojson, "osm_risk_tagged")
+    log.info(
+        "Streets GeoJSON cached — %d segments", len(geojson.get("features", []))
+    )
+    return _cached_streets_geojson
+
+
 def nearest_cell(lat: float, lon: float) -> pd.Series:
     grid, _ = get_grid()
     point = gpd.GeoSeries([gpd.points_from_xy([lon], [lat])[0]], crs=WGS84).to_crs(grid.crs)[0]

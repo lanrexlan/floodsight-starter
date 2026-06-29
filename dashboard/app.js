@@ -546,3 +546,123 @@ function setApiStatus(ok) {
 function setBeacon(level) {
   document.getElementById("beacon").dataset.level = level;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 15 — Street-level flood risk layer
+// Lazy-loaded when the user first zooms to ≥ 13 (street scale).
+// Each road segment is coloured by its static risk_class (inherited from the
+// nearest grid cell).  Arterial roads are always shown; high-risk residential
+// roads are included too.
+// ---------------------------------------------------------------------------
+
+const STREETS_MIN_ZOOM = 13;
+let _streetsLoaded = false;    // guard: fetch exactly once
+let _streetsVisible = true;    // toggle state
+
+// Street risk class → line colour (same palette as the grid)
+function _streetColor(riskClass) {
+  return RISK_COLORS[riskClass] || "#888";
+}
+
+// Kick off lazy load the first time the user zooms to street level
+map.on("zoom", () => {
+  if (!_streetsLoaded && map.getZoom() >= STREETS_MIN_ZOOM) {
+    _streetsLoaded = true;   // set before fetch to prevent double-fire
+    _loadStreetsLayer();
+  }
+});
+
+async function _loadStreetsLayer() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/risk/streets`);
+    if (!res.ok) {
+      // 404 = script hasn't been run yet — silently skip, don't spam console
+      if (res.status !== 404) console.warn("Streets layer HTTP", res.status);
+      return;
+    }
+    const geojson = await res.json();
+
+    if (map.getSource("street-risk")) return; // already added (shouldn't happen)
+
+    map.addSource("street-risk", { type: "geojson", data: geojson });
+
+    // Line width varies by road class — major roads wider
+    const widthExpr = [
+      "match", ["get", "highway"],
+      "motorway",       5,
+      "motorway_link",  4,
+      "trunk",          4,
+      "trunk_link",     3,
+      "primary",        3,
+      "primary_link",   2.5,
+      "secondary",      2.5,
+      "secondary_link", 2,
+      "tertiary",       2,
+      "tertiary_link",  1.5,
+      /* residential / unclassified / etc. */ 1.5
+    ];
+
+    map.addLayer({
+      id: "street-risk-lines",
+      type: "line",
+      source: "street-risk",
+      minzoom: STREETS_MIN_ZOOM,
+      layout: {
+        "line-cap":  "round",
+        "line-join": "round",
+      },
+      paint: {
+        "line-color": [
+          "match", ["get", "risk_class"],
+          "Very High", RISK_COLORS["Very High"],
+          "High",      RISK_COLORS["High"],
+          "Moderate",  RISK_COLORS["Moderate"],
+          /* Low / unknown */ RISK_COLORS["Low"]
+        ],
+        "line-width":   widthExpr,
+        "line-opacity": 0.85,
+      },
+    });
+
+    // Click popup — road name + risk
+    map.on("click", "street-risk-lines", (e) => {
+      const p    = e.features[0].properties;
+      const name = p.name && p.name !== "" ? p.name : "Unnamed road";
+      const rc   = p.risk_class || "Unknown";
+      new maplibregl.Popup({ className: "fs-popup", closeButton: false })
+        .setLngLat(e.lngLat)
+        .setHTML(
+          `<strong>${name}</strong><br>` +
+          `Type: ${p.highway}<br>` +
+          `Flood risk: <span style="color:${_streetColor(rc)};font-weight:600">${rc}</span>`
+        )
+        .addTo(map);
+    });
+    map.on("mouseenter", "street-risk-lines", () => {
+      map.getCanvas().style.cursor = "pointer";
+    });
+    map.on("mouseleave", "street-risk-lines", () => {
+      map.getCanvas().style.cursor = "";
+    });
+
+    // Show the toggle button now the layer is live
+    const toggleBtn = document.getElementById("streets-toggle");
+    if (toggleBtn) toggleBtn.hidden = false;
+
+    console.log(
+      `Streets layer loaded — ${(geojson.features || []).length} segments`
+    );
+  } catch (err) {
+    console.warn("Streets layer failed to load:", err);
+  }
+}
+
+// Toggle button handler (button defined in index.html)
+function toggleStreetsLayer() {
+  const layer = "street-risk-lines";
+  if (!map.getLayer(layer)) return;
+  _streetsVisible = !_streetsVisible;
+  map.setLayoutProperty(layer, "visibility", _streetsVisible ? "visible" : "none");
+  const btn = document.getElementById("streets-toggle");
+  if (btn) btn.textContent = _streetsVisible ? "Hide streets" : "Show streets";
+}

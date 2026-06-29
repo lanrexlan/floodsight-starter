@@ -57,7 +57,7 @@ def root():
         "docs": "/docs",
         "dashboard": "/dashboard/",
         "endpoints": [
-            "/risk/grid", "/risk/point",
+            "/risk/grid", "/risk/point", "/risk/streets",
             "/depth/predict",
             "/alerts/current",
             "/verify", "/verify/summary",
