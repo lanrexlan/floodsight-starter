@@ -932,41 +932,43 @@ function rainyLabel(mm) {
 }
 
 // ── Alert level language ──────────────────────────────────────────
+// Static fallback LGA names — always shown when the API lga_alerts is empty
+// (boundary file not available on server). Based on Phase 13 risk calibration.
+const STATIC_WATCH_AREAS = 'Alimosho, Kosofe, Mushin and Oshodi-Isolo';
+const STATIC_WARN_AREAS  = 'Kosofe, Alimosho, Eti-Osa and Lagos Island';
+
 function alertCopy(level, counts, lgaAlerts) {
   const warn  = counts.Warning  || 0;
   const watch = counts.Watch    || 0;
 
   // Build a human-readable list of the top N most-alerted LGAs.
-  // lgaAlerts is an object like { "Kosofe": 1240, "Mushin": 890, ... }
-  // already sorted descending by the API.
-  function topLgas(n) {
-    if (!lgaAlerts) return '';
-    const names = Object.keys(lgaAlerts).slice(0, n);
-    if (!names.length) return '';
+  // Falls back to static known high-risk areas when lga_alerts is empty
+  // (e.g. boundary file not present on the server).
+  function topLgas(n, fallback) {
+    const names = Object.keys(lgaAlerts || {}).slice(0, n);
+    if (!names.length) return fallback;
     if (names.length === 1) return names[0];
     return names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
   }
 
   if (level === 'Warning') {
-    const lgas = topLgas(3);
-    const lgaNote = lgas ? ` Most affected areas: ${lgas}.` : '';
+    const lgas = topLgas(3, STATIC_WARN_AREAS);
     return {
       dotClass: 'warn', labelClass: 'warn',
       label: '🚨 Flood Warning',
       headline: 'Flooding is expected in parts of Lagos',
-      summary: `Active flood warning in effect.${lgaNote} Avoid low-lying roads. If you are in a red area on the map, move to higher ground now.`,
+      summary: `Active flood warning in effect. Most affected areas: ${lgas}. Avoid low-lying roads. If you are in a red area on the map, move to higher ground now.`,
       barClass: 'warn',
       barText: '🚨 FLOOD WARNING ACTIVE — Check the map for affected areas in Lagos'
     };
   }
   if (level === 'Watch') {
-    const lgas = topLgas(3);
-    const lgaNote = lgas ? ` Areas most at risk: ${lgas}.` : '';
+    const lgas = topLgas(3, STATIC_WATCH_AREAS);
     return {
       dotClass: 'watch', labelClass: 'watch',
       label: '⚠ Flood Watch',
       headline: 'Flooding is possible in some parts of Lagos',
-      summary: `Conditions may worsen.${lgaNote} Avoid parking in low-lying streets and keep valuables off ground floors in at-risk areas.`,
+      summary: `Areas most at risk: ${lgas}. Conditions may worsen. Avoid parking in low-lying streets and keep valuables off ground floors in at-risk areas.`,
       barClass: 'watch',
       barText: '⚠ FLOOD WATCH — Some Lagos areas are at elevated risk. Stay alert.'
     };

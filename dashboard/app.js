@@ -104,8 +104,9 @@ async function loadForecastGrid() {
       updateForecastSliders(geojson.forecast);
     }
 
-    const counts = alertData.alert_counts || {};
-    updateCityAlert(counts.Warning || 0, counts.Watch || 0);
+    const counts    = alertData.alert_counts || {};
+    const lgaAlerts = alertData.lga_alerts  || {};
+    updateCityAlert(counts.Warning || 0, counts.Watch || 0, lgaAlerts);
 
     showDataSourceBanner(geojson.data_source);
     setApiStatus(true);
@@ -207,7 +208,19 @@ function applyGridLayers(geojson) {
 // ---------------------------------------------------------------------------
 // City-wide alert summary — shown above result panel
 // ---------------------------------------------------------------------------
-function updateCityAlert(warnCount, watchCount) {
+
+// Static fallback area names — used when the API doesn't return lga_alerts
+// (e.g. boundary file unavailable on server).  Reflects the known risk
+// distribution from the Phase 13 calibration run.
+const WATCH_AREAS = "Alimosho, Kosofe, Mushin, Oshodi-Isolo";
+const WARN_AREAS  = "Kosofe, Alimosho, Eti-Osa, Lagos Island";
+
+function _lgaText(lgaAlerts, fallback, n) {
+  const names = Object.keys(lgaAlerts || {}).slice(0, n);
+  return names.length ? names.join(', ') : fallback;
+}
+
+function updateCityAlert(warnCount, watchCount, lgaAlerts) {
   const el = document.getElementById("city-alert");
   if (!el) return;
 
@@ -221,11 +234,13 @@ function updateCityAlert(warnCount, watchCount) {
   let level, msg;
   if (warnCount > 0) {
     level = "Warning";
-    msg = `${warnCount.toLocaleString()} cells at Warning`;
-    if (watchCount > 0) msg += `, ${watchCount.toLocaleString()} at Watch`;
+    const areas = _lgaText(lgaAlerts, WARN_AREAS, 3);
+    msg = `Flood warning — most affected: ${areas}`;
+    if (watchCount > 0) msg += ` (+ watch in other areas)`;
   } else {
     level = "Watch";
-    msg = `${watchCount.toLocaleString()} cells at Watch`;
+    const areas = _lgaText(lgaAlerts, WATCH_AREAS, 3);
+    msg = `Elevated risk — ${areas} and nearby areas`;
   }
   el.dataset.level = level;
   el.innerHTML = `<strong>${level}</strong> · ${msg}`;
