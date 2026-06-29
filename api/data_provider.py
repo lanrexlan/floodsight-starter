@@ -86,6 +86,50 @@ def _build_synthetic_demo_grid(n_cells_per_side: int = 35) -> gpd.GeoDataFrame:
     return grid
 
 
+def _tag_lga_names(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """
+    Spatial-join each grid cell to its LGA name using the downloaded ADM2
+    boundary file.  Adds a `lga_name` column; silently skips if the boundary
+    file isn't present (e.g. fresh checkout before scripts/01 has been run).
+    Called once inside get_grid() so the result is cached with the grid.
+    """
+    from floodsight.config import RAW_DIR
+
+    boundaries_path = RAW_DIR / "boundaries" / "NGA_ADM2.geojson"
+    if not boundaries_path.exists():
+        log.info("Boundary file not found — LGA names not tagged (run scripts/01 first)")
+        return gdf
+    try:
+        boundaries = gpd.read_file(boundaries_path)
+        name_col = next(
+            (c for c in ("shapeName", "shapeName1", "NAME_2") if c in boundaries.columns),
+            None,
+        )
+        if name_col is None:
+            log.warning("No recognised name column in boundary file — skipping LGA tagging")
+            return gdf
+
+        from floodsight.config import AOI_LGAS
+
+        mask = boundaries[name_col].str.contains("|".join(AOI_LGAS), case=False, na=False)
+        boundaries = boundaries[mask][[name_col, "geometry"]]
+
+        gdf_wgs84 = gdf.to_crs(WGS84)
+        joined = gpd.sjoin(gdf_wgs84, boundaries, how="left", predicate="intersects")
+        # sjoin may produce duplicate rows when a cell overlaps two LGAs — keep first hit
+        joined = joined[~joined.index.duplicated(keep="first")]
+
+        gdf = gdf.copy()
+        gdf["lga_name"] = joined[name_col].values
+        log.info(
+            "Tagged %d/%d cells with LGA names",
+            gdf["lga_name"].notna().sum(), len(gdf),
+        )
+    except Exception as exc:
+        log.warning("LGA name tagging failed (%s) — proceeding without LGA names", exc)
+    return gdf
+
+
 def get_grid(force_reload: bool = False) -> tuple[gpd.GeoDataFrame, str]:
     global _cached_grid, _cached_source
     if _cached_grid is not None and not force_reload:
@@ -94,6 +138,7 @@ def get_grid(force_reload: bool = False) -> tuple[gpd.GeoDataFrame, str]:
     if SCORED_GRID_PATH.exists():
         log.info("Loading real processed grid from %s", SCORED_GRID_PATH)
         _cached_grid = gpd.read_file(SCORED_GRID_PATH)
+        _cached_grid = _tag_lga_names(_cached_grid)
         _cached_source = "processed_pipeline"
     else:
         log.warning(

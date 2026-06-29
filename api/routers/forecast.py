@@ -112,10 +112,22 @@ def get_grid_alerts(
         for rc in gdf["risk_class"]
     ]
 
-    # 3. Count levels
+    # 3. Count levels + per-LGA breakdown
     counts: dict[str, int] = {"Warning": 0, "Watch": 0, "No Alert": 0}
-    for level in alert_levels:
+    lga_alerts: dict[str, int] = {}
+    has_lga = "lga_name" in gdf.columns
+
+    for i, level in enumerate(alert_levels):
         counts[level] = counts.get(level, 0) + 1
+        if has_lga and level in ("Warning", "Watch"):
+            lga = gdf["lga_name"].iloc[i]
+            if lga and str(lga) != "nan":
+                lga_alerts[lga] = lga_alerts.get(lga, 0) + 1
+
+    # Sort LGAs by alerted cell count descending; keep top 6
+    lga_alerts = dict(
+        sorted(lga_alerts.items(), key=lambda kv: kv[1], reverse=True)[:6]
+    )
 
     highest = (
         "Warning" if counts["Warning"] > 0
@@ -127,6 +139,7 @@ def get_grid_alerts(
         "alert_levels":  alert_levels,
         "alert_counts":  counts,
         "highest_alert": highest,
+        "lga_alerts":    lga_alerts,
         "total_cells":   len(gdf),
         "forecast": {
             # Phase 11 dual-stream fields
