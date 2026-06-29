@@ -68,51 +68,64 @@ def get_rainfall_forecast(
 
 @router.get("/alerts")
 def get_grid_alerts(
-    lat: float = Query(PILOT_LAT, description="Latitude  for forecast lookup"),
-    lon: float = Query(PILOT_LON, description="Longitude for forecast lookup"),
+    lat: float = Query(PILOT_LAT, description="Latitude  for forecast lookup (informational; spatial grid covers full AOI)"),
+    lon: float = Query(PILOT_LON, description="Longitude for forecast lookup (informational; spatial grid covers full AOI)"),
 ):
     """
     Returns a **compact** alert payload — no geometry, just one alert-level
     string per grid cell in the same order as ``/risk/grid`` features.
 
-    The dashboard loads ``/risk/grid`` for geometry and ``/forecast/alerts``
-    for alert levels, then merges them client-side.  This split keeps each
-    response small and avoids serialising the full 54 k-cell GeoJSON twice
-    per page load — which was OOM-killing Render's 512 MB free tier.
+    Phase 14: Per-cell spatial rainfall.
+    Each cell's alert level is computed from its own rainfall value
+    (nearest GFS grid point, 0.25° / ~28 km) rather than a single
+    city-centre point.  IMERG satellite data (0.1° / ~11 km) replaces
+    the GFS-observed component when available.
 
     Response shape::
 
         {
-          "alert_levels":  ["No Alert", "Watch", "Warning", ...],  // 54 k items
+          "alert_levels":  ["No Alert", "Watch", "Warning", ...],
           "alert_counts":  {"Warning": 1234, "Watch": 5678, "No Alert": 46163},
           "highest_alert": "Warning",
-          "total_cells":   54115,
-          "forecast": {
-            "observed_24h_mm": 5.2, "forecast_24h_mm": 18.0, ...
-          }
+          "lga_alerts":    {"Kosofe": 980, "Alimosho": 710, ...},
+          "total_cells":   24933,
+          "spatial_mode":  "imerg+gfs" | "gfs_9point",
+          "forecast": { ...city-centre summary for the status card... }
         }
     """
-    # 1. Live forecast
+    from floodsight.alerts.engine import compute_alert_level
+    from floodsight.forecast.rainfall_grid import (
+        fetch_rainfall_grid,
+        get_centre_forecast,
+        interpolate_to_cells,
+        _try_imerg_observed,
+    )
+
+    # 1. Fetch spatial rainfall grid (9 points in parallel, 30-min cache)
     try:
-        from floodsight.forecast.openmeteo import fetch_forecast
-        fc = fetch_forecast(lat, lon)
+        rainfall_grid = fetch_rainfall_grid()
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    rain_24h = fc["rain_24h_mm"]
-    rain_72h = fc["rain_72h_mm"]
+    # 2. Try IMERG for higher-accuracy observed component (silent fallback)
+    imerg_obs = _try_imerg_observed()
+    spatial_mode = "imerg+gfs" if imerg_obs else "gfs_9point"
 
-    # 2. Compute alert levels by iterating the GeoDataFrame column directly —
-    #    no GeoJSON serialisation; this is the same O(n) loop used by /summary.
-    from floodsight.alerts.engine import compute_alert_level
-
+    # 3. Interpolate per-cell rainfall
     gdf, _ = get_grid()
+    cell_rain = interpolate_to_cells(gdf, rainfall_grid, imerg_obs)
+
+    # 4. Compute per-cell alert levels
     alert_levels = [
-        compute_alert_level(rc, rain_24h, rain_72h)
-        for rc in gdf["risk_class"]
+        compute_alert_level(rc, r24, r72)
+        for rc, r24, r72 in zip(
+            gdf["risk_class"],
+            cell_rain["rain_24h_mm"],
+            cell_rain["rain_72h_mm"],
+        )
     ]
 
-    # 3. Count levels + per-LGA breakdown
+    # 5. Count levels + per-LGA breakdown
     counts: dict[str, int] = {"Warning": 0, "Watch": 0, "No Alert": 0}
     lga_alerts: dict[str, int] = {}
     has_lga = "lga_name" in gdf.columns
@@ -124,7 +137,6 @@ def get_grid_alerts(
             if lga and str(lga) != "nan":
                 lga_alerts[lga] = lga_alerts.get(lga, 0) + 1
 
-    # Sort LGAs by alerted cell count descending; keep top 6
     lga_alerts = dict(
         sorted(lga_alerts.items(), key=lambda kv: kv[1], reverse=True)[:6]
     )
@@ -135,25 +147,26 @@ def get_grid_alerts(
         else "No Alert"
     )
 
+    # 6. City-centre forecast for the status card (backward-compatible)
+    cfc = get_centre_forecast(rainfall_grid)
+
     return {
         "alert_levels":  alert_levels,
         "alert_counts":  counts,
         "highest_alert": highest,
         "lga_alerts":    lga_alerts,
         "total_cells":   len(gdf),
+        "spatial_mode":  spatial_mode,
         "forecast": {
-            # Phase 11 dual-stream fields
-            "observed_24h_mm":  fc.get("observed_24h_mm", 0.0),
-            "forecast_24h_mm":  fc.get("forecast_24h_mm", rain_24h),
-            "forecast_48h_mm":  fc.get("forecast_48h_mm", 0.0),
-            "forecast_72h_mm":  fc.get("forecast_72h_mm", rain_72h),
-            # Alert engine compat (unchanged names)
-            "rain_24h_mm":      rain_24h,
-            "rain_72h_mm":      rain_72h,
-            # Metadata
-            "source":           fc["forecast_source"],
-            "data_mode":        fc.get("data_mode", "forecast_only"),
-            "fetched_at":       fc["fetched_at"],
+            "observed_24h_mm":  cfc.get("observed_24h_mm", 0.0),
+            "forecast_24h_mm":  cfc.get("forecast_24h_mm", cfc["rain_24h_mm"]),
+            "forecast_48h_mm":  cfc.get("forecast_48h_mm", 0.0),
+            "forecast_72h_mm":  cfc.get("forecast_72h_mm", cfc["rain_72h_mm"]),
+            "rain_24h_mm":      cfc["rain_24h_mm"],
+            "rain_72h_mm":      cfc["rain_72h_mm"],
+            "source":           cfc["forecast_source"],
+            "data_mode":        cfc.get("data_mode", "observed+forecast"),
+            "fetched_at":       cfc["fetched_at"],
         },
     }
 
@@ -184,51 +197,55 @@ def get_alert_summary(
       }
     }
     """
-    # 1. Live forecast
+    from floodsight.alerts.engine import compute_alert_level
+    from floodsight.forecast.rainfall_grid import (
+        fetch_rainfall_grid,
+        get_centre_forecast,
+        interpolate_to_cells,
+        _try_imerg_observed,
+    )
+
+    # 1. Spatial rainfall grid (same logic as /forecast/alerts)
     try:
-        from floodsight.forecast.openmeteo import fetch_forecast
-        fc = fetch_forecast(lat, lon)
+        rainfall_grid = fetch_rainfall_grid()
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    rain_24h = fc["rain_24h_mm"]
-    rain_72h = fc["rain_72h_mm"]
-
-    # 2. Load risk grid and count alert levels directly from the GeoDataFrame
-    #    (avoids the slow JSON serialisation that /alerts does for the full grid)
-    from floodsight.alerts.engine import compute_alert_level
-
+    imerg_obs = _try_imerg_observed()
     gdf, _ = get_grid()
+    cell_rain = interpolate_to_cells(gdf, rainfall_grid, imerg_obs)
 
+    # 2. Count alert levels using per-cell rainfall
     counts: dict = {"Warning": 0, "Watch": 0, "No Alert": 0}
-    for risk_class in gdf["risk_class"]:
-        level = compute_alert_level(risk_class, rain_24h, rain_72h)
+    for rc, r24, r72 in zip(
+        gdf["risk_class"],
+        cell_rain["rain_24h_mm"],
+        cell_rain["rain_72h_mm"],
+    ):
+        level = compute_alert_level(rc, r24, r72)
         counts[level] = counts.get(level, 0) + 1
 
-    # Determine highest alert (Warning > Watch > No Alert)
-    if counts.get("Warning", 0) > 0:
-        highest = "Warning"
-    elif counts.get("Watch", 0) > 0:
-        highest = "Watch"
-    else:
-        highest = "No Alert"
+    highest = (
+        "Warning" if counts.get("Warning", 0) > 0
+        else "Watch" if counts.get("Watch", 0) > 0
+        else "No Alert"
+    )
+
+    cfc = get_centre_forecast(rainfall_grid)
 
     return {
-        "total_cells": len(gdf),
+        "total_cells":  len(gdf),
         "alert_counts": counts,
         "highest_alert": highest,
         "forecast": {
-            # Phase 11 dual-stream fields
-            "observed_24h_mm":  fc.get("observed_24h_mm", 0.0),
-            "forecast_24h_mm":  fc.get("forecast_24h_mm", rain_24h),
-            "forecast_48h_mm":  fc.get("forecast_48h_mm", 0.0),
-            "forecast_72h_mm":  fc.get("forecast_72h_mm", rain_72h),
-            # Alert engine compat (unchanged names)
-            "rain_24h_mm":      rain_24h,
-            "rain_72h_mm":      rain_72h,
-            # Metadata
-            "source":           fc["forecast_source"],
-            "data_mode":        fc.get("data_mode", "forecast_only"),
-            "fetched_at":       fc["fetched_at"],
+            "observed_24h_mm":  cfc.get("observed_24h_mm", 0.0),
+            "forecast_24h_mm":  cfc.get("forecast_24h_mm", cfc["rain_24h_mm"]),
+            "forecast_48h_mm":  cfc.get("forecast_48h_mm", 0.0),
+            "forecast_72h_mm":  cfc.get("forecast_72h_mm", cfc["rain_72h_mm"]),
+            "rain_24h_mm":      cfc["rain_24h_mm"],
+            "rain_72h_mm":      cfc["rain_72h_mm"],
+            "source":           cfc["forecast_source"],
+            "data_mode":        cfc.get("data_mode", "observed+forecast"),
+            "fetched_at":       cfc["fetched_at"],
         },
     }
