@@ -44,16 +44,45 @@ for _d in (RAW_DIR, PROCESSED_DIR, MODELS_DIR):
     _d.mkdir(parents=True, exist_ok=True)
 
 # ---------------------------------------------------------------------------
-# Area of interest — Lagos pilot LGAs (Eti-Osa, Lagos Island, Kosofe)
+# Area of interest — Phase 13: city-wide Lagos (15 flood-prone LGAs)
 # Bounding box in WGS84 (lon_min, lat_min, lon_max, lat_max).
-# This is a generous box covering the three LGAs; tighten it with your
-# actual ADM2 boundary geometry once boundaries.py has downloaded it
-# (see floodsight/processing/grid.py, which clips to the real polygon).
+#
+# Expanded from the original 3-LGA pilot (Eti-Osa, Lagos Island, Kosofe)
+# to 15 of Lagos State's 20 LGAs — all the high-density, regularly-flooded
+# urban districts.  Excluded 5 (Apapa, Badagry, Epe, Ibeju-Lekki, Shomolu):
+# Badagry, Epe, and Ibeju-Lekki are largely rural / coastal with fewer
+# documented flood events; Apapa is predominantly industrial port area;
+# Shomolu is very small and partly captured by neighbouring LGA data.
+#
+# Resolution changed from 30 m → 200 m to keep the total cell count
+# comparable to the old 3-LGA/30m grid (~54 k cells):
+#   15 LGAs × Lagos land area share × (30/200)²  ≈  56 k cells
+# This holds Render 512 MB memory within safe bounds while delivering
+# neighbourhood-scale (200 m × 200 m = ~4 ha / ~2 city blocks) resolution.
+#
+# The bounding box is generous — the grid is clipped to the actual GADM
+# LGA polygons so cells over the ocean/lagoon are dropped automatically.
 # ---------------------------------------------------------------------------
 
-AOI_BBOX = (3.30, 6.40, 3.62, 6.62)  # lon_min, lat_min, lon_max, lat_max
-AOI_NAME = "lagos_pilot"
-AOI_LGAS = ["Eti-Osa", "Lagos Island", "Kosofe"]
+AOI_BBOX = (3.00, 6.30, 3.80, 6.80)  # lon_min, lat_min, lon_max, lat_max
+AOI_NAME = "lagos_city"
+AOI_LGAS = [
+    "Agege",
+    "Ajeromi-Ifelodun",
+    "Alimosho",
+    "Amuwo-Odofin",
+    "Eti-Osa",
+    "Ifako-Ijaiye",
+    "Ikeja",
+    "Ikorodu",
+    "Kosofe",
+    "Lagos Island",
+    "Lagos Mainland",
+    "Mushin",
+    "Ojo",
+    "Oshodi-Isolo",
+    "Surulere",
+]
 AOI_COUNTRY_ISO3 = "NGA"
 
 # Working CRS for all raster/vector processing (UTM 31N — correct zone for
@@ -66,7 +95,9 @@ WGS84 = "EPSG:4326"
 # Grid
 # ---------------------------------------------------------------------------
 
-GRID_RESOLUTION_M = 30  # matches the existing 30m pilot grid
+GRID_RESOLUTION_M = 200  # Phase 13: 200 m city-wide grid (was 30 m for pilot)
+                          # 200 m keeps total cell count ≈ 56 k across 15 LGAs,
+                          # matching the old 54 k at 30 m over 3 LGAs.
 
 # ---------------------------------------------------------------------------
 # Susceptibility model (v0 — ported from the existing README formula)
@@ -83,10 +114,17 @@ SUSCEPTIBILITY_WEIGHTS = {
 }
 
 RISK_CLASS_BREAKS = {
-    "Low": (0.0, 0.25),
-    "Moderate": (0.25, 0.50),
-    "High": (0.50, 0.75),
-    "Very High": (0.75, 1.01),  # upper bound inclusive of 1.0
+    # Phase 13: recalibrated to the actual Lagos city-wide score distribution.
+    # Lagos's flat terrain + high impervious cover pushes all scores into a
+    # narrow band (0.31–0.91, Q25=0.526, median=0.580, Q75=0.639).  The
+    # original generic 0.25/0.50/0.75 breaks put 84% of cells into "High"
+    # with no Low cells at all — too noisy for operational alerting.
+    # These breaks are the Lagos AOI quartiles, giving ~25% per class:
+    #   Low < 0.53 | Moderate 0.53–0.58 | High 0.58–0.64 | Very High > 0.64
+    "Low":       (0.00, 0.53),
+    "Moderate":  (0.53, 0.58),
+    "High":      (0.58, 0.64),
+    "Very High": (0.64, 1.01),
 }
 
 # ---------------------------------------------------------------------------

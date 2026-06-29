@@ -46,9 +46,12 @@ log = logging.getLogger(__name__)
 
 DEFAULT_API = "https://floodsight-starter.onrender.com"
 
-# Areas within the pilot grid for context (north cluster, where most cells are)
-NORTH_AREAS = "Kosofe, Gbagada, Ketu, Ojota"
-SOUTH_AREAS = "Lagos Island"
+# Phase 13: city-wide coverage — 15 LGAs.
+# Area labels used in the SMS depending on where alerts are concentrated.
+HIGH_DENSITY_AREAS  = "Alimosho, Kosofe, Mushin, Oshodi-Isolo"  # mainland core
+COASTAL_AREAS       = "Eti-Osa, Lagos Island, Amuwo-Odofin, Ojo"  # coastal/island
+NORTH_AREAS         = HIGH_DENSITY_AREAS   # backward-compat alias
+SOUTH_AREAS         = COASTAL_AREAS        # backward-compat alias
 
 
 # ---------------------------------------------------------------------------
@@ -91,13 +94,14 @@ def format_message(summary: dict) -> str:
             f"FloodSight Lagos {date_str}\n"
             f"STATUS: All Clear\n"
             f"Rain: {r24}mm/24h, {r72}mm/72h\n"
-            f"No active flood alerts. Stay prepared."
+            f"No active flood alerts across 15 LGAs. Stay prepared."
         )
     else:
         lines = [f"FloodSight Lagos {date_str}", f"STATUS: {highest.upper()}"]
 
         warn = counts.get("Warning", 0)
         watch = counts.get("Watch", 0)
+        total = warn + watch
         if warn:
             lines.append(f"WARNING: {warn:,} grid cells")
         if watch:
@@ -105,8 +109,13 @@ def format_message(summary: dict) -> str:
 
         lines.append(f"Rain: {r24}mm/24h, {r72}mm/72h")
 
-        # Mention affected pilot areas
-        areas = NORTH_AREAS if warn + watch > 1000 else SOUTH_AREAS
+        # Mention likely-affected areas based on cell count magnitude
+        if total > 5000:
+            areas = f"{HIGH_DENSITY_AREAS} & others"
+        elif total > 1000:
+            areas = HIGH_DENSITY_AREAS
+        else:
+            areas = COASTAL_AREAS
         lines.append(f"Areas: {areas}")
         lines.append("Avoid flooded roads. Stay safe.")
 

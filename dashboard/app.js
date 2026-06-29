@@ -1,6 +1,7 @@
 // ---------------------------------------------------------------------------
 // FloodSight Dashboard — MapLibre GL JS edition
-// 3D interactive map with live alert colors, place search, pilot LGA focus
+// 3D interactive map with live alert colors, place search, city-wide LGA view
+// Phase 13: expanded from 3-LGA pilot to 15-LGA city-wide coverage
 // ---------------------------------------------------------------------------
 
 const isLocalDev =
@@ -21,13 +22,12 @@ const ALERT_COLORS = {
   "Watch":   "#F5A623",
 };
 
-// Pilot grid actual bounds: lon 3.359–3.450, lat 6.439–6.620
-// Two clusters: south (lat 6.44–6.48, Lagos Is.) and north (lat 6.53–6.62, Kosofe/Gbagada)
-// Default opens on northern cluster which holds 87% of cells
-const PILOT_CENTER  = [3.395, 6.575];
-const PILOT_ZOOM    = 11.5;
-const PILOT_PITCH   = 48;
-const PILOT_BEARING = -8;
+// Phase 13: city-wide view — all 15 flood-prone LGAs (lon 3.00–3.80, lat 6.30–6.80)
+// Centre on Ikeja/mainland axis; zoom 10 fits ~80 km across, showing the full city.
+const PILOT_CENTER  = [3.39, 6.52];   // Lagos geographic centre (Ikeja area)
+const PILOT_ZOOM    = 10.5;
+const PILOT_PITCH   = 40;
+const PILOT_BEARING = -5;
 
 // ---------------------------------------------------------------------------
 // Map init — CARTO dark-matter (free, no API key)
