@@ -28,7 +28,8 @@ Environment variables
                         Authorization: Bearer <your-secret>
     SUPABASE_URL      — set in Render
     SUPABASE_KEY      — set in Render
-    TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER — set in Render
+    AT_USERNAME, AT_API_KEY, AT_SENDER_ID — Africa's Talking credentials
+                        (set in Render; use username='sandbox' for testing)
 """
 
 from __future__ import annotations

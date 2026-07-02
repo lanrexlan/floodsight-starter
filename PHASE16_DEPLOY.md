@@ -28,26 +28,32 @@ Estimated time: **30–45 minutes**.
 
 ---
 
-## Step 2 — Twilio: get a sending number
+## Step 2 — Africa's Talking: create account and get API key
 
-1. Sign up at **https://twilio.com** (trial account is free; gives $15 credit,
-   enough for ~500 test SMS to Nigeria).
+Africa's Talking has direct connections to MTN, Airtel, Glo, and 9mobile —
+~10× cheaper than Twilio for Nigerian SMS (~₦5–15/SMS vs ~₦160 with Twilio).
 
-2. Console → **Phone Numbers → Manage → Buy a number**.
-   - For Nigeria delivery, choose a **US long code** (most reliable) or a Twilio
-     **Alphanumeric Sender ID** if you want "FloodSight" as the sender name
-     (requires Twilio approval and some countries block them).
-   - Cheapest trial: any US number ≈ $1/month.
+1. Sign up at **https://account.africastalking.com** (free; sandbox is instant).
 
-3. **Console → Account → Account Info** — copy:
-   - Account SID → `TWILIO_ACCOUNT_SID`
-   - Auth Token → `TWILIO_AUTH_TOKEN`
-   - Your Twilio number (E.164) → `TWILIO_FROM_NUMBER`
+2. After login → **Settings → API Key** — generate and copy your API key.
+   - Your **username** is shown on the dashboard (top-right).
+   - For testing: use `AT_USERNAME=sandbox` and the sandbox API key.
+   - For production: switch to your real username and live API key.
 
-4. **Trial-account restriction**: Twilio trial accounts can only send to
-   **verified** numbers. Go to Console → Phone Numbers → Verified Caller IDs →
-   add your own Nigerian number for testing. Upgrade to a paid account before
-   sending to real subscribers.
+3. **Optional — register a Sender ID**:
+   - Go to **SMS → Sender IDs → Request** and apply for `FloodSight` as a
+     custom sender name. This replaces the shared shortcode (e.g. `AT-FLDSGT`).
+   - Approval takes 1–2 business days in Nigeria.
+   - If you skip this for now, set `AT_SENDER_ID=` (blank) to use AT's shared pool.
+
+4. **Test in sandbox**:
+   - Add your number to the **sandbox simulator** in the AT dashboard so you can
+     receive test messages before going live.
+
+AT credentials to copy:
+   - Your username → `AT_USERNAME`
+   - Your API key → `AT_API_KEY`
+   - Your sender ID (or blank) → `AT_SENDER_ID`
 
 ---
 
@@ -72,9 +78,9 @@ Go to **https://dashboard.render.com** → your `floodsight-starter` service
 |-----|-------|
 | `SUPABASE_URL` | `https://your-project-id.supabase.co` |
 | `SUPABASE_KEY` | service_role secret key |
-| `TWILIO_ACCOUNT_SID` | `ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
-| `TWILIO_AUTH_TOKEN` | your Twilio auth token |
-| `TWILIO_FROM_NUMBER` | your Twilio number in E.164, e.g. `+12345678901` |
+| `AT_USERNAME` | your Africa's Talking username (or `sandbox` for testing) |
+| `AT_API_KEY` | your Africa's Talking API key |
+| `AT_SENDER_ID` | `FloodSight` (or blank to use AT shared pool) |
 | `DISPATCH_SECRET` | the hex string from Step 3 |
 
 Click **Save Changes** — Render will redeploy automatically (~60 seconds).
@@ -194,7 +200,7 @@ SELECT * FROM alert_log ORDER BY sent_at DESC LIMIT 20;
 |---------|-------|-----|
 | `/subscribe` returns 503 | SUPABASE_URL or SUPABASE_KEY not set | Check Render env vars |
 | `/alerts/dispatch` returns 401 | Wrong Authorization header | Check DISPATCH_SECRET matches |
-| `/alerts/dispatch` returns 503 | TWILIO_* vars missing | Add to Render env |
-| SMS sends but recipient gets nothing | Trial account + unverified number | Verify number in Twilio console |
+| `/alerts/dispatch` returns 503 | AT_USERNAME or AT_API_KEY missing | Add to Render env |
+| SMS sends but recipient gets nothing | Using sandbox credentials in production | Switch AT_USERNAME to your real username + live API key |
 | `dispatch` returns `dispatched:0, skipped:N` | No Watch/Warning active today | Normal behaviour — alerts only go out when thresholds are crossed |
 | Supabase upsert fails | Using anon key instead of service_role | Re-copy service_role key |
