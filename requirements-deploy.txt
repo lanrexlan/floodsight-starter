@@ -24,3 +24,9 @@ pyproj==3.6.1
 #   gracefully skipped if login fails; falls back to GFS observed)
 earthaccess==0.10.0
 h5py>=3.10
+
+# Phase 16: resident SMS alert subscriptions
+# supabase: PostgreSQL cloud DB client (subscriber store + alert log)
+# twilio: SMS delivery
+supabase==2.7.4
+twilio==9.3.1

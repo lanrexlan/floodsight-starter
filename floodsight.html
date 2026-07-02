@@ -421,6 +421,75 @@ h2 em { font-style: italic; font-weight: 300; color: var(--accent); }
 }
 .step-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
 
+/* ─── Subscribe Form ───────────────────────────────────────────── */
+.subscribe-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 56px;
+  position: relative; overflow: hidden;
+}
+.subscribe-section::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 30% 50%, rgba(79,195,247,0.05), transparent 60%);
+  pointer-events: none;
+}
+.subscribe-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 56px;
+  align-items: start;
+  position: relative;
+}
+@media(max-width:700px) { .subscribe-grid { grid-template-columns: 1fr; gap: 32px; } }
+.subscribe-pitch h2 { margin-bottom: 16px; }
+.subscribe-pitch p  { color: var(--muted); line-height: 1.7; margin-bottom: 20px; }
+.subscribe-benefit  {
+  display: flex; align-items: flex-start; gap: 12px;
+  margin-bottom: 14px; font-size: 14px; color: var(--muted);
+}
+.subscribe-benefit svg { flex-shrink: 0; margin-top: 2px; }
+.subscribe-form-wrap h3 { font-size: 18px; margin-bottom: 20px; }
+.sub-field { margin-bottom: 14px; }
+.sub-field label {
+  display: block; font-size: 12px; font-weight: 600;
+  color: var(--muted); text-transform: uppercase; letter-spacing: .05em;
+  margin-bottom: 6px;
+}
+.sub-field input[type="text"],
+.sub-field input[type="tel"] {
+  width: 100%; padding: 11px 14px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); font-size: 15px;
+  box-sizing: border-box; transition: border-color .15s;
+}
+.sub-field input:focus { outline: none; border-color: var(--accent); }
+.sub-location-row { display: flex; gap: 8px; align-items: center; }
+.sub-location-row input { flex: 1; }
+.btn-locate {
+  padding: 10px 14px; background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 8px;
+  color: var(--accent); cursor: pointer; font-size: 13px;
+  white-space: nowrap; transition: background .15s; flex-shrink: 0;
+}
+.btn-locate:hover { background: rgba(79,195,247,0.12); }
+.sub-risk-preview { font-size: 13px; color: var(--muted); margin: 6px 0 14px; min-height: 20px; }
+.sub-risk-preview strong { font-weight: 600; }
+#sub-submit {
+  width: 100%; padding: 13px;
+  background: var(--accent); color: #000;
+  border: none; border-radius: 8px;
+  font-size: 15px; font-weight: 700; cursor: pointer;
+  transition: opacity .15s;
+}
+#sub-submit:hover    { opacity: 0.88; }
+#sub-submit:disabled { opacity: 0.45; cursor: not-allowed; }
+.sub-status { margin-top: 14px; font-size: 14px; min-height: 20px; display: none; }
+.sub-status.success { color: var(--green); display: block; }
+.sub-status.error   { color: var(--red);   display: block; }
+.sub-note { font-size: 12px; color: var(--muted); margin-top: 10px; }
+
 /* ─── CTA Banner ───────────────────────────────────────────────── */
 .cta-banner {
   background: var(--surface);
@@ -858,6 +927,86 @@ footer {
 
 <div class="section-divider"></div>
 
+<!-- ░░ SUBSCRIBE ░░ -->
+<section id="subscribe">
+  <div class="subscribe-section">
+    <div class="subscribe-grid">
+
+      <!-- Left: pitch copy -->
+      <div class="subscribe-pitch">
+        <div class="eyebrow">\U0001f514 Flood Alerts</div>
+        <h2>Get Warned <em>Before</em> the Water Rises</h2>
+        <p>
+          Sign up for free SMS flood alerts for your neighbourhood.
+          When FloodSight issues a Watch or Warning for your area,
+          you’ll receive a text so you can act — before roads flood and options narrow.
+        </p>
+        <div class="subscribe-benefit">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="7" stroke="#4fc3f7" stroke-width="1.5"/>
+            <path d="M5 8l2 2 4-4" stroke="#4fc3f7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Hyperlocal — alerts are specific to <em>your</em> street’s risk level, not generic city warnings</span>
+        </div>
+        <div class="subscribe-benefit">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="7" stroke="#4fc3f7" stroke-width="1.5"/>
+            <path d="M5 8l2 2 4-4" stroke="#4fc3f7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Updated hourly using live rainfall data from satellite and weather models</span>
+        </div>
+        <div class="subscribe-benefit">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="7" stroke="#4fc3f7" stroke-width="1.5"/>
+            <path d="M5 8l2 2 4-4" stroke="#4fc3f7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Free SMS — no app, no internet needed to receive alerts</span>
+        </div>
+      </div>
+
+      <!-- Right: form -->
+      <div class="subscribe-form-wrap">
+        <h3>Subscribe for free</h3>
+
+        <div class="sub-field">
+          <label for="sub-name">Your name <span style="font-weight:400;text-transform:none">(optional)</span></label>
+          <input type="text" id="sub-name" placeholder="e.g. Habeeb" />
+        </div>
+
+        <div class="sub-field">
+          <label for="sub-phone">Phone number <span style="color:var(--red)">*</span></label>
+          <input type="tel" id="sub-phone" placeholder="e.g. 08012345678 or +2348012345678"
+                 oninput="subCheckReady()" />
+        </div>
+
+        <div class="sub-field">
+          <label>Your location <span style="color:var(--red)">*</span></label>
+          <div class="sub-location-row">
+            <input type="text" id="sub-area" placeholder="Type your area or street…"
+                   oninput="subGeocode(this.value)" />
+            <button class="btn-locate" onclick="subUseMyLocation()" title="Use GPS location">
+              \U0001f4cd Locate me
+            </button>
+          </div>
+        </div>
+
+        <div class="sub-risk-preview" id="sub-risk-preview"></div>
+
+        <button id="sub-submit" onclick="submitSubscription()" disabled>
+          Subscribe to flood alerts
+        </button>
+
+        <div class="sub-status" id="sub-status"></div>
+        <p class="sub-note">
+          Alerts sent only during active Watch or Warning events.
+          Reply STOP at any time to unsubscribe. Your number is never shared.
+        </p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
 <!-- ░░ CTA ░░ -->
 <section>
   <div class="cta-banner">
@@ -1119,6 +1268,156 @@ fetch(`${API}/forecast/summary`)
   .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
   .then(renderStatus)
   .catch(renderError);
+
+// ═══════════════════════════════════════════════════════════════════
+// Phase 16 — Subscription form
+// ═══════════════════════════════════════════════════════════════════
+let _subLat = null, _subLon = null, _subGeoTimer = null;
+
+const RISK_COLORS_SUB = {
+  'Very High': '#f87171',
+  'High':      '#fb923c',
+  'Moderate':  '#fbbf24',
+  'Low':       '#34d399',
+};
+
+function subCheckReady() {
+  const phone = document.getElementById('sub-phone').value.trim();
+  const ready = phone.length >= 7 && _subLat !== null;
+  document.getElementById('sub-submit').disabled = !ready;
+}
+
+function subSetLocation(lat, lon, areaLabel) {
+  _subLat = lat;
+  _subLon = lon;
+  document.getElementById('sub-area').value = areaLabel;
+  subCheckReady();
+  // Fetch risk class for this location
+  fetch(`${API}/risk/point?lat=${lat}&lon=${lon}`)
+    .then(r => r.json())
+    .then(d => {
+      const rc    = d.risk_class || 'Unknown';
+      const color = RISK_COLORS_SUB[rc] || '#aaa';
+      document.getElementById('sub-risk-preview').innerHTML =
+        `Baseline flood risk for this location: <strong style="color:${color}">${rc}</strong>`;
+      subCheckReady();
+    })
+    .catch(() => {
+      document.getElementById('sub-risk-preview').textContent = '';
+    });
+}
+
+// Geocode typed area name (debounced 600 ms)
+function subGeocode(query) {
+  _subLat = null; _subLon = null;
+  document.getElementById('sub-risk-preview').textContent = '';
+  subCheckReady();
+  clearTimeout(_subGeoTimer);
+  if (query.trim().length < 3) return;
+  _subGeoTimer = setTimeout(() => {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query + ', Lagos, Nigeria')}&format=json&limit=1&accept-language=en`;
+    fetch(url, { headers: { 'User-Agent': 'FloodSight-Subscribe/1.0' } })
+      .then(r => r.json())
+      .then(results => {
+        if (results && results.length > 0) {
+          const { lat, lon, display_name } = results[0];
+          subSetLocation(parseFloat(lat), parseFloat(lon), display_name.split(',').slice(0,2).join(', '));
+        }
+      })
+      .catch(() => {});
+  }, 600);
+}
+
+// Use browser GPS
+function subUseMyLocation() {
+  if (!navigator.geolocation) {
+    alert('Geolocation is not supported by your browser.');
+    return;
+  }
+  const btn = document.querySelector('.btn-locate');
+  btn.textContent = 'Locating…';
+  btn.disabled = true;
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      btn.textContent = '📍 Locate me';
+      btn.disabled = false;
+      const lat = pos.coords.latitude, lon = pos.coords.longitude;
+      // Reverse geocode for a human label
+      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=14&accept-language=en`, {
+        headers: { 'User-Agent': 'FloodSight-Subscribe/1.0' }
+      })
+        .then(r => r.json())
+        .then(d => {
+          const a = d.address || {};
+          const label = a.neighbourhood || a.suburb || a.city_district || a.town || d.display_name.split(',')[0];
+          subSetLocation(lat, lon, label);
+        })
+        .catch(() => subSetLocation(lat, lon, `${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E`));
+    },
+    (err) => {
+      btn.textContent = '📍 Locate me';
+      btn.disabled = false;
+      alert('Could not get your location. Please type your area instead.');
+    },
+    { timeout: 10000 }
+  );
+}
+
+async function submitSubscription() {
+  const phone    = document.getElementById('sub-phone').value.trim();
+  const name     = document.getElementById('sub-name').value.trim();
+  const areaName = document.getElementById('sub-area').value.trim();
+  const statusEl = document.getElementById('sub-status');
+  const submitBtn= document.getElementById('sub-submit');
+
+  if (!phone || _subLat === null) return;
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Subscribing…';
+  statusEl.className = 'sub-status';
+  statusEl.style.display = 'none';
+
+  try {
+    const res = await fetch(`${API}/subscribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone, name: name || null,
+        lat: _subLat, lon: _subLon,
+        area_name: areaName || null,
+      }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.detail || `Error ${res.status}`);
+    }
+
+    const rc    = data.risk_class || '';
+    const area  = data.area_name  || areaName || 'your area';
+    const color = RISK_COLORS_SUB[rc] || '#4fc3f7';
+    statusEl.innerHTML =
+      `✓ Subscribed! Your area (<strong>${area}</strong>) has ` +
+      `<strong style="color:${color}">${rc || 'unknown'}</strong> baseline flood risk. ` +
+      `You’ll receive an SMS when a Watch or Warning is issued for your location.`;
+    statusEl.className = 'sub-status success';
+
+    // Reset form
+    document.getElementById('sub-phone').value = '';
+    document.getElementById('sub-name').value  = '';
+    document.getElementById('sub-area').value  = '';
+    document.getElementById('sub-risk-preview').textContent = '';
+    _subLat = null; _subLon = null;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Subscribe to flood alerts';
+
+  } catch (err) {
+    statusEl.textContent = `✗ ${err.message || 'Could not subscribe. Please try again.'}`;
+    statusEl.className = 'sub-status error';
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Subscribe to flood alerts';
+  }
+}
 </script>
 </body>
 </html>
