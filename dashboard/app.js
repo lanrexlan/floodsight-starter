@@ -769,7 +769,80 @@ async function _loadSwmmLayer() {
   }
 }
 
-// Toggle SWMM layer visibility
+// ── SMS Alert Subscription (dashboard panel) ──────────────────────────────
+
+async function _loadSubCount() {
+  try {
+    const res  = await fetch(`${API_BASE_URL}/subscribers/count`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const badge = document.getElementById("sub-count-badge");
+    if (badge) {
+      const n = data.active_subscribers || 0;
+      badge.textContent = `${n} subscriber${n !== 1 ? "s" : ""}`;
+    }
+  } catch (_) {}
+}
+
+function dashSubCheck() {
+  const phone = (document.getElementById("dash-sub-phone")?.value || "").trim();
+  const btn   = document.getElementById("dash-sub-btn");
+  if (!btn) return;
+  const ready = phone.length >= 7;
+  btn.disabled      = !ready;
+  btn.style.cursor  = ready ? "pointer"  : "not-allowed";
+  btn.style.opacity = ready ? "1"        : "0.5";
+}
+
+async function dashSubscribe() {
+  const phoneEl  = document.getElementById("dash-sub-phone");
+  const areaEl   = document.getElementById("dash-sub-area");
+  const statusEl = document.getElementById("dash-sub-status");
+  const btn      = document.getElementById("dash-sub-btn");
+  if (!phoneEl || !statusEl) return;
+
+  const phone    = phoneEl.value.trim();
+  const areaName = areaEl?.value.trim() || null;
+  if (!phone) return;
+
+  // Use current map centre as the subscriber's location
+  const centre = map.getCenter();
+  const lat    = parseFloat(centre.lat.toFixed(5));
+  const lon    = parseFloat(centre.lng.toFixed(5));
+
+  btn.disabled    = true;
+  btn.textContent = "Subscribing…";
+  statusEl.style.color = "#90CAF9";
+  statusEl.textContent = "";
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/subscribe`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ phone, lat, lon, area_name: areaName || undefined }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+
+    statusEl.style.color = "#81C784";
+    statusEl.textContent = `✓ Subscribed — ${data.risk_class || "?"} risk area`;
+    phoneEl.value = "";
+    if (areaEl) areaEl.value = "";
+    await _loadSubCount();
+  } catch (err) {
+    statusEl.style.color = "#EF9A9A";
+    statusEl.textContent = `✗ ${err.message}`;
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = "Subscribe";
+    dashSubCheck();
+  }
+}
+
+// Load subscriber count on page load (after map init)
+map.on("load", _loadSubCount);
+
+// ── Toggle SWMM layer visibility ──────────────────────────────────────────
 function toggleSwmmLayer() {
   if (!_swmmLoaded) return;
   _swmmVisible = !_swmmVisible;

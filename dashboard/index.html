@@ -133,6 +133,39 @@
       </p>
     </section>
 
+    <!-- SMS Alert Subscriptions -->
+    <section class="panel">
+      <h2>SMS Alerts
+        <span id="sub-count-badge" style="
+          display:inline-block;margin-left:8px;padding:1px 7px;
+          background:#1F3864;color:#90CAF9;border-radius:10px;
+          font-size:11px;font-weight:600;letter-spacing:.3px;vertical-align:middle">
+          0 subscribers
+        </span>
+      </h2>
+      <p class="hint" style="margin:0 0 8px">Register a resident for flood alerts. Location defaults to the current map centre.</p>
+      <input id="dash-sub-phone" type="tel"
+             placeholder="e.g. 08012345678"
+             autocomplete="off"
+             style="width:100%;box-sizing:border-box;padding:7px 10px;
+                    background:#1a2236;border:1px solid #2d4060;border-radius:6px;
+                    color:#E8EAF6;font-size:13px;margin-bottom:8px;outline:none"
+             oninput="dashSubCheck()" />
+      <input id="dash-sub-area" type="text"
+             placeholder="Area name (optional)"
+             autocomplete="off"
+             style="width:100%;box-sizing:border-box;padding:7px 10px;
+                    background:#1a2236;border:1px solid #2d4060;border-radius:6px;
+                    color:#E8EAF6;font-size:13px;margin-bottom:8px;outline:none" />
+      <button id="dash-sub-btn" onclick="dashSubscribe()" disabled
+              class="lga-btn"
+              style="width:100%;padding:8px;font-size:13px;
+                     background:#1F3864;color:#90CAF9;cursor:not-allowed;opacity:0.5">
+        Subscribe
+      </button>
+      <div id="dash-sub-status" style="font-size:12px;margin-top:6px;min-height:16px"></div>
+    </section>
+
     <footer class="api-footer">
       <span id="api-status" class="mono">connecting…</span>
     </footer>
