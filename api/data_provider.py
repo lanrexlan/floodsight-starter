@@ -215,8 +215,42 @@ def get_streets_geojson() -> tuple[dict | None, str]:
     return _cached_streets_geojson
 
 
+SWMM_FLOODING_PATH = PROCESSED_DIR / "swmm_flooding.geojson"
+_cached_swmm_geojson: dict | None = None
+
+
+def get_swmm_flooding_geojson() -> dict | None:
+    """
+    Returns the SWMM flooded-junction GeoJSON dict, or None if the file
+    hasn't been generated yet (run scripts/07_parse_swmm_results.py).
+    Cached for the process lifetime.
+    """
+    global _cached_swmm_geojson
+    if _cached_swmm_geojson is not None:
+        return _cached_swmm_geojson
+
+    if not SWMM_FLOODING_PATH.exists():
+        log.info(
+            "swmm_flooding.geojson not found at %s "
+            "-- run scripts/07_parse_swmm_results.py",
+            SWMM_FLOODING_PATH,
+        )
+        return None
+
+    log.info("Loading SWMM flooding GeoJSON from %s ...", SWMM_FLOODING_PATH)
+    with open(SWMM_FLOODING_PATH, encoding="utf-8") as fh:
+        geojson = json.load(fh)
+    _cached_swmm_geojson = geojson
+    log.info(
+        "SWMM GeoJSON cached -- %d flooded nodes",
+        len(geojson.get("features", [])),
+    )
+    return _cached_swmm_geojson
+
+
 def nearest_cell(lat: float, lon: float) -> pd.Series:
     grid, _ = get_grid()
     point = gpd.GeoSeries([gpd.points_from_xy([lon], [lat])[0]], crs=WGS84).to_crs(grid.crs)[0]
     idx = grid.geometry.distance(point).idxmin()
     return grid.loc[idx]
+

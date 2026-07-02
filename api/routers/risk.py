@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
-from api.data_provider import get_grid, get_grid_geojson, get_streets_geojson, nearest_cell
+from api.data_provider import get_grid, get_grid_geojson, get_streets_geojson, get_swmm_flooding_geojson, nearest_cell
 from api.schemas import RiskAtPoint
 
 router = APIRouter(prefix="/risk", tags=["risk"])
@@ -61,6 +61,31 @@ def risk_streets():
             detail=(
                 "Street risk data not available. "
                 "Run scripts/05_tag_street_risk.py to generate it."
+            ),
+        )
+    return geojson
+
+
+@router.get("/swmm-flooding")
+def swmm_flooding():
+    """
+    SWMM 5.2 flooded-junction GeoJSON for the Kosofe pilot.
+
+    Each feature is a junction that overflowed during the 150 mm / 4 h design
+    storm.  Properties include ``flood_class`` (Severe / Moderate / Nuisance),
+    ``max_rate_cms``, ``hours_flooded``, ``total_vol_10e6l``, and ``colour``
+    (CSS hex for the dashboard layer).
+
+    **Pre-requisite:** run ``scripts/07_parse_swmm_results.py``.
+    Returns 404 until ``data/processed/swmm_flooding.geojson`` exists.
+    """
+    geojson = get_swmm_flooding_geojson()
+    if geojson is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "SWMM flooding data not available. "
+                "Run scripts/07_parse_swmm_results.py to generate it."
             ),
         )
     return geojson

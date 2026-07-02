@@ -666,3 +666,117 @@ function toggleStreetsLayer() {
   const btn = document.getElementById("streets-toggle");
   if (btn) btn.textContent = _streetsVisible ? "Hide streets" : "Show streets";
 }
+
+// ---------------------------------------------------------------------------
+// SWMM flood layer — junction overflow points from 150 mm design storm
+// Colour-coded by severity: Severe (red) / Moderate (amber) / Nuisance (yellow)
+// Pulsing outer ring on Severe nodes highlights highest-risk locations.
+// ---------------------------------------------------------------------------
+const SWMM_MIN_ZOOM = 11;   // visible from LGA level
+let _swmmLoaded    = false;
+let _swmmVisible   = true;
+
+// Load once when map is ready (not lazy — it's a small point file)
+map.on("load", () => {
+  _loadSwmmLayer();
+});
+
+async function _loadSwmmLayer() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/risk/swmm-flooding`);
+    if (!res.ok) {
+      if (res.status !== 404) console.warn("SWMM flooding layer HTTP", res.status);
+      return;
+    }
+    const geojson = await res.json();
+    _swmmLoaded = true;
+
+    map.addSource("swmm-flooding", { type: "geojson", data: geojson });
+
+    // Outer glow ring — Severe nodes only; gives a pulsing effect via CSS animation
+    map.addLayer({
+      id: "swmm-flood-glow",
+      type: "circle",
+      source: "swmm-flooding",
+      minzoom: SWMM_MIN_ZOOM,
+      filter: ["==", ["get", "flood_class"], "Severe"],
+      paint: {
+        "circle-radius":       10,
+        "circle-color":        "#C62828",
+        "circle-opacity":      0.25,
+        "circle-stroke-width": 0,
+      },
+    });
+
+    // Core dot — all nodes, coloured by flood_class
+    map.addLayer({
+      id: "swmm-flood-dots",
+      type: "circle",
+      source: "swmm-flooding",
+      minzoom: SWMM_MIN_ZOOM,
+      paint: {
+        "circle-radius": [
+          "interpolate", ["linear"], ["zoom"],
+          11, 3,
+          14, 6,
+          17, 10,
+        ],
+        "circle-color": ["get", "colour"],
+        "circle-opacity": 0.9,
+        "circle-stroke-color": "rgba(0,0,0,0.55)",
+        "circle-stroke-width": 1,
+      },
+    });
+
+    // Click popup
+    map.on("click", "swmm-flood-dots", (e) => {
+      const p = e.features[0].properties;
+      const colHex = p.colour || "#888";
+      new maplibregl.Popup({ className: "fs-popup", closeButton: false })
+        .setLngLat(e.lngLat)
+        .setHTML(
+          `<strong>${p.node_id}</strong><br>` +
+          `Severity: <span style="color:${colHex};font-weight:600">${p.flood_class}</span><br>` +
+          `Peak rate: ${p.max_rate_cms} m³/s<br>` +
+          `Hours flooded: ${p.hours_flooded} h<br>` +
+          `Total volume: ${p.total_vol_10e6l} × 10⁶ L<br>` +
+          `Elevation: ${p.elevation_m} m`
+        )
+        .addTo(map);
+    });
+    map.on("mouseenter", "swmm-flood-dots", () => {
+      map.getCanvas().style.cursor = "pointer";
+    });
+    map.on("mouseleave", "swmm-flood-dots", () => {
+      map.getCanvas().style.cursor = "";
+    });
+
+    // Show toggle button
+    const toggleBtn = document.getElementById("swmm-toggle");
+    if (toggleBtn) toggleBtn.hidden = false;
+
+    const meta = geojson.metadata || {};
+    const counts = meta.severity_counts || {};
+    console.log(
+      `SWMM flooding layer loaded — ` +
+      `${(geojson.features || []).length} nodes ` +
+      `(Severe: ${counts.Severe || 0}, ` +
+      `Moderate: ${counts.Moderate || 0}, ` +
+      `Nuisance: ${counts.Nuisance || 0})`
+    );
+  } catch (err) {
+    console.warn("SWMM flooding layer failed to load:", err);
+  }
+}
+
+// Toggle SWMM layer visibility
+function toggleSwmmLayer() {
+  if (!_swmmLoaded) return;
+  _swmmVisible = !_swmmVisible;
+  const vis = _swmmVisible ? "visible" : "none";
+  ["swmm-flood-glow", "swmm-flood-dots"].forEach(id => {
+    if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", vis);
+  });
+  const btn = document.getElementById("swmm-toggle");
+  if (btn) btn.textContent = _swmmVisible ? "Hide SWMM flood" : "Show SWMM flood";
+}

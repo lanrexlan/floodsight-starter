@@ -20,14 +20,11 @@ data/processed/**
 # HyP3 SAR processing + FwDET + manual event curation), small enough to
 # commit directly (~80KB).
 !data/processed/real_training_dataset.csv
+# Exception: SWMM Phase 17 flood results for Kosofe pilot — served by /risk/swmm-flooding
+!data/processed/swmm_flooding.geojson
+!data/processed/swmm_summary.json
 
 # Trained models — regenerate with floodsight/ml/train.py
 data/models/**
 !data/models/.gitkeep
-# Exception: real trained model — trained on real labeled events, commit
-# directly so Render serves real predictions without requiring a full
-# retrain (~644KB).
-!data/models/depth_model.joblib
-
-.pytest_cache/
-.DS_Store
+# Exception: real trained model — trained on real labeled e
