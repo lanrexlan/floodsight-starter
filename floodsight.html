@@ -891,7 +891,7 @@ footer {
   <div class="accuracy-hero" id="accuracy-hero" style="display:none;">
     <div class="accuracy-stat">
       <div class="accuracy-num" id="accuracy-num">—</div>
-      <div class="accuracy-label">Detection accuracy</div>
+      <div class="accuracy-label">Events correctly flagged</div>
     </div>
     <div class="accuracy-desc" id="accuracy-desc"></div>
   </div>
@@ -934,7 +934,7 @@ footer {
 
       <!-- Left: pitch copy -->
       <div class="subscribe-pitch">
-        <div class="eyebrow">\U0001f514 Flood Alerts</div>
+        <div class="eyebrow">🔔 Flood Alerts</div>
         <h2>Get Warned <em>Before</em> the Water Rises</h2>
         <p>
           Sign up for free SMS flood alerts for your neighbourhood.
@@ -985,7 +985,7 @@ footer {
             <input type="text" id="sub-area" placeholder="Type your area or street…"
                    oninput="subGeocode(this.value)" />
             <button class="btn-locate" onclick="subUseMyLocation()" title="Use GPS location">
-              \U0001f4cd Locate me
+              📍 Locate me
             </button>
           </div>
         </div>
@@ -1207,23 +1207,28 @@ function renderTrackRecord(data) {
   const events  = data.events;
   const summary = data.summary;
 
-  // Accuracy hero — use meaningful-rain accuracy as the headline
-  const headlineAcc = summary.meaningful_accuracy_pct ?? summary.accuracy_pct;
-  document.getElementById('accuracy-num').textContent = headlineAcc + '%';
+  // Accuracy hero — show overall accuracy as the headline
+  const overallAcc  = summary.accuracy_pct ?? 0;
+  const totalEvents = summary.total_events  ?? 0;
+  const correct     = summary.correct       ?? 0;
+  document.getElementById('accuracy-num').textContent = correct + ' / ' + totalEvents;
   const era5Misses = summary.era5_misses ?? 0;
   const damMisses  = summary.dam_release_misses ?? 0;
+  const meaningfulAcc = summary.meaningful_accuracy_pct;
   document.getElementById('accuracy-desc').innerHTML =
-    `<strong>FloodSight correctly flagged ${summary.meaningful_correct ?? summary.correct} of ` +
-    `${summary.meaningful_rain_events ?? summary.total_events} events</strong> where meaningful ` +
-    `rainfall was recorded. ` +
+    `<strong>FloodSight correctly issued an alert for ${correct} of ${totalEvents} ` +
+    `documented Lagos flood events</strong> (${overallAcc}% overall). ` +
+    (meaningfulAcc != null
+      ? `For the ${summary.meaningful_rain_events} events where ERA5 recorded meaningful rainfall ` +
+        `(≥10 mm on the peak day), accuracy was ${meaningfulAcc}%. `
+      : '') +
     (era5Misses > 0
-      ? `${era5Misses} miss${era5Misses > 1 ? 'es' : ''} are due to ERA5 global weather model data ` +
-        `underestimating localised Lagos storms — a known limitation being addressed in the next ` +
-        `phase with real-time satellite data. `
+      ? `${era5Misses} miss${era5Misses > 1 ? 'es are' : ' is'} due to ERA5 underestimating localised ` +
+        `Lagos convective storms — a known satellite-reanalysis limitation. `
       : '') +
     (damMisses > 0
       ? `${damMisses} event${damMisses > 1 ? 's were' : ' was'} a dam-release flood, ` +
-        `not driven by local rainfall and therefore undetectable by any rainfall-based system. `
+        `undetectable by any rainfall-based system. `
       : '');
   document.getElementById('accuracy-hero').style.display = 'flex';
 
