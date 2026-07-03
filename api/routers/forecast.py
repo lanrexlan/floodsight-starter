@@ -108,12 +108,16 @@ def get_grid_alerts(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     # 2. Try IMERG for higher-accuracy observed component (silent fallback)
-    imerg_obs = _try_imerg_observed()
-    spatial_mode = "imerg+gfs" if imerg_obs else "gfs_9point"
+    imerg_obs, imerg_source = _try_imerg_observed()
+    if imerg_obs:
+        # e.g. "IMERG_early+gfs" or "IMERG_late+gfs"
+        spatial_mode = f"{imerg_source}+gfs"
+    else:
+        spatial_mode = "gfs_9point"
 
     # 3. Interpolate per-cell rainfall
     gdf, _ = get_grid()
-    cell_rain = interpolate_to_cells(gdf, rainfall_grid, imerg_obs)
+    cell_rain = interpolate_to_cells(gdf, rainfall_grid, imerg_obs, imerg_source)
 
     # 4. Compute per-cell alert levels
     alert_levels = [
@@ -151,12 +155,13 @@ def get_grid_alerts(
     cfc = get_centre_forecast(rainfall_grid)
 
     return {
-        "alert_levels":  alert_levels,
-        "alert_counts":  counts,
-        "highest_alert": highest,
-        "lga_alerts":    lga_alerts,
-        "total_cells":   len(gdf),
-        "spatial_mode":  spatial_mode,
+        "alert_levels":   alert_levels,
+        "alert_counts":   counts,
+        "highest_alert":  highest,
+        "lga_alerts":     lga_alerts,
+        "total_cells":    len(gdf),
+        "spatial_mode":   spatial_mode,
+        "observed_source": imerg_source or "GFS",
         "forecast": {
             "observed_24h_mm":  cfc.get("observed_24h_mm", 0.0),
             "forecast_24h_mm":  cfc.get("forecast_24h_mm", cfc["rain_24h_mm"]),
@@ -211,9 +216,9 @@ def get_alert_summary(
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    imerg_obs = _try_imerg_observed()
+    imerg_obs, imerg_source = _try_imerg_observed()
     gdf, _ = get_grid()
-    cell_rain = interpolate_to_cells(gdf, rainfall_grid, imerg_obs)
+    cell_rain = interpolate_to_cells(gdf, rainfall_grid, imerg_obs, imerg_source)
 
     # 2. Count alert levels using per-cell rainfall
     counts: dict = {"Warning": 0, "Watch": 0, "No Alert": 0}
@@ -234,9 +239,10 @@ def get_alert_summary(
     cfc = get_centre_forecast(rainfall_grid)
 
     return {
-        "total_cells":  len(gdf),
-        "alert_counts": counts,
-        "highest_alert": highest,
+        "total_cells":    len(gdf),
+        "alert_counts":   counts,
+        "highest_alert":  highest,
+        "observed_source": imerg_source or "GFS",
         "forecast": {
             "observed_24h_mm":  cfc.get("observed_24h_mm", 0.0),
             "forecast_24h_mm":  cfc.get("forecast_24h_mm", cfc["rain_24h_mm"]),

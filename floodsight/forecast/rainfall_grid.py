@@ -104,18 +104,31 @@ def fetch_rainfall_grid() -> dict[tuple[float, float], dict]:
     return results
 
 
-def _try_imerg_observed() -> dict[tuple[float, float], float] | None:
+def _try_imerg_observed() -> tuple[dict[tuple[float, float], float] | None, str | None]:
     """
-    Attempt to fetch IMERG Late Run daily observed rainfall.
-    Returns {(lat, lon): mm} at 0.1° resolution, or None on any failure.
+    Attempt to fetch IMERG observed rainfall (Early Run first, Late Run fallback).
+
+    Returns
+    -------
+    (data, source_label) where:
+      data         — {(lat, lon): mm/day} at 0.1° resolution, or None on failure
+      source_label — "IMERG_early", "IMERG_late", or None when unavailable
+
     Failures are always silent — callers fall back to GFS observed data.
     """
     try:
-        from floodsight.forecast.imerg import fetch_imerg_daily
-        return fetch_imerg_daily()
+        from floodsight.forecast.imerg import fetch_imerg_daily, get_imerg_product_used
+        data = fetch_imerg_daily()
+        if data is None:
+            return None, None
+        # get_imerg_product_used reads from the in-process cache set by fetch_imerg_daily
+        source = get_imerg_product_used()   # "IMERG_early" | "IMERG_late" | "unavailable"
+        if source == "unavailable":
+            source = "IMERG_late"           # shouldn't happen; data was just returned
+        return data, source
     except Exception as exc:
         log.debug("IMERG overlay skipped: %s", exc)
-        return None
+        return None, None
 
 
 # ---------------------------------------------------------------------------
@@ -126,6 +139,7 @@ def interpolate_to_cells(
     gdf: "gpd.GeoDataFrame",
     rainfall_grid: dict[tuple[float, float], dict] | None = None,
     imerg_observed: dict[tuple[float, float], float] | None = None,
+    observed_source: str | None = None,
 ) -> "pd.DataFrame":
     """
     Nearest-neighbour interpolation from rainfall grid points to every
@@ -141,12 +155,17 @@ def interpolate_to_cells(
         Optional IMERG observed rainfall at 0.1° from _try_imerg_observed().
         When present, replaces the GFS-derived observed_24h_mm for each cell,
         giving higher-accuracy combined 72h risk.
+    observed_source :
+        Label identifying which observed data source is active.
+        Typically "IMERG_early", "IMERG_late", or "GFS" (default when no IMERG).
+        Stored in each output row for API observability.
 
     Returns
     -------
     pd.DataFrame with one row per gdf cell:
         rain_24h_mm, rain_72h_mm, observed_24h_mm,
-        forecast_24h_mm, forecast_48h_mm, source_lat, source_lon
+        forecast_24h_mm, forecast_48h_mm, source_lat, source_lon,
+        observed_source
     """
     from scipy.spatial import cKDTree
     import pandas as pd
@@ -196,6 +215,9 @@ def interpolate_to_cells(
             else gfs_obs
         )
 
+        # Determine per-call observed_source label
+        _obs_src = observed_source if (imerg_nn is not None and observed_source) else "GFS"
+
         rows.append({
             "rain_24h_mm":      round(fc24, 1),          # what's COMING (alert signal)
             "rain_72h_mm":      round(obs24 + fc48, 1),  # combined 72h risk window
@@ -204,13 +226,15 @@ def interpolate_to_cells(
             "forecast_48h_mm":  round(fc48, 1),
             "source_lat":       gfs_key[0],
             "source_lon":       gfs_key[1],
+            "observed_source":  _obs_src,
         })
 
     df = pd.DataFrame(rows, index=gdf.index)
-    obs_source = "IMERG" if imerg_nn is not None else "GFS"
+    # observed_source is the same for all cells — read from first row
+    _obs_label = df["observed_source"].iloc[0] if len(df) else "GFS"
     log.info(
         "Spatial rainfall (%s obs): %d cells | r24 %.1f–%.1f mm | r72 %.1f–%.1f mm",
-        obs_source, len(df),
+        _obs_label, len(df),
         df["rain_24h_mm"].min(), df["rain_24h_mm"].max(),
         df["rain_72h_mm"].min(), df["rain_72h_mm"].max(),
     )

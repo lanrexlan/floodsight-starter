@@ -2,27 +2,33 @@
 Open-Meteo forecast fetcher — free API, no key required.
 https://open-meteo.com/
 
-Phase 11: Dual-stream observed + forecast rainfall.
-Phase 11b: Switched from ERA5 reanalysis to GFS seamless model.
+Phase 11:   Dual-stream observed + forecast rainfall.
+Phase 11b:  Switched from ERA5 reanalysis to GFS seamless model.
+Phase 18T2: GFS + ICON ensemble (per-hour max) for better convective coverage.
 
-Uses Open-Meteo's ``past_hours=24`` parameter to fetch both:
-  - Observed rainfall: GFS analysis for the past 24 h
-    (NOAA Global Forecast System, updated every 6 h, 0.25° / ~28 km)
-  - Forecast rainfall: next 72 h from the NOAA GFS
+Architecture
+------------
+Two NWP models are fetched in parallel for every grid point:
 
-Why GFS over ERA5 for observed data
-------------------------------------
-ERA5 reanalysis is post-processed from observations and underestimates
-intense localised convective rainfall events over coastal West Africa by
-30–70 %.  GFS analysis uses the operational model's own data assimilation
-cycle, which is updated every 6 hours and captures convective precipitation
-more faithfully at short lookback windows.
+  GFS seamless  — NOAA GFS, 0.25° (~28 km), updated every 6 h.
+                  Good global coverage; tends to smooth out intense
+                  localised convective cells.
 
-This matters because:
-  - Heavy rain that already fell saturates the soil and overwhelms
-    drainage — even moderate forecast rain can then cause flooding.
-  - The combined 72 h risk window (observed 24 h + forecast 48 h)
-    is more accurate than a pure forecast for flood alerting.
+  ICON seamless — DWD ICON (German Weather Service), 13 km global
+                  (ICON-Global), blended with 7 km (ICON-EU) where
+                  available.  Better representation of mesoscale
+                  convective systems (MCS) — the dominant rainfall
+                  mode in coastal West Africa during the wet season.
+
+Ensemble strategy: per-hour MAXIMUM
+  precip[t] = max(gfs_precip[t], icon_precip[t])
+
+"Max" is deliberately conservative for flood alerting:
+  - False alarm cost  : nuisance (residents stay home one day)
+  - Missed event cost : catastrophic (no warning → people in flooded roads)
+
+If either model fails, the other is used alone.
+Both fail → fallback to Open-Meteo best_match (single call, any model).
 
 Alert engine mapping
 --------------------
@@ -38,20 +44,20 @@ import json
 import logging
 import time
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Model selection
+# Ensemble model list
 # ---------------------------------------------------------------------------
-# GFS seamless: NOAA Global Forecast System, 0.25° (~28 km), updated every 6 h.
-# Better than ERA5 for observed (past) tropical convective rainfall because
-# GFS data assimilation runs operationally every 6 h rather than the ~5-day
-# ERA5 reanalysis lag.
-# Falls back to Open-Meteo default (best_match) if GFS is unavailable.
-_PREFERRED_MODEL = "gfs_seamless"
-_FALLBACK_MODEL = ""  # empty string → Open-Meteo default (best_match)
+# ICON-Global (~13 km) is the effective resolution for Nigeria — ICON-EU
+# (7 km) only covers Europe and northern Mediterranean.
+# "icon_seamless" lets Open-Meteo pick the best-resolution ICON domain
+# available for the requested lat/lon; for Lagos it uses icon_global.
+_ENSEMBLE_MODELS: list[str] = ["gfs_seamless", "icon_seamless"]
+_FALLBACK_MODEL: str = ""  # empty string → Open-Meteo best_match (any model)
 
 # ---------------------------------------------------------------------------
 # Simple in-memory cache: (lat_r, lon_r) → (expires_ts, data_dict)
@@ -65,125 +71,165 @@ def _round_coord(v: float) -> float:
     return round(v, 2)
 
 
+# ---------------------------------------------------------------------------
+# Single-model fetch (called in parallel for each ensemble member)
+# ---------------------------------------------------------------------------
+
+def _fetch_model_hourly(
+    lat: float,
+    lon: float,
+    model: str,
+) -> tuple[list[str], list[float]]:
+    """
+    Fetch hourly precipitation for one Open-Meteo model.
+
+    Returns (times, precip_mm_per_hour) where times are ISO strings like
+    "2026-07-03T14:00" and precip is hourly mm with None replaced by 0.0.
+
+    Raises on any network or parse error.
+    """
+    model_param = f"&models={model}" if model else ""
+    url = (
+        "https://api.open-meteo.com/v1/forecast"
+        f"?latitude={lat}&longitude={lon}"
+        "&hourly=precipitation"
+        "&past_hours=24"
+        "&forecast_days=3"
+        "&timezone=UTC"
+        + model_param
+    )
+    req = urllib.request.Request(
+        url, headers={"User-Agent": "FloodSight/1.0 (flood-early-warning, Lagos)"}
+    )
+    with urllib.request.urlopen(req, timeout=12) as resp:
+        payload = json.loads(resp.read())
+    times  = payload["hourly"]["time"]
+    precip = [p if p is not None else 0.0 for p in payload["hourly"]["precipitation"]]
+    return times, precip
+
+
+# ---------------------------------------------------------------------------
+# Ensemble fetch — parallel GFS + ICON, per-hour max merge
+# ---------------------------------------------------------------------------
+
 def fetch_combined(lat: float, lon: float) -> dict:
     """
-    Fetch observed (past 24 h) + forecast (next 72 h) in a single API call.
+    Fetch observed (past 24 h) + forecast (next 72 h) using a GFS + ICON
+    ensemble.  Returns the per-hour maximum precipitation across both models.
 
     Returns::
+
         {
-            "observed_24h_mm":  float,   # actual rain in the past 24 h
-            "forecast_24h_mm":  float,   # forecast for the next 24 h
-            "forecast_48h_mm":  float,   # forecast for the next 48 h
-            "forecast_72h_mm":  float,   # forecast for the next 72 h
-            "rain_24h_mm":      float,   # = forecast_24h_mm  (alert engine compat)
-            "rain_72h_mm":      float,   # = observed + fc48  (true 72 h window)
+            "observed_24h_mm":  float,   # past 24 h (ensemble max)
+            "forecast_24h_mm":  float,   # next 24 h (ensemble max)
+            "forecast_48h_mm":  float,   # next 48 h (ensemble max)
+            "forecast_72h_mm":  float,   # next 72 h (ensemble max)
+            "rain_24h_mm":      float,   # = forecast_24h_mm  (alert engine)
+            "rain_72h_mm":      float,   # = observed + fc48  (72 h window)
             "data_mode":        str,     # "observed+forecast"
-            "forecast_source":  str,
+            "forecast_source":  str,     # e.g. "GFS+ICON ensemble (max)"
+            "ensemble_models":  list,    # which models succeeded
             "fetched_at":       str,     # ISO-8601
-            "valid_from":       str,     # current UTC hour
+            "valid_from":       str,     # current UTC hour string
             "lat":              float,
             "lon":              float,
         }
 
-    Raises ``RuntimeError`` on fetch or parse failure (caller should return 503).
+    Raises ``RuntimeError`` if every model (including fallback) fails.
     """
     key = (_round_coord(lat), _round_coord(lon))
     now_ts = time.time()
 
-    # Return cached result if still fresh
     if key in _CACHE:
         expires, data = _CACHE[key]
         if now_ts < expires:
             log.debug("Forecast cache hit for %s", key)
             return data
 
-    # past_hours=24 + forecast_days=3 → 24 observed + 72 forecast = 96 h total
-    def _build_url(model: str) -> str:
-        model_param = f"&models={model}" if model else ""
-        return (
-            "https://api.open-meteo.com/v1/forecast"
-            f"?latitude={lat}&longitude={lon}"
-            "&hourly=precipitation"
-            "&past_hours=24"
-            "&forecast_days=3"
-            "&timezone=UTC"
-            + model_param
+    # ── Step 1: fetch ensemble models in parallel ─────────────────────────
+    model_results: dict[str, tuple[list[str], list[float]]] = {}
+
+    with ThreadPoolExecutor(max_workers=len(_ENSEMBLE_MODELS)) as pool:
+        future_to_model = {
+            pool.submit(_fetch_model_hourly, lat, lon, m): m
+            for m in _ENSEMBLE_MODELS
+        }
+        for future in as_completed(future_to_model):
+            m = future_to_model[future]
+            try:
+                model_results[m] = future.result()
+                log.debug("Ensemble model %s OK for (%.2f, %.2f)", m, lat, lon)
+            except Exception as exc:
+                log.warning("Ensemble model %s failed for (%.2f, %.2f): %s", m, lat, lon, exc)
+
+    # ── Step 2: fallback if all ensemble models failed ────────────────────
+    if not model_results:
+        log.warning(
+            "All ensemble models failed for (%.2f, %.2f) — trying best_match fallback",
+            lat, lon,
         )
-
-    payload = None
-    used_model = _PREFERRED_MODEL
-    for model in (_PREFERRED_MODEL, _FALLBACK_MODEL):
-        url = _build_url(model)
         try:
-            req = urllib.request.Request(
-                url, headers={"User-Agent": "FloodSight/1.0 (flood-early-warning, Lagos)"}
-            )
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                payload = json.loads(resp.read())
-            used_model = model
-            break
+            times, precip = _fetch_model_hourly(lat, lon, _FALLBACK_MODEL)
+            model_results["best_match"] = (times, precip)
         except Exception as exc:
-            if model == _FALLBACK_MODEL:
-                raise RuntimeError(f"Open-Meteo request failed: {exc}") from exc
-            log.warning("Open-Meteo model=%s failed (%s); retrying with default.", model, exc)
+            raise RuntimeError(
+                f"All Open-Meteo models (ensemble + fallback) failed for "
+                f"({lat:.2f}, {lon:.2f}): {exc}"
+            ) from exc
 
-    if payload is None:
-        raise RuntimeError("Open-Meteo returned no data")
+    # ── Step 3: per-hour maximum across successful models ─────────────────
+    # Use the time array from the first successful model as the reference.
+    ref_times   = next(iter(model_results.values()))[0]
+    n_hours     = len(ref_times)
+    merged_precip: list[float] = []
+    for i in range(n_hours):
+        hourly_vals = [
+            model_results[m][1][i]
+            for m in model_results
+            if i < len(model_results[m][1])
+        ]
+        merged_precip.append(max(hourly_vals) if hourly_vals else 0.0)
 
-    try:
-        times  = payload["hourly"]["time"]        # ["2026-06-24T00:00", ...]
-        precip = payload["hourly"]["precipitation"]
-    except (KeyError, TypeError) as exc:
-        raise RuntimeError(f"Unexpected Open-Meteo response format: {exc}") from exc
-
-    # Replace None values (missing data gaps) with 0.0
-    precip = [p if p is not None else 0.0 for p in precip]
-
-    # Locate the current UTC hour in the time array
+    # ── Step 4: accumulate windows from merged hourly precipitation ───────
     now_dt = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
     current_hour_str = now_dt.strftime("%Y-%m-%dT%H:00")
 
-    if current_hour_str in times:
-        now_idx = times.index(current_hour_str)
+    if current_hour_str in ref_times:
+        now_idx = ref_times.index(current_hour_str)
     else:
-        # With past_hours=24, current hour is typically at index 24
-        now_idx = min(24, len(times) - 1)
+        now_idx = min(24, n_hours - 1)
         log.warning(
             "Current hour %s not found in Open-Meteo response; using index %d",
             current_hour_str, now_idx,
         )
 
-    # ── Observed: actual rainfall in the past 24 h ────────────────────────
-    observed_24h = sum(precip[max(0, now_idx - 24) : now_idx])
-
-    # ── Forecast: future rainfall windows from current hour ───────────────
-    forecast_24h = sum(precip[now_idx : now_idx + 24])
-    forecast_48h = sum(precip[now_idx : now_idx + 48])
-    forecast_72h = sum(precip[now_idx : now_idx + 72])
-
-    # ── Combined 72 h risk window ─────────────────────────────────────────
-    # Antecedent soil saturation (observed 24 h) + upcoming rain (forecast 48 h)
-    # = the full 72 h rainfall burden on Lagos drainage.
+    observed_24h = sum(merged_precip[max(0, now_idx - 24) : now_idx])
+    forecast_24h = sum(merged_precip[now_idx : now_idx + 24])
+    forecast_48h = sum(merged_precip[now_idx : now_idx + 48])
+    forecast_72h = sum(merged_precip[now_idx : now_idx + 72])
     rain_72h_combined = observed_24h + forecast_48h
 
+    # ── Step 5: build result dict ─────────────────────────────────────────
+    succeeded = list(model_results.keys())
+    if set(succeeded) == {"gfs_seamless", "icon_seamless"}:
+        source_label = "GFS + ICON ensemble (max)"
+    elif "gfs_seamless" in succeeded:
+        source_label = "GFS seamless (ICON unavailable)"
+    elif "icon_seamless" in succeeded:
+        source_label = "ICON seamless (GFS unavailable)"
+    else:
+        source_label = "Open-Meteo best_match (ensemble fallback)"
+
     data: dict = {
-        # Phase 11 observed + forecast fields
         "observed_24h_mm":  round(observed_24h, 1),
         "forecast_24h_mm":  round(forecast_24h, 1),
         "forecast_48h_mm":  round(forecast_48h, 1),
         "forecast_72h_mm":  round(forecast_72h, 1),
-        # Alert engine compatibility (used by /forecast/alerts and /forecast/summary)
-        # rain_24h_mm = what's COMING → determines next-24h alert level
-        # rain_72h_mm = combined 72h burden → determines sustained-rain alert level
         "rain_24h_mm":      round(forecast_24h, 1),
         "rain_72h_mm":      round(rain_72h_combined, 1),
-        # Metadata
-        "forecast_source":  (
-            f"Open-Meteo — GFS observed analysis + NOAA GFS forecast"
-            if used_model == "gfs_seamless"
-            else "Open-Meteo — ERA5-RT observed + ECMWF/GFS forecast"
-        ),
-        "model":            used_model or "best_match",
+        "forecast_source":  f"Open-Meteo — {source_label}",
+        "ensemble_models":  succeeded,
+        "model":            "+".join(succeeded),
         "data_mode":        "observed+forecast",
         "fetched_at":       datetime.now(timezone.utc).isoformat(),
         "valid_from":       current_hour_str,
@@ -192,19 +238,19 @@ def fetch_combined(lat: float, lon: float) -> dict:
     }
     _CACHE[key] = (now_ts + CACHE_TTL_S, data)
     log.info(
-        "Dual-stream fetch (%.2f, %.2f) model=%s: observed=%.1f mm | fc24=%.1f mm, fc48=%.1f mm → alert72=%.1f mm",
-        lat, lon, used_model or "best_match", observed_24h, forecast_24h, forecast_48h, rain_72h_combined,
+        "Ensemble fetch (%.2f, %.2f) [%s]: obs=%.1f mm | fc24=%.1f mm | fc48=%.1f mm → r72=%.1f mm",
+        lat, lon, source_label,
+        observed_24h, forecast_24h, forecast_48h, rain_72h_combined,
     )
     return data
 
 
 def fetch_forecast(lat: float, lon: float) -> dict:
     """
-    Backward-compatible wrapper — now delegates to fetch_combined().
+    Backward-compatible wrapper — delegates to fetch_combined().
 
-    Returns all original fields (rain_24h_mm, rain_72h_mm, forecast_source,
-    fetched_at, valid_from, lat, lon) plus the new Phase 11 fields
-    (observed_24h_mm, forecast_24h_mm, forecast_48h_mm, forecast_72h_mm,
-    data_mode).
+    Preserves the original return shape (rain_24h_mm, rain_72h_mm,
+    forecast_source, fetched_at, valid_from, lat, lon) plus all Phase 11
+    and Phase 18T2 fields.
     """
     return fetch_combined(lat, lon)
