@@ -215,35 +215,48 @@ def get_streets_geojson() -> tuple[dict | None, str]:
     return _cached_streets_geojson
 
 
-SWMM_FLOODING_PATH = PROCESSED_DIR / "swmm_flooding.geojson"
+# Phase 18 Track 3: prefer the merged all-LGA file; fall back to legacy Kosofe-only file.
+_SWMM_ALL_PATH     = PROCESSED_DIR / "swmm_flooding_all.geojson"    # merged (Track 3+)
+_SWMM_LEGACY_PATH  = PROCESSED_DIR / "swmm_flooding.geojson"        # Kosofe-only (Phase 17)
 _cached_swmm_geojson: dict | None = None
 
 
 def get_swmm_flooding_geojson() -> dict | None:
     """
-    Returns the SWMM flooded-junction GeoJSON dict, or None if the file
-    hasn't been generated yet (run scripts/07_parse_swmm_results.py).
+    Returns the SWMM flooded-junction GeoJSON dict, or None if no file exists.
+
+    Priority:
+      1. swmm_flooding_all.geojson   — merged Kosofe + Alimosho + Eti-Osa (Track 3)
+      2. swmm_flooding.geojson       — legacy Kosofe-only file (Phase 17)
+
+    Generate with:
+      python scripts/07_parse_swmm_results.py --lga all
+      python scripts/08_merge_swmm_results.py
+
     Cached for the process lifetime.
     """
     global _cached_swmm_geojson
     if _cached_swmm_geojson is not None:
         return _cached_swmm_geojson
 
-    if not SWMM_FLOODING_PATH.exists():
+    path = _SWMM_ALL_PATH if _SWMM_ALL_PATH.exists() else _SWMM_LEGACY_PATH
+
+    if not path.exists():
         log.info(
-            "swmm_flooding.geojson not found at %s "
-            "-- run scripts/07_parse_swmm_results.py",
-            SWMM_FLOODING_PATH,
+            "No SWMM flooding GeoJSON found (checked %s and %s). "
+            "Run scripts/07_parse_swmm_results.py --lga all, then "
+            "scripts/08_merge_swmm_results.py",
+            _SWMM_ALL_PATH, _SWMM_LEGACY_PATH,
         )
         return None
 
-    log.info("Loading SWMM flooding GeoJSON from %s ...", SWMM_FLOODING_PATH)
-    with open(SWMM_FLOODING_PATH, encoding="utf-8") as fh:
+    log.info("Loading SWMM flooding GeoJSON from %s ...", path)
+    with open(path, encoding="utf-8") as fh:
         geojson = json.load(fh)
     _cached_swmm_geojson = geojson
     log.info(
-        "SWMM GeoJSON cached -- %d flooded nodes",
-        len(geojson.get("features", [])),
+        "SWMM GeoJSON cached — %d flooded nodes (source: %s)",
+        len(geojson.get("features", [])), path.name,
     )
     return _cached_swmm_geojson
 

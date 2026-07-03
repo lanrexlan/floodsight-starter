@@ -1,6 +1,7 @@
 """
 scripts/06_build_swmm_network.py
-Phase 17 — Approximate SWMM 5.2 drainage network, Kosofe pilot area.
+Phase 17 — Approximate SWMM 5.2 drainage network (Kosofe pilot).
+Phase 18 Track 3 — Extended to Alimosho and Eti-Osa LGAs.
 
 Approach
 --------
@@ -14,18 +15,27 @@ build a physically plausible network from open data:
                        added as open-channel conduits.
   • Pipe diameters     Road-class proxy (see DIAMETER_M below).
   • Elevations         DEM-derived elevation_m column from scored_grid.gpkg.
-  • Subcatchments      Voronoi polygons clipped to pilot bbox; area +
+  • Subcatchments      Voronoi polygons clipped to LGA bbox; area +
                        imperviousness estimated from grid landcover_class.
-  • Outfalls           Lowest-elevation boundary nodes (≤ 5 m).
+  • Outfalls           Single virtual outfall at lowest-elevation dead-end.
 
-Outputs
--------
-  data/processed/swmm_kosofe.inp          Valid SWMM 5.2 input file
-  data/processed/swmm_kosofe_network.gpkg Junctions + conduits for QGIS
+Supported LGAs
+--------------
+  kosofe    (lon 3.37-3.50, lat 6.54-6.65)  NE mainland, drains to Lagos Lagoon
+  alimosho  (lon 3.08-3.28, lat 6.56-6.70)  W mainland, largest LGA, drains SW
+  eti_osa   (lon 3.45-3.78, lat 6.42-6.58)  E coastal, Victoria Is / Lekki
+
+Outputs (per LGA, e.g. for alimosho)
+--------------------------------------
+  data/processed/swmm_alimosho.inp          Valid SWMM 5.2 input file
+  data/processed/swmm_alimosho_network.gpkg Junctions + conduits for QGIS
 
 Usage
 -----
-  python scripts/06_build_swmm_network.py
+  python scripts/06_build_swmm_network.py               # default: kosofe
+  python scripts/06_build_swmm_network.py --lga alimosho
+  python scripts/06_build_swmm_network.py --lga eti_osa
+  python scripts/06_build_swmm_network.py --lga all     # run all three
 
 Dependencies (already in requirements.txt):
   geopandas, shapely, numpy, scipy, networkx
@@ -33,10 +43,9 @@ Dependencies (already in requirements.txt):
 
 from __future__ import annotations
 
+import argparse
 import logging
 import math
-import textwrap
-from collections import defaultdict
 from pathlib import Path
 
 import geopandas as gpd
@@ -45,28 +54,46 @@ import numpy as np
 from scipy.spatial import KDTree, Voronoi
 from shapely.geometry import (
     LineString,
-    MultiLineString,
     MultiPolygon,
     Point,
     Polygon,
     box,
 )
-from shapely.ops import split, unary_union
+from shapely.ops import unary_union
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 log = logging.getLogger(__name__)
 
 # ── Paths ───────────────────────────────────────────────────────────────────
-ROOT       = Path(__file__).resolve().parent.parent
-ROADS_GPK  = ROOT / "data/raw/osm/clipped/roads.gpkg"
-WATER_GPK  = ROOT / "data/raw/osm/clipped/water.gpkg"
-GRID_GPK   = ROOT / "data/processed/scored_grid.gpkg"
-OUT_INP    = ROOT / "data/processed/swmm_kosofe.inp"
-OUT_NET    = ROOT / "data/processed/swmm_kosofe_network.gpkg"
+ROOT      = Path(__file__).resolve().parent.parent
+ROADS_GPK = ROOT / "data/raw/osm/clipped/roads.gpkg"
+WATER_GPK = ROOT / "data/raw/osm/clipped/water.gpkg"
+GRID_GPK  = ROOT / "data/processed/scored_grid.gpkg"
 
-# ── Kosofe pilot bounding box (WGS-84) ──────────────────────────────────────
-BBOX_WGS84 = (3.37, 6.54, 3.50, 6.65)   # (min_lon, min_lat, max_lon, max_lat)
-BBOX_BOX   = box(*BBOX_WGS84)
+# ── LGA registry — (min_lon, min_lat, max_lon, max_lat) ─────────────────────
+# All coordinates in WGS-84.  Outfall virtual node direction is always
+# placed 50 m south of the lowest-elevation dead-end (toward water bodies).
+LGA_CONFIGS: dict[str, dict] = {
+    "kosofe": {
+        "bbox":        (3.37, 6.54, 3.50, 6.65),
+        "description": "Kosofe — NE Lagos mainland, drains to Lagos Lagoon",
+        "title":       "FloodSight — Kosofe Drainage Network (approximate)",
+    },
+    "alimosho": {
+        "bbox":        (3.08, 6.56, 3.28, 6.70),
+        "description": "Alimosho — W Lagos mainland (largest LGA), drains SW toward Badagry Creek",
+        "title":       "FloodSight — Alimosho Drainage Network (approximate)",
+    },
+    "eti_osa": {
+        "bbox":        (3.45, 6.42, 3.78, 6.58),
+        "description": "Eti-Osa — E coastal Lagos (Victoria Island / Lekki), drains to Atlantic",
+        "title":       "FloodSight — Eti-Osa Drainage Network (approximate)",
+    },
+}
+
+# ── Module-level bbox vars (set by main() per LGA run) ──────────────────────
+BBOX_WGS84: tuple[float, float, float, float] = (3.37, 6.54, 3.50, 6.65)
+BBOX_BOX = box(*BBOX_WGS84)
 
 # ── UTM zone 31N — metric CRS for Lagos ──────────────────────────────────────
 UTM = "EPSG:32631"
@@ -477,6 +504,7 @@ def write_swmm_inp(
     outfalls:     set[int],
     subcatchments: gpd.GeoDataFrame,
     out_path:     Path,
+    title:        str = "FloodSight — Drainage Network (approximate)",
 ) -> None:
     log.info("Writing SWMM input file …")
 
@@ -488,7 +516,7 @@ def write_swmm_inp(
     # ── [TITLE] ─────────────────────────────────────────────────────────────
     lines += [
         "[TITLE]",
-        "FloodSight — Kosofe Pilot Drainage Network (approximate)",
+        title,
         "Generated by scripts/06_build_swmm_network.py",
         "Pipe sizes are road-class proxies; validate against field survey.",
         "",
@@ -805,9 +833,25 @@ def save_network_gpkg(
 # MAIN
 # ════════════════════════════════════════════════════════════════════════════
 
-def main() -> None:
-    log.info("=== FloodSight Phase 17: SWMM Network Builder ===")
-    log.info("Pilot area: Kosofe (lon %.2f-%.2f, lat %.2f-%.2f)",
+def _run_lga(lga_name: str) -> None:
+    """Build SWMM network for one LGA and write outputs."""
+    global BBOX_WGS84, BBOX_BOX
+
+    if lga_name not in LGA_CONFIGS:
+        log.error("Unknown LGA '%s'. Choose from: %s", lga_name, ", ".join(LGA_CONFIGS))
+        return
+
+    cfg = LGA_CONFIGS[lga_name]
+    BBOX_WGS84 = cfg["bbox"]
+    BBOX_BOX   = box(*BBOX_WGS84)
+
+    out_inp = ROOT / f"data/processed/swmm_{lga_name}.inp"
+    out_net = ROOT / f"data/processed/swmm_{lga_name}_network.gpkg"
+
+    log.info("")
+    log.info("=== FloodSight SWMM Network Builder — %s ===", lga_name.upper())
+    log.info("%s", cfg["description"])
+    log.info("Bbox: lon %.2f-%.2f, lat %.2f-%.2f",
              BBOX_WGS84[0], BBOX_WGS84[2], BBOX_WGS84[1], BBOX_WGS84[3])
 
     roads  = _load_roads()
@@ -817,39 +861,60 @@ def main() -> None:
     G, node_coords, edge_data = build_graph(roads, canals)
 
     if not node_coords:
-        log.error("No nodes found — check roads.gpkg exists and Kosofe bbox is correct.")
+        log.error(
+            "No nodes found for %s — check roads.gpkg covers this bbox.", lga_name
+        )
         return
 
     elevations = assign_elevations(node_coords, grid)
     edge_data  = orient_downslope(edge_data, elevations)
 
-    # Rebuild directed graph from oriented edges
     G2 = nx.DiGraph()
     for e in edge_data:
         G2.add_edge(e["from_node"], e["to_node"])
 
-    # find_outfalls returns one virtual outfall + updated coords/elevations/edges
     outfalls, node_coords, elevations, extra_edges = find_outfalls(
         G2, node_coords, elevations
     )
-    edge_data.extend(extra_edges)   # add stub conduit to virtual outfall
+    edge_data.extend(extra_edges)
 
     subcatchments = build_subcatchments(node_coords, grid)
 
-    write_swmm_inp(node_coords, elevations, edge_data, outfalls, subcatchments, OUT_INP)
-    save_network_gpkg(node_coords, elevations, edge_data, outfalls, subcatchments, OUT_NET)
+    write_swmm_inp(
+        node_coords, elevations, edge_data, outfalls, subcatchments,
+        out_inp, title=cfg["title"],
+    )
+    save_network_gpkg(node_coords, elevations, edge_data, outfalls, subcatchments, out_net)
 
     log.info("")
-    log.info("=== DONE ===")
-    log.info("  SWMM input:  %s", OUT_INP)
-    log.info("  Network viz: %s", OUT_NET)
+    log.info("=== DONE: %s ===", lga_name.upper())
+    log.info("  SWMM input:  %s", out_inp)
+    log.info("  Network viz: %s", out_net)
     log.info("")
     log.info("Next steps:")
-    log.info("  1. Open %s in EPA SWMM 5.2 (free download)", OUT_INP)
+    log.info("  1. Open %s in EPA SWMM 5.2 (free download)", out_inp)
     log.info("  2. Check for disconnected nodes (Run > Status Report)")
-    log.info("  3. Load %s in QGIS to verify network layout", OUT_NET)
-    log.info("  4. Replace pipe diameters when real data is obtained")
-    log.info("  5. Run design storm: 90mm/3hr (1-in-10yr for Lagos)")
+    log.info("  3. Run design storm: 90 mm/3 hr (1-in-10yr for Lagos)")
+    log.info("  4. Parse results: python scripts/07_parse_swmm_results.py --lga %s", lga_name)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Build SWMM 5.2 drainage network for Lagos LGAs."
+    )
+    parser.add_argument(
+        "--lga",
+        default="kosofe",
+        choices=list(LGA_CONFIGS.keys()) + ["all"],
+        help="LGA to build (default: kosofe). Use 'all' to build every LGA.",
+    )
+    args = parser.parse_args()
+
+    if args.lga == "all":
+        for lga in LGA_CONFIGS:
+            _run_lga(lga)
+    else:
+        _run_lga(args.lga)
 
 
 if __name__ == "__main__":

@@ -69,15 +69,20 @@ def risk_streets():
 @router.get("/swmm-flooding")
 def swmm_flooding():
     """
-    SWMM 5.2 flooded-junction GeoJSON for the Kosofe pilot.
+    SWMM 5.2 flooded-junction GeoJSON — Kosofe, Alimosho, and Eti-Osa.
 
     Each feature is a junction that overflowed during the 150 mm / 4 h design
-    storm.  Properties include ``flood_class`` (Severe / Moderate / Nuisance),
-    ``max_rate_cms``, ``hours_flooded``, ``total_vol_10e6l``, and ``colour``
-    (CSS hex for the dashboard layer).
+    storm.  Properties: ``flood_class`` (Severe / Moderate / Nuisance),
+    ``max_rate_cms``, ``hours_flooded``, ``total_vol_10e6l``, ``colour``
+    (CSS hex), ``lga``, ``lga_display``.
 
-    **Pre-requisite:** run ``scripts/07_parse_swmm_results.py``.
-    Returns 404 until ``data/processed/swmm_flooding.geojson`` exists.
+    Serves ``swmm_flooding_all.geojson`` (3 LGAs) when available,
+    falling back to the legacy Kosofe-only file.
+
+    **Pre-requisite:**
+      python scripts/07_parse_swmm_results.py --lga all
+      python scripts/08_merge_swmm_results.py
+    Returns 404 until at least one SWMM flooding GeoJSON exists.
     """
     geojson = get_swmm_flooding_geojson()
     if geojson is None:
@@ -85,7 +90,8 @@ def swmm_flooding():
             status_code=404,
             detail=(
                 "SWMM flooding data not available. "
-                "Run scripts/07_parse_swmm_results.py to generate it."
+                "Run: python scripts/07_parse_swmm_results.py --lga all "
+                "then: python scripts/08_merge_swmm_results.py"
             ),
         )
     return geojson
