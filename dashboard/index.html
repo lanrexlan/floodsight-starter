@@ -157,6 +157,16 @@
              style="width:100%;box-sizing:border-box;padding:7px 10px;
                     background:#1a2236;border:1px solid #2d4060;border-radius:6px;
                     color:#E8EAF6;font-size:13px;margin-bottom:8px;outline:none" />
+      <label style="display:flex;align-items:flex-start;gap:8px;margin-bottom:10px;cursor:pointer">
+        <input type="checkbox" id="dash-sub-consent"
+               onchange="dashSubCheck()"
+               style="flex-shrink:0;margin-top:2px;accent-color:#90CAF9;width:14px;height:14px" />
+        <span style="font-size:11px;color:#8899aa;line-height:1.5">
+          The resident consents to receive flood alert SMS and to their phone number and
+          location being stored. See
+          <a href="../privacy.html" target="_blank" style="color:#90CAF9">Privacy Policy</a>.
+        </span>
+      </label>
       <button id="dash-sub-btn" onclick="dashSubscribe()" disabled
               class="lga-btn"
               style="width:100%;padding:8px;font-size:13px;

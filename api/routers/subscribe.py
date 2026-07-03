@@ -10,6 +10,7 @@ Requires SUPABASE_URL and SUPABASE_KEY environment variables.
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, field_validator
@@ -37,6 +38,7 @@ class SubscribeRequest(BaseModel):
     lon:       float
     name:      str | None = None
     area_name: str | None = None
+    consent:   bool = False  # NDPR: explicit consent required
 
     @field_validator("phone")
     @classmethod
@@ -45,6 +47,17 @@ class SubscribeRequest(BaseModel):
             return normalize_phone(v)
         except ValueError as exc:
             raise ValueError(str(exc)) from exc
+
+    @field_validator("consent")
+    @classmethod
+    def must_consent(cls, v: bool) -> bool:
+        if not v:
+            raise ValueError(
+                "Explicit consent is required to subscribe (NDPR compliance). "
+                "Set consent=true to confirm the subscriber agrees to receive "
+                "flood alert SMS and to their data being stored."
+            )
+        return v
 
     @field_validator("lat")
     @classmethod
@@ -103,6 +116,7 @@ def subscribe(req: SubscribeRequest):
             name       = req.name,
             area_name  = req.area_name,
             risk_class = risk_class,
+            consent_at = datetime.now(timezone.utc).isoformat(),
         )
     except RuntimeError as exc:
         # Missing env vars — Supabase not configured
@@ -152,7 +166,7 @@ def subscriber_count():
 def unsubscribe(phone: str):
     """
     Deactivate a subscriber by phone number.
-    Twilio's built-in STOP handling also covers opt-outs for SMS.
+    Africa's Talking STOP keyword also triggers deactivation via webhook.
 
     Response::
 

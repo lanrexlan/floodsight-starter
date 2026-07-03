@@ -785,10 +785,11 @@ async function _loadSubCount() {
 }
 
 function dashSubCheck() {
-  const phone = (document.getElementById("dash-sub-phone")?.value || "").trim();
-  const btn   = document.getElementById("dash-sub-btn");
+  const phone   = (document.getElementById("dash-sub-phone")?.value || "").trim();
+  const consent = document.getElementById("dash-sub-consent")?.checked || false;
+  const btn     = document.getElementById("dash-sub-btn");
   if (!btn) return;
-  const ready = phone.length >= 7;
+  const ready = phone.length >= 7 && consent;
   btn.disabled      = !ready;
   btn.style.cursor  = ready ? "pointer"  : "not-allowed";
   btn.style.opacity = ready ? "1"        : "0.5";
@@ -819,7 +820,7 @@ async function dashSubscribe() {
     const res = await fetch(`${API_BASE_URL}/subscribe`, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ phone, lat, lon, area_name: areaName || undefined }),
+      body:    JSON.stringify({ phone, lat, lon, area_name: areaName || undefined, consent: true }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
@@ -828,6 +829,8 @@ async function dashSubscribe() {
     statusEl.textContent = `✓ Subscribed — ${data.risk_class || "?"} risk area`;
     phoneEl.value = "";
     if (areaEl) areaEl.value = "";
+    const consentEl = document.getElementById("dash-sub-consent");
+    if (consentEl) consentEl.checked = false;
     await _loadSubCount();
   } catch (err) {
     statusEl.style.color = "#EF9A9A";

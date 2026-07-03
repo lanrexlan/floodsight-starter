@@ -98,6 +98,7 @@ def add_subscriber(
     name: str | None = None,
     area_name: str | None = None,
     risk_class: str | None = None,
+    consent_at: str | None = None,  # ISO 8601 timestamp of explicit NDPR consent
 ) -> dict[str, Any]:
     """
     Insert or update a subscriber record.
@@ -115,6 +116,7 @@ def add_subscriber(
         "lat":        lat,
         "lon":        lon,
         "active":     True,
+        "consent_at": consent_at or datetime.now(timezone.utc).isoformat(),
     }
     if name:       payload["name"]       = name.strip()
     if area_name:  payload["area_name"]  = area_name.strip()

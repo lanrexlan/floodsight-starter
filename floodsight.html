@@ -451,6 +451,17 @@ h2 em { font-style: italic; font-weight: 300; color: var(--accent); }
 }
 .subscribe-benefit svg { flex-shrink: 0; margin-top: 2px; }
 .subscribe-form-wrap h3 { font-size: 18px; margin-bottom: 20px; }
+.sub-consent-wrap {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin: 4px 0 16px;
+  font-size: 13px; color: var(--muted); line-height: 1.5;
+  cursor: pointer;
+}
+.sub-consent-wrap input[type="checkbox"] {
+  flex-shrink: 0; margin-top: 2px; accent-color: var(--blue);
+  width: 15px; height: 15px; cursor: pointer;
+}
+.sub-consent-wrap a { color: var(--blue); }
 .sub-field { margin-bottom: 14px; }
 .sub-field label {
   display: block; font-size: 12px; font-weight: 600;
@@ -992,6 +1003,16 @@ footer {
 
         <div class="sub-risk-preview" id="sub-risk-preview"></div>
 
+        <label class="sub-consent-wrap" id="sub-consent-label">
+          <input type="checkbox" id="sub-consent" onchange="subCheckReady()" />
+          <span>
+            I consent to receive flood alert SMS messages. I have read and agree to the
+            <a href="privacy.html" target="_blank">Privacy Policy</a>.
+            I understand my phone number and location will be stored securely and I can
+            unsubscribe at any time by replying <strong>STOP</strong>.
+          </span>
+        </label>
+
         <button id="sub-submit" onclick="submitSubscription()" disabled>
           Subscribe to flood alerts
         </button>
@@ -999,7 +1020,8 @@ footer {
         <div class="sub-status" id="sub-status"></div>
         <p class="sub-note">
           Alerts sent only during active Watch or Warning events.
-          Reply STOP at any time to unsubscribe. Your number is never shared.
+          Reply STOP at any time to opt out.
+          <a href="privacy.html" style="color:var(--muted);text-decoration:underline">Privacy Policy</a>
         </p>
       </div>
 
@@ -1287,8 +1309,9 @@ const RISK_COLORS_SUB = {
 };
 
 function subCheckReady() {
-  const phone = document.getElementById('sub-phone').value.trim();
-  const ready = phone.length >= 7 && _subLat !== null;
+  const phone   = document.getElementById('sub-phone').value.trim();
+  const consent = document.getElementById('sub-consent').checked;
+  const ready   = phone.length >= 7 && _subLat !== null && consent;
   document.getElementById('sub-submit').disabled = !ready;
 }
 
@@ -1390,6 +1413,7 @@ async function submitSubscription() {
         phone, name: name || null,
         lat: _subLat, lon: _subLon,
         area_name: areaName || null,
+        consent: true,
       }),
     });
     const data = await res.json();
@@ -1408,9 +1432,10 @@ async function submitSubscription() {
     statusEl.className = 'sub-status success';
 
     // Reset form
-    document.getElementById('sub-phone').value = '';
-    document.getElementById('sub-name').value  = '';
-    document.getElementById('sub-area').value  = '';
+    document.getElementById('sub-phone').value   = '';
+    document.getElementById('sub-name').value    = '';
+    document.getElementById('sub-area').value    = '';
+    document.getElementById('sub-consent').checked = false;
     document.getElementById('sub-risk-preview').textContent = '';
     _subLat = null; _subLon = null;
     submitBtn.disabled = true;
