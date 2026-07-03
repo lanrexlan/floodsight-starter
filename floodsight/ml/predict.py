@@ -32,19 +32,36 @@ def load_model(path=ML_MODEL_PATH):
 
 
 def predict_depth(features: dict) -> float:
-    """features: dict with keys matching ML_FEATURE_COLUMNS (see
-    floodsight/config.py). Returns predicted depth in meters."""
-    bundle = load_model()
-    model = bundle["model"]
-    row = pd.DataFrame([{col: features[col] for col in ML_FEATURE_COLUMNS}])
-    pred = float(model.predict(row)[0])
+    """Return predicted flood depth in metres for a single feature dict.
+
+    Keys must match ML_FEATURE_COLUMNS (see floodsight/config.py).
+    hand_m may be None/NaN — imputed with training-set median from bundle.
+    """
+    bundle      = load_model()
+    model       = bundle["model"]
+    hand_median = bundle.get("hand_impute_median", 3.0)
+
+    row_data = {}
+    for col in ML_FEATURE_COLUMNS:
+        v = features.get(col)
+        if col == "hand_m" and (v is None or (isinstance(v, float) and pd.isna(v))):
+            v = hand_median
+        row_data[col] = v
+
+    row  = pd.DataFrame([row_data])
+    pred = float(model.predict(row.values)[0])
     return max(pred, 0.0)
 
 
 def predict_depth_batch(df: pd.DataFrame) -> pd.Series:
-    bundle = load_model()
-    model = bundle["model"]
-    preds = model.predict(df[ML_FEATURE_COLUMNS])
+    """Batch prediction — df must contain all ML_FEATURE_COLUMNS."""
+    bundle      = load_model()
+    model       = bundle["model"]
+    hand_median = bundle.get("hand_impute_median", 3.0)
+
+    Xb = df[ML_FEATURE_COLUMNS].copy()
+    Xb["hand_m"] = pd.to_numeric(Xb["hand_m"], errors="coerce").fillna(hand_median)
+    preds = model.predict(Xb.values)
     return pd.Series(preds, index=df.index).clip(lower=0)
 
 

@@ -4,8 +4,9 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from api.schemas import DepthPredictionRequest, DepthPredictionResponse
 from floodsight.config import DATA_DIR, ML_MODEL_PATH
@@ -95,3 +96,102 @@ def predictions_log(limit: int = 100):
     entries = [json.loads(ln) for ln in lines if ln.strip()]
     entries.reverse()
     return {"entries": entries[:limit], "total": len(entries)}
+
+
+# ---------------------------------------------------------------------------
+# Phase 21: ML flood depth grid  (centroid-based GeoJSON)
+# ---------------------------------------------------------------------------
+
+ML_GRID_GEOJSON = DATA_DIR / "processed" / "flood_depth_ml.geojson"
+ML_GRID_SUMMARY = DATA_DIR / "processed" / "flood_depth_ml_summary.json"
+
+_VALID_CLASSES = {"None", "Low", "Medium", "High", "Extreme"}
+
+
+@router.get("/ml-grid")
+def ml_grid(
+    depth_class: Optional[str] = Query(
+        default=None,
+        description=(
+            "Comma-separated depth classes to return: "
+            "None, Low, Medium, High, Extreme. "
+            "Omit to return all cells."
+        ),
+    ),
+    limit: int = Query(
+        default=0,
+        ge=0,
+        description="Max features to return (0 = no limit).",
+    ),
+):
+    """
+    Phase 21 — ML-predicted flood depth grid for Lagos under a 100-year
+    design storm (rain_24h=150 mm, rain_72h=150 mm).
+
+    Returns a GeoJSON FeatureCollection of centroid points.  Each feature
+    carries ``predicted_depth_m``, ``depth_class``, and ``depth_colour``
+    alongside the cell's elevation, flood_score, and risk_class.
+
+    Run ``python scripts/09_train_flood_depth.py`` once to generate the
+    grid file before calling this endpoint.
+
+    Depth classes
+    -------------
+    - **None**    depth < 0.05 m
+    - **Low**     0.05 – 0.30 m
+    - **Medium**  0.30 – 1.00 m
+    - **High**    1.00 – 2.00 m
+    - **Extreme** > 2.00 m
+    """
+    if not ML_GRID_GEOJSON.exists():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "ML depth grid not yet generated. "
+                "Run: python scripts/09_train_flood_depth.py"
+            ),
+        )
+
+    data = json.loads(ML_GRID_GEOJSON.read_text(encoding="utf-8"))
+    features = data.get("features", [])
+
+    # Filter by depth class if requested
+    if depth_class:
+        requested = {c.strip() for c in depth_class.split(",")}
+        unknown = requested - _VALID_CLASSES
+        if unknown:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Unknown depth_class value(s): {sorted(unknown)}. "
+                       f"Valid: {sorted(_VALID_CLASSES)}",
+            )
+        features = [
+            f for f in features
+            if f.get("properties", {}).get("depth_class") in requested
+        ]
+
+    if limit > 0:
+        features = features[:limit]
+
+    return {
+        "type":     "FeatureCollection",
+        "features": features,
+        "metadata": data.get("metadata", {}),
+    }
+
+
+@router.get("/ml-grid/summary")
+def ml_grid_summary():
+    """
+    Return the summary statistics from the last Phase 21 training run:
+    model metrics, depth class counts, top flooded cells, design storm params.
+    """
+    if not ML_GRID_SUMMARY.exists():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "ML depth grid summary not found. "
+                "Run: python scripts/09_train_flood_depth.py"
+            ),
+        )
+    return json.loads(ML_GRID_SUMMARY.read_text(encoding="utf-8"))

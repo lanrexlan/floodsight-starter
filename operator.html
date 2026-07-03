@@ -360,6 +360,12 @@ const VALID_PW = 'floodsight2026';
 const COLOURS = ['#1565C0','#2E7D32','#E65100','#6A1B9A','#00838F','#AD1457'];
 const LEVEL_ORDER = { Red: 0, Orange: 1, Yellow: 2, Green: 3 };
 
+// ── Helpers ───────────────────────────────────────────────────────────
+function showApiError(elId, msg) {
+  const el = document.getElementById(elId);
+  if (el) el.innerHTML = `<div style="padding:1rem;color:var(--orange);font-size:.85rem">⚠ ${msg}</div>`;
+}
+
 // ── Auth ──────────────────────────────────────────────────────────────
 function tryLogin() {
   const pw = document.getElementById('pwInput').value.trim();
@@ -387,8 +393,8 @@ if (sessionStorage.getItem(PW_KEY) === '1') showDash();
 // ── Data loading ─────────────────────────────────────────────────────
 async function loadAll() {
   const [stats, history] = await Promise.all([
-    fetch(`${API}/subscribers/stats`).then(r => r.json()).catch(() => null),
-    fetch(`${API}/alerts/history?limit=10`).then(r => r.json()).catch(() => null),
+    fetch(`${API}/subscribers/stats`).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetch(`${API}/alerts/history?limit=10`).then(r => r.ok ? r.json() : null).catch(() => null),
   ]);
 
   const now = new Date().toLocaleString('en-NG', {
@@ -396,11 +402,24 @@ async function loadAll() {
   });
   document.getElementById('refreshed').textContent = `Last updated: ${now} (WAT)`;
 
-  if (stats)   renderStats(stats);
-  if (history) renderHistory(history);
+  // Validate shapes — a 404 body would lack .active / .dispatches
+  const validStats   = stats   && typeof stats.active   === 'number';
+  const validHistory = history && Array.isArray(history.dispatches);
+
+  // Set history reference before renderStats reads it for the delivery avg
+  if (validHistory) window._lastHistory = history;
+
+  if (validStats)   renderStats(stats);
+  else showApiError('kpiRow', 'subscribers/stats endpoint not available yet — push code to Render first.');
+
+  if (validHistory) renderHistory(history);
+  else showApiError('histTable', 'alerts/history endpoint not available yet — push code to Render first.');
 
   // data-source note
-  const src = (stats?.data_source === 'synthetic_demo' || history?.data_source === 'synthetic_demo')
+  const isDemo = stats?.data_source === 'synthetic_demo' || history?.data_source === 'synthetic_demo';
+  const src = !validStats
+    ? '⚠ API endpoints not deployed — run the git push, then reload'
+    : isDemo
     ? '⚠ Demo mode — displaying synthetic data (Supabase not connected)'
     : '✓ Live data from Supabase';
   const noteEl = document.getElementById('dataNote');
@@ -473,7 +492,6 @@ function renderDonut(stats) {
 // ── History ───────────────────────────────────────────────────────────
 let sparkInst = null;
 function renderHistory(history) {
-  window._lastHistory = history;
   const rows = history.dispatches;
 
   // ── History table

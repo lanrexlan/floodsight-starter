@@ -61,8 +61,9 @@ def root():
         "endpoints": [
             "/risk/grid", "/risk/point", "/risk/streets",
             "/subscribe", "/subscribers/count",
+            "/subscribers/stats", "/alerts/history",
             "/alerts/dispatch",
-            "/depth/predict",
+            "/depth/predict", "/depth/ml-grid", "/depth/ml-grid/summary",
             "/alerts/current",
             "/verify", "/verify/summary",
             "/forecast/rainfall", "/forecast/alerts", "/forecast/summary",

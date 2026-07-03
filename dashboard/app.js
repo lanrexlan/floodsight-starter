@@ -856,3 +856,141 @@ function toggleSwmmLayer() {
   const btn = document.getElementById("swmm-toggle");
   if (btn) btn.textContent = _swmmVisible ? "Hide SWMM flood" : "Show SWMM flood";
 }
+
+
+// ---------------------------------------------------------------------------
+// Phase 21 — ML Flood Depth Layer (GradientBoostingRegressor, 150 mm storm)
+// 24,933 centroid points coloured by predicted depth class.
+// Loaded lazily on first toggle to avoid 6.8 MB fetch on page load.
+// ---------------------------------------------------------------------------
+let _mlDepthLoaded  = false;
+let _mlDepthLoading = false;
+let _mlDepthVisible = false;   // off by default — user toggles on
+
+const ML_DEPTH_COLORS = {
+  "None":    "#FFFFFF",
+  "Low":     "#FFF176",
+  "Medium":  "#FF9800",
+  "High":    "#F44336",
+  "Extreme": "#B71C1C",
+};
+
+async function _loadMlDepthLayer() {
+  if (_mlDepthLoaded || _mlDepthLoading) return;
+  _mlDepthLoading = true;
+
+  const btn = document.getElementById("ml-depth-toggle");
+  if (btn) btn.textContent = "Loading ML depth…";
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/depth/ml-grid`);
+    if (!res.ok) {
+      if (res.status === 503) {
+        console.info("ML depth grid not yet generated — run 09_train_flood_depth.py");
+      } else {
+        console.warn("ML depth layer HTTP", res.status);
+      }
+      if (btn) { btn.textContent = "ML depth (unavailable)"; btn.disabled = true; }
+      return;
+    }
+
+    const geojson = await res.json();
+    _mlDepthLoaded = true;
+
+    map.addSource("ml-depth", { type: "geojson", data: geojson });
+
+    // Outer glow for High + Extreme cells
+    map.addLayer({
+      id: "ml-depth-glow",
+      type: "circle",
+      source: "ml-depth",
+      filter: ["in", ["get", "depth_class"], ["literal", ["High", "Extreme"]]],
+      paint: {
+        "circle-radius": [
+          "interpolate", ["linear"], ["zoom"],
+          10, 6,
+          14, 12,
+        ],
+        "circle-color":   "#F44336",
+        "circle-opacity": 0.18,
+        "circle-blur":    1,
+      },
+    });
+
+    // Core dots — all cells, colour by depth_class
+    map.addLayer({
+      id: "ml-depth-dots",
+      type: "circle",
+      source: "ml-depth",
+      paint: {
+        "circle-radius": [
+          "interpolate", ["linear"], ["zoom"],
+          10, 2.5,
+          13, 5,
+          16, 9,
+        ],
+        "circle-color":        ["get", "depth_colour"],
+        "circle-opacity":      0.82,
+        "circle-stroke-color": "rgba(0,0,0,0.45)",
+        "circle-stroke-width": 0.6,
+      },
+    });
+
+    // Click popup
+    map.on("click", "ml-depth-dots", (e) => {
+      const p   = e.features[0].properties;
+      const col = p.depth_colour || "#888";
+      new maplibregl.Popup({ className: "fs-popup", closeButton: false })
+        .setLngLat(e.lngLat)
+        .setHTML(
+          `<strong>Grid cell ${p.cell_id}</strong><br>` +
+          `<span style="font-size:11px;color:#aaa">Phase 21 ML depth (100-yr storm)</span><br>` +
+          `Predicted depth: <span style="color:${col};font-weight:600">${p.predicted_depth_m} m</span><br>` +
+          `Class: <span style="color:${col}">${p.depth_class}</span><br>` +
+          `Elevation: ${p.elevation_m != null ? Number(p.elevation_m).toFixed(1) : "—"} m<br>` +
+          `Risk class: ${p.risk_class || "—"}`
+        )
+        .addTo(map);
+    });
+    map.on("mouseenter", "ml-depth-dots", () => { map.getCanvas().style.cursor = "pointer"; });
+    map.on("mouseleave", "ml-depth-dots", () => { map.getCanvas().style.cursor = ""; });
+
+    // Start hidden unless the user already clicked toggle before load finished
+    const vis = _mlDepthVisible ? "visible" : "none";
+    ["ml-depth-glow", "ml-depth-dots"].forEach(id => {
+      if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", vis);
+    });
+
+    if (btn) btn.textContent = _mlDepthVisible ? "Hide ML depth" : "Show ML depth";
+
+    const meta = geojson.metadata || {};
+    console.log(
+      `ML depth layer loaded — ${(geojson.features || []).length} cells ` +
+      `(design storm ${meta.design_rain_24h_mm || 150} mm/24h)`
+    );
+  } catch (err) {
+    console.warn("ML depth layer failed to load:", err);
+    if (btn) { btn.textContent = "ML depth (error)"; btn.disabled = true; }
+  } finally {
+    _mlDepthLoading = false;
+  }
+}
+
+// ── Toggle ML depth layer visibility ──────────────────────────────────────
+function toggleMlDepthLayer() {
+  _mlDepthVisible = !_mlDepthVisible;
+  const btn = document.getElementById("ml-depth-toggle");
+
+  if (!_mlDepthLoaded) {
+    // Lazy-load on first toggle
+    _loadMlDepthLayer();
+    if (btn) btn.textContent = "Loading ML depth…";
+    return;
+  }
+
+  const vis = _mlDepthVisible ? "visible" : "none";
+  ["ml-depth-glow", "ml-depth-dots"].forEach(id => {
+    if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", vis);
+  });
+  if (btn) btn.textContent = _mlDepthVisible ? "Hide ML depth" : "Show ML depth";
+}
