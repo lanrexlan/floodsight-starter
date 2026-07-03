@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FloodSight Operator Dashboard — Rankine Innovation Lab</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --blue:    #1565C0;
+      --lblue:   #E3F2FD;
+      --green:   #2E7D32;
+      --lgreen:  #E8F5E9;
+      --orange:  #E65100;
+      --red:     #B71C1C;
+      --yellow:  #F9A825;
+      --grey:    #455A64;
+      --bg:      #F5F7FA;
+      --card:    #FFFFFF;
+      --border:  #CFD8DC;
+      --text:    #263238;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── AUTH GATE ─────────────────────────────────────────────── */
+    #gate {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: var(--blue);
+    }
+    #gate-card {
+      background: white;
+      border-radius: 12px;
+      padding: 2.5rem 3rem;
+      width: 360px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.25);
+      text-align: center;
+    }
+    #gate-card .logo { font-size: 2.5rem; margin-bottom: .75rem; }
+    #gate-card h2 { font-size: 1.25rem; color: var(--blue); margin-bottom: .25rem; }
+    #gate-card p  { font-size: .85rem; color: var(--grey); margin-bottom: 1.5rem; }
+    #gate-card input {
+      width: 100%;
+      padding: .65rem 1rem;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+      margin-bottom: .75rem;
+      outline: none;
+    }
+    #gate-card input:focus { border-color: var(--blue); }
+    #gate-card button {
+      width: 100%;
+      padding: .7rem;
+      background: var(--blue);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    #gate-card button:hover { background: #0d47a1; }
+    #gate-err {
+      color: var(--red);
+      font-size: .85rem;
+      margin-top: .5rem;
+      min-height: 1.2em;
+    }
+
+    /* ── MAIN DASHBOARD ───────────────────────────────────────── */
+    #app { display: none; }
+
+    header {
+      background: var(--blue);
+      color: white;
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header .brand { display: flex; align-items: center; gap: .75rem; }
+    header .brand span { font-size: 1.4rem; font-weight: 700; }
+    header .brand small { font-size: .8rem; font-weight: 400; opacity: .8; display: block; }
+    header .meta { font-size: .8rem; opacity: .75; text-align: right; }
+    header button#logout {
+      background: rgba(255,255,255,.15);
+      border: 1px solid rgba(255,255,255,.4);
+      color: white;
+      padding: .35rem .8rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: .8rem;
+      margin-left: 1rem;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 1.5rem 1.5rem 3rem;
+    }
+
+    /* ── STAT CARDS ───────────────────────────────────────────── */
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .stat-card {
+      background: var(--card);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      border-left: 4px solid var(--blue);
+      box-shadow: 0 1px 4px rgba(0,0,0,.07);
+    }
+    .stat-card.green  { border-color: var(--green); }
+    .stat-card.orange { border-color: var(--orange); }
+    .stat-card.red    { border-color: var(--red); }
+    .stat-card label {
+      font-size: .75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--grey);
+      display: block;
+      margin-bottom: .3rem;
+    }
+    .stat-card .val {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+    }
+    .stat-card .sub {
+      font-size: .8rem;
+      color: var(--grey);
+      margin-top: .25rem;
+    }
+
+    /* ── GRID ─────────────────────────────────────────────────── */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1.8fr;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    @media (max-width: 720px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.07);
+    }
+    .card h3 {
+      font-size: .95rem;
+      font-weight: 700;
+      color: var(--blue);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+    }
+
+    /* ── DONUT ────────────────────────────────────────────────── */
+    #donutWrap {
+      position: relative;
+      max-width: 220px;
+      margin: 0 auto .75rem;
+    }
+    #donutCenter {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      pointer-events: none;
+    }
+    #donutCenter .big  { font-size: 1.8rem; font-weight: 700; color: var(--text); }
+    #donutCenter .lbl  { font-size: .7rem; color: var(--grey); }
+    .donut-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .4rem .75rem;
+      justify-content: center;
+      font-size: .8rem;
+    }
+    .donut-legend span {
+      display: flex;
+      align-items: center;
+      gap: .3rem;
+    }
+    .donut-legend i {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border-radius: 2px;
+    }
+
+    /* ── SPARKLINE ────────────────────────────────────────────── */
+    #sparkWrap { height: 90px; }
+
+    /* ── HISTORY TABLE ────────────────────────────────────────── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .85rem;
+    }
+    th {
+      text-align: left;
+      padding: .4rem .75rem;
+      background: var(--lblue);
+      color: var(--blue);
+      font-size: .75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    td {
+      padding: .55rem .75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f9fbff; }
+
+    .badge {
+      display: inline-block;
+      padding: .15rem .55rem;
+      border-radius: 99px;
+      font-size: .72rem;
+      font-weight: 700;
+    }
+    .badge.Red    { background: #ffebee; color: var(--red); }
+    .badge.Orange { background: #fff3e0; color: var(--orange); }
+    .badge.Yellow { background: #fffde7; color: #6d4c00; }
+    .badge.Green  { background: var(--lgreen); color: var(--green); }
+
+    .delivery-bar {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+    .bar-bg {
+      flex: 1;
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      background: var(--green);
+      border-radius: 3px;
+    }
+
+    /* ── FOOTER / DATA SOURCE ─────────────────────────────────── */
+    .data-note {
+      font-size: .75rem;
+      color: var(--grey);
+      margin-top: 1.5rem;
+      text-align: center;
+    }
+    .data-note.demo { color: var(--orange); font-weight: 600; }
+
+    /* ── LOADING SPINNER ──────────────────────────────────────── */
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: var(--grey);
+      font-size: .9rem;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════ AUTH GATE ═══════════════════════════ -->
+<div id="gate">
+  <div id="gate-card">
+    <div class="logo">🌊</div>
+    <h2>FloodSight Operator</h2>
+    <p>Rankine Innovation Lab — restricted access</p>
+    <input id="pwInput" type="password" placeholder="Enter operator password" />
+    <button onclick="tryLogin()">Sign in</button>
+    <div id="gate-err"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ DASHBOARD ═══════════════════════════ -->
+<div id="app">
+  <header>
+    <div class="brand">
+      <div>
+        <span>🌊 FloodSight Operator</span>
+        <small>Subscriber &amp; Dispatch Analytics · Rankine Innovation Lab</small>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:.5rem">
+      <div class="meta" id="refreshed">Loading…</div>
+      <button id="logout" onclick="doLogout()">Sign out</button>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <!-- KPI row -->
+    <div class="stat-row" id="kpiRow">
+      <div class="loading">Loading stats…</div>
+    </div>
+
+    <!-- Donut + Sparkline -->
+    <div class="grid-2">
+      <div class="card">
+        <h3>📍 Subscribers by LGA</h3>
+        <div id="donutWrap">
+          <canvas id="donutChart"></canvas>
+          <div id="donutCenter">
+            <div class="big" id="donutTotal">—</div>
+            <div class="lbl">active</div>
+          </div>
+        </div>
+        <div class="donut-legend" id="donutLegend"></div>
+      </div>
+
+      <div class="card">
+        <h3>📈 New Subscribers — Last 7 Dispatches</h3>
+        <div id="sparkWrap"><canvas id="sparkChart"></canvas></div>
+        <div style="height:.75rem"></div>
+        <h3 style="margin-top:.5rem">📊 Delivery Rate by Dispatch</h3>
+        <div id="deliveryBars" style="margin-top:.5rem"></div>
+      </div>
+    </div>
+
+    <!-- History table -->
+    <div class="card">
+      <h3>📋 Recent Dispatch History</h3>
+      <div id="histTable"><div class="loading">Loading…</div></div>
+    </div>
+
+    <div class="data-note" id="dataNote"></div>
+  </div>
+</div>
+
+<script>
+const API      = 'https://floodsight-starter.onrender.com';
+const PW_KEY   = 'fs_op_auth';
+// Operator password — change this before deploying to production
+const VALID_PW = 'floodsight2026';
+
+const COLOURS = ['#1565C0','#2E7D32','#E65100','#6A1B9A','#00838F','#AD1457'];
+const LEVEL_ORDER = { Red: 0, Orange: 1, Yellow: 2, Green: 3 };
+
+// ── Auth ──────────────────────────────────────────────────────────────
+function tryLogin() {
+  const pw = document.getElementById('pwInput').value.trim();
+  if (pw === VALID_PW) {
+    sessionStorage.setItem(PW_KEY, '1');
+    showDash();
+  } else {
+    document.getElementById('gate-err').textContent = 'Incorrect password.';
+  }
+}
+document.getElementById('pwInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') tryLogin();
+});
+function doLogout() {
+  sessionStorage.removeItem(PW_KEY);
+  location.reload();
+}
+function showDash() {
+  document.getElementById('gate').style.display = 'none';
+  document.getElementById('app').style.display  = 'block';
+  loadAll();
+}
+if (sessionStorage.getItem(PW_KEY) === '1') showDash();
+
+// ── Data loading ─────────────────────────────────────────────────────
+async function loadAll() {
+  const [stats, history] = await Promise.all([
+    fetch(`${API}/subscribers/stats`).then(r => r.json()).catch(() => null),
+    fetch(`${API}/alerts/history?limit=10`).then(r => r.json()).catch(() => null),
+  ]);
+
+  const now = new Date().toLocaleString('en-NG', {
+    dateStyle: 'medium', timeStyle: 'short', timeZone: 'Africa/Lagos'
+  });
+  document.getElementById('refreshed').textContent = `Last updated: ${now} (WAT)`;
+
+  if (stats)   renderStats(stats);
+  if (history) renderHistory(history);
+
+  // data-source note
+  const src = (stats?.data_source === 'synthetic_demo' || history?.data_source === 'synthetic_demo')
+    ? '⚠ Demo mode — displaying synthetic data (Supabase not connected)'
+    : '✓ Live data from Supabase';
+  const noteEl = document.getElementById('dataNote');
+  noteEl.textContent = src;
+  if (src.startsWith('⚠')) noteEl.classList.add('demo');
+}
+
+// ── KPI cards ────────────────────────────────────────────────────────
+function renderStats(stats) {
+  const dispatches = window._lastHistory;
+  const totalDisp  = dispatches ? dispatches.total_dispatches : '—';
+  const avgDel     = dispatches
+    ? (dispatches.dispatches.reduce((a,d) => a + d.delivery_rate, 0) /
+       Math.max(dispatches.dispatches.length, 1) * 100).toFixed(1)
+    : '—';
+
+  document.getElementById('kpiRow').innerHTML = `
+    <div class="stat-card">
+      <label>Active Subscribers</label>
+      <div class="val">${stats.active.toLocaleString()}</div>
+      <div class="sub">${stats.total.toLocaleString()} total registered</div>
+    </div>
+    <div class="stat-card green">
+      <label>Consent Rate</label>
+      <div class="val">${(stats.consent_rate * 100).toFixed(1)}%</div>
+      <div class="sub">NDPR-compliant sign-ups</div>
+    </div>
+    <div class="stat-card orange">
+      <label>LGAs Covered</label>
+      <div class="val">${stats.by_area.length}</div>
+      <div class="sub">${stats.by_area.map(a => a.area).join(', ')}</div>
+    </div>
+    <div class="stat-card red">
+      <label>Avg Delivery Rate</label>
+      <div class="val">${avgDel}%</div>
+      <div class="sub">via Africa's Talking SMS</div>
+    </div>
+  `;
+
+  renderDonut(stats);
+}
+
+// ── Donut chart ───────────────────────────────────────────────────────
+let donutInst = null;
+function renderDonut(stats) {
+  document.getElementById('donutTotal').textContent = stats.active.toLocaleString();
+  const labels = stats.by_area.map(a => a.area);
+  const data   = stats.by_area.map(a => a.count);
+  const colours = COLOURS.slice(0, data.length);
+
+  if (donutInst) donutInst.destroy();
+  donutInst = new Chart(document.getElementById('donutChart'), {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: colours, borderWidth: 2, borderColor: '#fff' }] },
+    options: {
+      cutout: '68%',
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed} subscribers` }
+      }},
+      animation: { duration: 600 },
+    }
+  });
+
+  const legend = document.getElementById('donutLegend');
+  legend.innerHTML = labels.map((l, i) =>
+    `<span><i style="background:${colours[i]}"></i>${l} (${data[i]})</span>`
+  ).join('');
+}
+
+// ── History ───────────────────────────────────────────────────────────
+let sparkInst = null;
+function renderHistory(history) {
+  window._lastHistory = history;
+  const rows = history.dispatches;
+
+  // ── History table
+  const tbody = rows.map(r => `
+    <tr>
+      <td>${r.event_date}</td>
+      <td><span class="badge ${r.alert_level}">${r.alert_level}</span></td>
+      <td>${r.recipients.toLocaleString()}</td>
+      <td>${r.delivered.toLocaleString()}</td>
+      <td>
+        <div class="delivery-bar">
+          <div class="bar-bg"><div class="bar-fill" style="width:${(r.delivery_rate*100).toFixed(0)}%"></div></div>
+          ${(r.delivery_rate*100).toFixed(0)}%
+        </div>
+      </td>
+    </tr>
+  `).join('');
+
+  document.getElementById('histTable').innerHTML = rows.length ? `
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Level</th>
+          <th>Recipients</th>
+          <th>Delivered</th>
+          <th>Delivery Rate</th>
+        </tr>
+      </thead>
+      <tbody>${tbody}</tbody>
+    </table>
+  ` : '<div class="loading">No dispatches recorded yet.</div>';
+
+  // ── Sparkline (recipient growth across dispatches)
+  const sorted   = [...rows].sort((a, b) => a.event_date.localeCompare(b.event_date));
+  const sparkLbl = sorted.map(r => r.event_date.slice(5));   // MM-DD
+  const sparkDat = sorted.map(r => r.recipients);
+  const levelCol = sorted.map(r => ({
+    Red: '#B71C1C', Orange: '#E65100', Yellow: '#F9A825', Green: '#2E7D32'
+  }[r.alert_level] || '#1565C0'));
+
+  if (sparkInst) sparkInst.destroy();
+  sparkInst = new Chart(document.getElementById('sparkChart'), {
+    type: 'bar',
+    data: {
+      labels: sparkLbl,
+      datasets: [{
+        label: 'Recipients',
+        data: sparkDat,
+        backgroundColor: levelCol,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { title: ctx => sorted[ctx[0].dataIndex].event_date,
+                     label:  ctx => ` ${ctx.parsed.y} recipients` }
+      }},
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { beginAtZero: true, ticks: { font: { size: 10 } } }
+      },
+      animation: { duration: 500 },
+    }
+  });
+
+  // ── Delivery mini-bars (per dispatch, compact)
+  const barsHtml = sorted.slice(-5).map(r => `
+    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem;font-size:.78rem">
+      <span style="width:42px;color:var(--grey)">${r.event_date.slice(5)}</span>
+      <div class="bar-bg" style="flex:1">
+        <div class="bar-fill" style="width:${(r.delivery_rate*100).toFixed(0)}%;background:${
+          r.delivery_rate >= 0.9 ? 'var(--green)' : r.delivery_rate >= 0.8 ? 'var(--yellow)' : 'var(--red)'
+        }"></div>
+      </div>
+      <span style="width:34px;text-align:right">${(r.delivery_rate*100).toFixed(0)}%</span>
+    </div>
+  `).join('');
+  document.getElementById('deliveryBars').innerHTML = barsHtml ||
+    '<span style="font-size:.8rem;color:var(--grey)">No dispatch data yet</span>';
+
+  // Now that history is available, refresh KPI delivery avg
+  const statsEl = document.getElementById('kpiRow').querySelector('.stat-card.red .val');
+  if (statsEl) {
+    const avg = rows.reduce((a, d) => a + d.delivery_rate, 0) / Math.max(rows.length, 1);
+    statsEl.textContent = (avg * 100).toFixed(1) + '%';
+  }
+}
+</script>
+</body>
+</html>

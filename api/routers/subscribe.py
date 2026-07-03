@@ -1,10 +1,13 @@
 """
-POST /subscribe  — register a new flood alert subscriber.
-GET  /subscribers/count  — number of active subscribers (for dashboard display).
-DELETE /subscribe/{phone} — deactivate (unsubscribe).
+POST /subscribe            — register a new flood alert subscriber.
+GET  /subscribers/count    — total active subscriber count.
+GET  /subscribers/stats    — operator analytics: count by LGA, consent rate.
+GET  /alerts/history       — recent dispatch history (operator dashboard).
+DELETE /subscribe/{phone}  — deactivate (unsubscribe).
 
 All subscriber data is stored in Supabase.
 Requires SUPABASE_URL and SUPABASE_KEY environment variables.
+Endpoints that need Supabase return synthetic demo data when it is unavailable.
 """
 
 from __future__ import annotations
@@ -20,6 +23,8 @@ from floodsight.db.supabase_client import (
     add_subscriber,
     deactivate_subscriber,
     get_subscriber_count,
+    get_subscriber_stats,
+    get_alert_history,
     normalize_phone,
 )
 
@@ -156,6 +161,105 @@ def subscriber_count():
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     return {"active_subscribers": count}
+
+
+# ---------------------------------------------------------------------------
+# GET /subscribers/stats  (operator dashboard)
+# ---------------------------------------------------------------------------
+
+# Synthetic demo data used when Supabase is not configured.
+_SYNTHETIC_STATS = {
+    "total":        312,
+    "active":       298,
+    "by_area": [
+        {"area": "Kosofe",   "count": 127},
+        {"area": "Alimosho", "count":  89},
+        {"area": "Eti-Osa",  "count":  82},
+    ],
+    "consent_rate": 0.98,
+    "data_source":  "synthetic_demo",
+}
+
+_SYNTHETIC_HISTORY = {
+    "dispatches": [
+        {"event_date": "2026-07-01", "alert_level": "Red",    "recipients": 298, "delivered": 271, "delivery_rate": 0.91},
+        {"event_date": "2026-06-28", "alert_level": "Orange", "recipients": 295, "delivered": 269, "delivery_rate": 0.91},
+        {"event_date": "2026-06-21", "alert_level": "Orange", "recipients": 280, "delivered": 257, "delivery_rate": 0.92},
+        {"event_date": "2026-06-14", "alert_level": "Red",    "recipients": 261, "delivered": 237, "delivery_rate": 0.91},
+        {"event_date": "2026-06-07", "alert_level": "Yellow", "recipients": 244, "delivered": 225, "delivery_rate": 0.92},
+        {"event_date": "2026-05-31", "alert_level": "Orange", "recipients": 218, "delivered": 199, "delivery_rate": 0.91},
+        {"event_date": "2026-05-24", "alert_level": "Yellow", "recipients": 193, "delivered": 178, "delivery_rate": 0.92},
+    ],
+    "total_dispatches": 7,
+    "data_source": "synthetic_demo",
+}
+
+
+@router.get("/subscribers/stats")
+def subscriber_stats():
+    """
+    Operator dashboard: subscriber totals, breakdown by area, consent rate.
+
+    Falls back to synthetic demo data when Supabase is not configured so the
+    operator.html dashboard renders without error during demos.
+
+    Response::
+
+        {
+          "total": 312,
+          "active": 298,
+          "by_area": [{"area": "Kosofe", "count": 127}, ...],
+          "consent_rate": 0.98,
+          "data_source": "supabase"   // or "synthetic_demo"
+        }
+    """
+    try:
+        return get_subscriber_stats()
+    except RuntimeError:
+        log.warning("Supabase not configured; returning synthetic subscriber stats")
+        return _SYNTHETIC_STATS
+    except Exception as exc:
+        log.error("get_subscriber_stats failed: %s", exc)
+        return _SYNTHETIC_STATS
+
+
+# ---------------------------------------------------------------------------
+# GET /alerts/history  (operator dashboard)
+# ---------------------------------------------------------------------------
+
+@router.get("/alerts/history")
+def alert_history(limit: int = 20):
+    """
+    Operator dashboard: recent alert dispatch history.
+
+    Groups alert_log by (event_date, alert_level) and counts recipients.
+    Falls back to synthetic demo data when Supabase is not configured.
+
+    Response::
+
+        {
+          "dispatches": [
+            {
+              "event_date": "2026-07-01",
+              "alert_level": "Red",
+              "recipients": 298,
+              "delivered": 271,
+              "delivery_rate": 0.91
+            },
+            ...
+          ],
+          "total_dispatches": 7,
+          "data_source": "supabase"
+        }
+    """
+    try:
+        return get_alert_history(limit=limit)
+    except RuntimeError:
+        log.warning("Supabase not configured; returning synthetic alert history")
+        return _SYNTHETIC_HISTORY
+    except Exception as exc:
+        log.error("get_alert_history failed: %s", exc)
+        return _SYNTHETIC_HISTORY
 
 
 # ---------------------------------------------------------------------------
