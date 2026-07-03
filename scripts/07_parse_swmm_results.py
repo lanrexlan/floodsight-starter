@@ -449,8 +449,6 @@ def main() -> None:
         choices=SUPPORTED_LGAS + ["all"],
         help="LGA to parse (default: kosofe). Use 'all' to parse every LGA.",
     )
-    # Positional arg for backward compat: legacy usage was
-    #   python 07_parse_swmm_results.py "path/to/file.rpt"
     parser.add_argument(
         "rpt_path",
         nargs="?",

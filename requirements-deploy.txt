@@ -1,0 +1,32 @@
+# Minimal dependencies for deploying api/main.py (e.g. on Render) — NOT
+# for running the data pipeline scripts, which need the full
+# requirements.txt (rasterio, pysheds, pyrosm, etc.). The live API only
+# reads an already-processed scored_grid.gpkg and serves it; it never
+# touches raw rasters, terrain processing, or OSM extraction at runtime.
+# Using this instead of requirements.txt for deployment means a much
+# faster, lighter build with no GDAL/rasterio compilation involved.
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic==2.9.2
+numpy==1.26.4
+pandas==2.2.2
+scikit-learn==1.5.2
+scipy==1.13.1
+joblib==1.4.2
+python-dotenv==1.0.1
+geopandas==1.0.1
+shapely==2.0.6
+pyproj==3.6.1
+
+# Phase 14: spatial rainfall grid + IMERG satellite observed
+# scipy: nearest-neighbour interpolation (rainfall_grid.py)
+# earthaccess + h5py: NASA GPM IMERG streaming (imerg.py — optional,
+#   gracefully skipped if login fails; falls back to GFS observed)
+earthaccess==0.10.0
+h5py>=3.10
+
+# Phase 16: resident SMS alert subscriptions
+# supabase: PostgreSQL cloud DB client (subscriber store + alert log)
+# twilio: SMS delivery
+supabase==2.7.4
+twilio==9.3.1

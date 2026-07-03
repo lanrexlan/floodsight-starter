@@ -1,0 +1,30 @@
+name: Keep API Alive
+
+# Pings the Render API every 14 minutes to prevent the free-tier instance
+# from spinning down. Render free tier sleeps after 15 minutes of inactivity,
+# causing 30–60 s cold-start 502s on the dashboard.
+# This workflow keeps the process warm 24/7 at zero cost.
+
+on:
+  schedule:
+    - cron: '*/14 * * * *'   # every 14 minutes, all day
+  workflow_dispatch:           # allow manual trigger to test
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Ping API
+        run: |
+          echo "Pinging FloodSight API..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 60 \
+            https://floodsight-starter.onrender.com/forecast/summary)
+          echo "HTTP status: $STATUS"
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 500 ]; then
+            echo "API is alive."
+          else
+            echo "WARNING: API returned $STATUS — may still be waking up."
+          fi

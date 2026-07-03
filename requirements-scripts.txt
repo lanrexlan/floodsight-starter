@@ -1,0 +1,3 @@
+# Dependencies for scripts/ only (not required by the API or model training).
+# Install with:  pip install -r requirements-scripts.txt
+africastalking

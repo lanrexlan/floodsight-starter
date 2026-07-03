@@ -1,0 +1,1453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FloodSight Lagos — Rankine Innovation Lab</title>
+<meta name="description" content="Real-time flood risk intelligence for Lagos. Know before the water rises." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+<style>
+/* ─── Reset & Base ─────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #08080d;
+  --surface:    #0f0f18;
+  --surface2:   #16161f;
+  --border:     rgba(255,255,255,0.08);
+  --text:       #f0f0f4;
+  --muted:      rgba(240,240,244,0.50);
+  --accent:     #4fc3f7;
+  --green:      #34d399;
+  --amber:      #fbbf24;
+  --red:        #f87171;
+  --rankine:    #4fc3f7;   /* Rankine brand teal */
+  --radius:     12px;
+  --max-w:      1100px;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Nav ──────────────────────────────────────────────────────── */
+nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(8,8,13,0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 32px;
+}
+.nav-inner {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  gap: 24px;
+}
+.nav-logo {
+  display: flex; align-items: center; gap: 10px;
+  text-decoration: none; color: var(--text);
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600; font-size: 15px;
+  flex-shrink: 0;
+}
+.nav-logo img { height: 28px; }
+.nav-logo span { opacity: 0.5; margin: 0 6px; font-weight: 300; }
+.nav-badge {
+  font-size: 12px; font-weight: 500;
+  background: rgba(79,195,247,0.12);
+  color: var(--accent);
+  border: 1px solid rgba(79,195,247,0.25);
+  padding: 2px 10px; border-radius: 20px;
+}
+.nav-links {
+  display: flex; align-items: center; gap: 28px;
+  list-style: none;
+}
+.nav-links a {
+  color: var(--muted); text-decoration: none;
+  font-size: 14px; transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--text); }
+.nav-cta {
+  font-size: 13px; font-weight: 500;
+  padding: 8px 20px; border-radius: 8px;
+  background: rgba(79,195,247,0.10);
+  border: 1px solid rgba(79,195,247,0.30);
+  color: var(--accent) !important;
+  transition: background 0.2s !important;
+}
+.nav-cta:hover { background: rgba(79,195,247,0.18) !important; }
+
+/* ─── Hero ─────────────────────────────────────────────────────── */
+.hero {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: 80px 32px 64px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: center;
+}
+.hero-eyebrow {
+  font-size: 12px; font-weight: 500; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--accent);
+  margin-bottom: 20px;
+  display: flex; align-items: center; gap: 8px;
+}
+.hero-eyebrow::before {
+  content: '◎';
+  font-size: 10px;
+}
+.hero h1 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(36px, 5vw, 56px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin-bottom: 24px;
+}
+.hero h1 em {
+  font-style: italic; font-weight: 300;
+  color: var(--accent);
+}
+.hero-sub {
+  font-size: 17px; color: var(--muted); line-height: 1.7;
+  margin-bottom: 40px;
+  max-width: 480px;
+}
+.hero-actions {
+  display: flex; gap: 16px; flex-wrap: wrap;
+}
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 24px; border-radius: 8px;
+  font-size: 14px; font-weight: 500;
+  text-decoration: none; cursor: pointer;
+  border: none; transition: all 0.2s;
+}
+.btn-primary {
+  background: var(--accent); color: #000;
+}
+.btn-primary:hover { opacity: 0.85; }
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.btn-ghost:hover { border-color: rgba(255,255,255,0.2); background: var(--surface2); }
+
+/* ─── Status Card ──────────────────────────────────────────────── */
+.status-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 36px;
+  position: relative;
+  overflow: hidden;
+}
+.status-card::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: 20px;
+  background: radial-gradient(ellipse at top left, rgba(79,195,247,0.06), transparent 60%);
+  pointer-events: none;
+}
+.status-loading {
+  display: flex; align-items: center; gap: 12px;
+  color: var(--muted); font-size: 14px;
+}
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.status-level {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 20px;
+}
+.level-dot {
+  width: 14px; height: 14px; border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 12px currentColor;
+}
+.level-dot.safe   { background: var(--green); color: var(--green); }
+.level-dot.watch  { background: var(--amber); color: var(--amber); animation: pulse-dot 2s ease-in-out infinite; }
+.level-dot.warn   { background: var(--red);   color: var(--red);   animation: pulse-dot 1.2s ease-in-out infinite; }
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 8px currentColor; }
+  50% { box-shadow: 0 0 20px currentColor; }
+}
+
+.level-label {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.level-label.safe  { color: var(--green); }
+.level-label.watch { color: var(--amber); }
+.level-label.warn  { color: var(--red); }
+
+.status-headline {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 26px; font-weight: 700;
+  line-height: 1.2; margin-bottom: 12px;
+}
+.status-summary {
+  font-size: 15px; color: var(--muted); line-height: 1.6;
+  margin-bottom: 28px;
+}
+.status-divider {
+  height: 1px; background: var(--border); margin-bottom: 24px;
+}
+.rain-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+}
+.rain-box {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+.rain-label {
+  font-size: 11px; font-weight: 500; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted);
+  margin-bottom: 6px;
+}
+.rain-value {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 20px; font-weight: 700; margin-bottom: 4px;
+}
+.rain-plain {
+  font-size: 12px; color: var(--muted); line-height: 1.4;
+}
+.status-updated {
+  font-size: 11px; color: var(--muted);
+  margin-top: 20px;
+  display: flex; align-items: center; gap: 6px;
+}
+.status-updated::before { content: '⟐'; }
+
+/* ─── Section wrapper ──────────────────────────────────────────── */
+section {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: 64px 32px;
+}
+.section-divider {
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--border), transparent);
+  margin: 0 32px;
+}
+.eyebrow {
+  font-size: 11px; font-weight: 500; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--accent);
+  margin-bottom: 16px;
+  display: flex; align-items: center; gap: 8px;
+}
+h2 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 700; line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin-bottom: 16px;
+}
+h2 em { font-style: italic; font-weight: 300; color: var(--accent); }
+.section-lead {
+  font-size: 17px; color: var(--muted);
+  max-width: 560px; line-height: 1.7;
+  margin-bottom: 48px;
+}
+
+/* ─── Rainfall explainer ───────────────────────────────────────── */
+.rain-scale {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+.scale-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  transition: border-color 0.2s;
+}
+.scale-item:hover { border-color: rgba(255,255,255,0.15); }
+.scale-icon { font-size: 24px; margin-bottom: 10px; }
+.scale-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px; font-weight: 600; margin-bottom: 4px;
+}
+.scale-range {
+  font-size: 11px; color: var(--accent);
+  font-weight: 500; margin-bottom: 8px;
+}
+.scale-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+.scale-item[data-level="0"] .scale-name { color: #60a5fa; }
+.scale-item[data-level="1"] .scale-name { color: #93c5fd; }
+.scale-item[data-level="2"] .scale-name { color: #6ee7b7; }
+.scale-item[data-level="3"] .scale-name { color: var(--amber); }
+.scale-item[data-level="4"] .scale-name { color: #fb923c; }
+.scale-item[data-level="5"] .scale-name { color: var(--red); }
+
+/* ─── Map ──────────────────────────────────────────────────────── */
+.map-wrap {
+  width: 100%;
+  height: 580px;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  position: relative;
+  background: var(--surface);
+}
+.map-wrap iframe {
+  width: 100%; height: 100%;
+  border: none;
+}
+.map-overlay-badge {
+  position: absolute;
+  top: 20px; left: 20px;
+  background: rgba(8,8,13,0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 12px; font-weight: 500;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* ─── What it means ────────────────────────────────────────────── */
+.alert-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-bottom: 48px;
+}
+.alert-card {
+  border-radius: var(--radius);
+  padding: 28px;
+  border: 1px solid transparent;
+}
+.alert-card.safe {
+  background: rgba(52,211,153,0.06);
+  border-color: rgba(52,211,153,0.20);
+}
+.alert-card.watch {
+  background: rgba(251,191,36,0.06);
+  border-color: rgba(251,191,36,0.20);
+}
+.alert-card.warn {
+  background: rgba(248,113,113,0.06);
+  border-color: rgba(248,113,113,0.20);
+}
+.alert-icon { font-size: 28px; margin-bottom: 14px; }
+.alert-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 16px; font-weight: 700; margin-bottom: 8px;
+}
+.alert-card.safe  .alert-name { color: var(--green); }
+.alert-card.watch .alert-name { color: var(--amber); }
+.alert-card.warn  .alert-name { color: var(--red); }
+.alert-meaning {
+  font-size: 14px; color: var(--muted); line-height: 1.6;
+  margin-bottom: 14px;
+}
+.alert-actions-list {
+  list-style: none;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.alert-actions-list li {
+  font-size: 13px; color: var(--muted);
+  display: flex; gap: 8px; align-items: flex-start;
+}
+.alert-actions-list li::before {
+  content: '→'; flex-shrink: 0;
+  color: var(--accent);
+}
+
+/* ─── How it works ─────────────────────────────────────────────── */
+.steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  position: relative;
+}
+.steps::before {
+  content: '';
+  position: absolute;
+  top: 28px; left: 10%; right: 10%;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--border) 20%, var(--border) 80%, transparent);
+}
+.step {
+  text-align: center; padding: 0 16px;
+  position: relative;
+}
+.step-icon {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  margin: 0 auto 20px;
+  position: relative; z-index: 1;
+}
+.step-num {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.1em;
+  color: var(--accent); margin-bottom: 8px;
+}
+.step-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 15px; font-weight: 600; margin-bottom: 8px;
+}
+.step-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+/* ─── Subscribe Form ───────────────────────────────────────────── */
+.subscribe-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 56px;
+  position: relative; overflow: hidden;
+}
+.subscribe-section::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 30% 50%, rgba(79,195,247,0.05), transparent 60%);
+  pointer-events: none;
+}
+.subscribe-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 56px;
+  align-items: start;
+  position: relative;
+}
+@media(max-width:700px) { .subscribe-grid { grid-template-columns: 1fr; gap: 32px; } }
+.subscribe-pitch h2 { margin-bottom: 16px; }
+.subscribe-pitch p  { color: var(--muted); line-height: 1.7; margin-bottom: 20px; }
+.subscribe-benefit  {
+  display: flex; align-items: flex-start; gap: 12px;
+  margin-bottom: 14px; font-size: 14px; color: var(--muted);
+}
+.subscribe-benefit svg { flex-shrink: 0; margin-top: 2px; }
+.subscribe-form-wrap h3 { font-size: 18px; margin-bottom: 20px; }
+.sub-consent-wrap {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin: 4px 0 16px;
+  font-size: 13px; color: var(--muted); line-height: 1.5;
+  cursor: pointer;
+}
+.sub-consent-wrap input[type="checkbox"] {
+  flex-shrink: 0; margin-top: 2px; accent-color: var(--blue);
+  width: 15px; height: 15px; cursor: pointer;
+}
+.sub-consent-wrap a { color: var(--blue); }
+.sub-field { margin-bottom: 14px; }
+.sub-field label {
+  display: block; font-size: 12px; font-weight: 600;
+  color: var(--muted); text-transform: uppercase; letter-spacing: .05em;
+  margin-bottom: 6px;
+}
+.sub-field input[type="text"],
+.sub-field input[type="tel"] {
+  width: 100%; padding: 11px 14px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); font-size: 15px;
+  box-sizing: border-box; transition: border-color .15s;
+}
+.sub-field input:focus { outline: none; border-color: var(--accent); }
+.sub-location-row { display: flex; gap: 8px; align-items: center; }
+.sub-location-row input { flex: 1; }
+.btn-locate {
+  padding: 10px 14px; background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 8px;
+  color: var(--accent); cursor: pointer; font-size: 13px;
+  white-space: nowrap; transition: background .15s; flex-shrink: 0;
+}
+.btn-locate:hover { background: rgba(79,195,247,0.12); }
+.sub-risk-preview { font-size: 13px; color: var(--muted); margin: 6px 0 14px; min-height: 20px; }
+.sub-risk-preview strong { font-weight: 600; }
+#sub-submit {
+  width: 100%; padding: 13px;
+  background: var(--accent); color: #000;
+  border: none; border-radius: 8px;
+  font-size: 15px; font-weight: 700; cursor: pointer;
+  transition: opacity .15s;
+}
+#sub-submit:hover    { opacity: 0.88; }
+#sub-submit:disabled { opacity: 0.45; cursor: not-allowed; }
+.sub-status { margin-top: 14px; font-size: 14px; min-height: 20px; display: none; }
+.sub-status.success { color: var(--green); display: block; }
+.sub-status.error   { color: var(--red);   display: block; }
+.sub-note { font-size: 12px; color: var(--muted); margin-top: 10px; }
+
+/* ─── CTA Banner ───────────────────────────────────────────────── */
+.cta-banner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 56px;
+  text-align: center;
+  position: relative; overflow: hidden;
+}
+.cta-banner::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at center, rgba(79,195,247,0.06), transparent 70%);
+  pointer-events: none;
+}
+.cta-banner h2 { margin-bottom: 16px; }
+.cta-banner p { color: var(--muted); max-width: 480px; margin: 0 auto 36px; }
+.cta-actions {
+  display: flex; justify-content: center; gap: 16px; flex-wrap: wrap;
+}
+
+/* ─── Footer ───────────────────────────────────────────────────── */
+footer {
+  border-top: 1px solid var(--border);
+  margin-top: 32px;
+}
+.footer-inner {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: 40px 32px;
+  display: flex; align-items: center;
+  justify-content: space-between; gap: 24px;
+  flex-wrap: wrap;
+}
+.footer-brand {
+  display: flex; align-items: center; gap: 10px;
+  text-decoration: none;
+}
+.footer-brand img { height: 24px; opacity: 0.7; }
+.footer-brand span {
+  font-size: 13px; color: var(--muted);
+}
+.footer-note {
+  font-size: 12px; color: var(--muted); text-align: right;
+}
+.footer-note a { color: var(--accent); text-decoration: none; }
+
+/* ─── Alert banner (top of page when active) ───────────────────── */
+.alert-top-bar {
+  display: none;
+  padding: 12px 32px;
+  font-size: 14px; font-weight: 500;
+  text-align: center;
+}
+.alert-top-bar.watch {
+  display: block;
+  background: rgba(251,191,36,0.12);
+  border-bottom: 1px solid rgba(251,191,36,0.30);
+  color: var(--amber);
+}
+.alert-top-bar.warn {
+  display: block;
+  background: rgba(248,113,113,0.12);
+  border-bottom: 1px solid rgba(248,113,113,0.30);
+  color: var(--red);
+  animation: bar-pulse 3s ease-in-out infinite;
+}
+@keyframes bar-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
+
+/* ─── Track Record ─────────────────────────────────────────────── */
+.accuracy-hero {
+  display: flex; align-items: center; gap: 40px; margin-bottom: 48px;
+  flex-wrap: wrap;
+}
+.accuracy-stat {
+  text-align: center; flex-shrink: 0;
+}
+.accuracy-num {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 72px; font-weight: 700; line-height: 1;
+  background: linear-gradient(135deg, var(--green), var(--accent));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.accuracy-label {
+  font-size: 14px; color: var(--muted); margin-top: 6px;
+}
+.accuracy-desc {
+  font-size: 16px; color: var(--muted); line-height: 1.7; max-width: 520px;
+}
+
+.event-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 14px;
+}
+.event-table thead th {
+  text-align: left; padding: 12px 16px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+.event-table tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+.event-table tbody tr:hover { background: var(--surface2); }
+.event-table tbody td { padding: 14px 16px; vertical-align: top; }
+.event-name { font-weight: 500; color: var(--text); }
+.event-areas { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.event-rain { font-variant-numeric: tabular-nums; }
+.badge {
+  display: inline-block; padding: 3px 10px; border-radius: 20px;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.badge-warn  { background: rgba(248,113,113,0.12); color: var(--red);   border: 1px solid rgba(248,113,113,0.25); }
+.badge-watch { background: rgba(251,191,36,0.12);  color: var(--amber); border: 1px solid rgba(251,191,36,0.25);  }
+.badge-safe  { background: rgba(52,211,153,0.12);  color: var(--green); border: 1px solid rgba(52,211,153,0.25);  }
+.badge-na    { background: rgba(255,255,255,0.05); color: var(--muted); border: 1px solid var(--border); }
+.match-tick { font-size: 16px; }
+.track-loading { color: var(--muted); font-size: 14px; display: flex; align-items: center; gap: 10px; padding: 32px 0; }
+.warn-bar { height: 6px; border-radius: 3px; background: rgba(248,113,113,0.15); overflow: hidden; min-width: 80px; }
+.warn-bar-fill { height: 100%; background: var(--red); border-radius: 3px; transition: width 0.6s ease; }
+
+/* ─── Responsive ───────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .hero { grid-template-columns: 1fr; gap: 48px; }
+  .alert-cards { grid-template-columns: 1fr; }
+  .steps { grid-template-columns: repeat(2, 1fr); gap: 32px; }
+  .steps::before { display: none; }
+  .rain-scale { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  nav { padding: 0 20px; }
+  .nav-links { display: none; }
+  section, .hero { padding-left: 20px; padding-right: 20px; }
+  .cta-banner { padding: 36px 24px; }
+  .steps { grid-template-columns: 1fr; }
+  .rain-scale { grid-template-columns: 1fr; }
+  .footer-inner { flex-direction: column; align-items: flex-start; }
+  .footer-note { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<!-- ░░ TOP ALERT BAR (shown only when Watch/Warning active) ░░ -->
+<div class="alert-top-bar" id="alert-bar"></div>
+
+<!-- ░░ NAV ░░ -->
+<nav>
+  <div class="nav-inner">
+    <a class="nav-logo" href="https://www.rankineinnovationlab.com">
+      <img src="https://rankineinnovationlab.com/Images/rankine_logo.svg"
+           onerror="this.style.display='none'"
+           alt="Rankine Innovation Lab" />
+      <span>Rankine Innovation Lab</span>
+      <span>|</span>
+      <span class="nav-badge">FloodSight</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="https://www.rankineinnovationlab.com/about.html">About</a></li>
+      <li><a href="https://www.rankineinnovationlab.com/research.html">Research</a></li>
+      <li><a href="#how-it-works">How It Works</a></li>
+      <li><a href="mailto:admin@rankineinnovationlab.com" class="nav-cta">Partner with Us</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- ░░ HERO ░░ -->
+<section class="hero" style="padding-bottom:32px;">
+  <div class="hero-text">
+    <div class="hero-eyebrow">FloodSight Lagos — Live Intelligence</div>
+    <h1>Know Before<br />the Water <em>Rises</em></h1>
+    <p class="hero-sub">
+      FloodSight uses machine learning and live weather data to predict where
+      flooding is most likely in Lagos — giving residents, responders, and
+      planners hours of advance notice.
+    </p>
+    <div class="hero-actions">
+      <a href="#live-map" class="btn btn-primary">View Live Map ↓</a>
+      <a href="#how-it-works" class="btn btn-ghost">How It Works</a>
+    </div>
+  </div>
+
+  <!-- Live status card -->
+  <div class="status-card" id="status-card">
+    <div class="status-loading" id="status-loading">
+      <div class="spinner"></div>
+      <span>Loading live conditions…</span>
+    </div>
+    <div id="status-content" style="display:none;">
+      <div class="status-level">
+        <div class="level-dot" id="level-dot"></div>
+        <div class="level-label" id="level-label"></div>
+      </div>
+      <div class="status-headline" id="status-headline"></div>
+      <div class="status-summary" id="status-summary"></div>
+      <div class="status-divider"></div>
+      <div class="rain-row">
+        <div class="rain-box">
+          <div class="rain-label">Observed · past 24h</div>
+          <div class="rain-value" id="rain-obs-val"></div>
+          <div class="rain-plain" id="rain-obs-plain"></div>
+        </div>
+        <div class="rain-box">
+          <div class="rain-label">Forecast · next 24h</div>
+          <div class="rain-value" id="rain-fc-val"></div>
+          <div class="rain-plain" id="rain-fc-plain"></div>
+        </div>
+      </div>
+      <div id="rain-72-note" style="font-size:12px;color:var(--muted);margin-top:12px;line-height:1.5;"></div>
+      <div class="status-updated" id="status-updated"></div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ░░ LIVE MAP ░░ -->
+<section id="live-map" style="padding-top:64px;">
+  <div class="eyebrow">⬡ Interactive Risk Map</div>
+  <h2>See Every Street,<br />Every <em>Risk Level</em></h2>
+  <p class="section-lead">
+    The map below shows flood risk across Lagos in real time. Taller columns
+    mean higher risk. Red cells are under active flood warning right now.
+    Alert colours factor in <em>both</em> observed rainfall from the last 24 hours
+    and the upcoming 48-hour forecast. Click any cell for details.
+  </p>
+  <div class="map-wrap">
+    <iframe
+      src="https://floodsight-starter.onrender.com/dashboard/"
+      title="FloodSight Lagos Live Map"
+      loading="lazy"
+      allow="fullscreen"
+    ></iframe>
+    <div class="map-overlay-badge">◎ Live · Updates every 30 min</div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ░░ RAINFALL EXPLAINER ░░ -->
+<section>
+  <div class="eyebrow">◈ Plain-English Guide</div>
+  <h2>What Does Rainfall <em>Actually Mean</em>?</h2>
+  <p class="section-lead">
+    Weather forecasts use millimetres (mm) to measure rain — but that means
+    nothing to most people. Here's what each level feels like on the ground in Lagos.
+  </p>
+
+  <div class="rain-scale">
+    <div class="scale-item" data-level="0">
+      <div class="scale-icon">🌤</div>
+      <div class="scale-name">Barely Any Rain</div>
+      <div class="scale-range">0 – 5 mm / day</div>
+      <div class="scale-desc">A few stray drops. You won't need an umbrella. Streets stay dry.</div>
+    </div>
+    <div class="scale-item" data-level="1">
+      <div class="scale-icon">🌦</div>
+      <div class="scale-name">Light Shower</div>
+      <div class="scale-range">5 – 20 mm / day</div>
+      <div class="scale-desc">A brief afternoon drizzle. Puddles form quickly but drain within minutes.</div>
+    </div>
+    <div class="scale-item" data-level="2">
+      <div class="scale-icon">🌧</div>
+      <div class="scale-name">Steady Rain</div>
+      <div class="scale-range">20 – 40 mm / day</div>
+      <div class="scale-desc">A proper rainy afternoon. Surface water on some roads. Low-lying spots may be soggy.</div>
+    </div>
+    <div class="scale-item" data-level="3">
+      <div class="scale-icon">⛈</div>
+      <div class="scale-name">Heavy Downpour</div>
+      <div class="scale-range">40 – 80 mm / day</div>
+      <div class="scale-desc">A serious Lagos storm. Gutters overflow. High-risk areas begin to flood. Drive carefully.</div>
+    </div>
+    <div class="scale-item" data-level="4">
+      <div class="scale-icon">🌊</div>
+      <div class="scale-name">Very Heavy Rain</div>
+      <div class="scale-range">80 – 150 mm / day</div>
+      <div class="scale-desc">Many roads flood. Vehicles get stranded. Avoid driving unless essential.</div>
+    </div>
+    <div class="scale-item" data-level="5">
+      <div class="scale-icon">🚨</div>
+      <div class="scale-name">Extreme Rainfall</div>
+      <div class="scale-range">150+ mm / day</div>
+      <div class="scale-desc">Among the worst Lagos sees. Severe flooding across the city. Stay home if possible.</div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ░░ WHAT THE ALERTS MEAN ░░ -->
+<section>
+  <div class="eyebrow">⟐ Understanding Alerts</div>
+  <h2>What Should <em>I Do</em>?</h2>
+  <p class="section-lead">
+    FloodSight issues three levels of alert based on the combination of your
+    area's flood risk and how much rain is expected.
+  </p>
+
+  <div class="alert-cards">
+    <div class="alert-card safe">
+      <div class="alert-icon">✅</div>
+      <div class="alert-name">All Clear</div>
+      <div class="alert-meaning">
+        Rainfall is too light to trigger flooding in high-risk areas.
+        Conditions are safe across all 15 monitored LGAs.
+      </div>
+      <ul class="alert-actions-list">
+        <li>Go about your day normally</li>
+        <li>Check again after heavy rain begins</li>
+        <li>Know your nearest high ground just in case</li>
+      </ul>
+    </div>
+    <div class="alert-card watch">
+      <div class="alert-icon">⚠️</div>
+      <div class="alert-name">Flood Watch</div>
+      <div class="alert-meaning">
+        Flooding is possible in elevated-risk areas, especially where
+        drainage is poor. Stay alert and be ready to act.
+      </div>
+      <ul class="alert-actions-list">
+        <li>Avoid parking in low-lying streets</li>
+        <li>Keep valuables off the ground floor</li>
+        <li>Monitor conditions — they may worsen</li>
+        <li>Know your evacuation route</li>
+      </ul>
+    </div>
+    <div class="alert-card warn">
+      <div class="alert-icon">🚨</div>
+      <div class="alert-name">Flood Warning</div>
+      <div class="alert-meaning">
+        Flooding is expected in high and very-high risk areas. Take
+        protective action now. Do not wait for water to arrive.
+      </div>
+      <ul class="alert-actions-list">
+        <li>Move to higher ground immediately</li>
+        <li>Do not drive through flooded roads</li>
+        <li>Disconnect electrical appliances</li>
+        <li>Contact emergency services if trapped: 112</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ░░ HOW IT WORKS ░░ -->
+<section id="how-it-works">
+  <div class="eyebrow">◎ The Science</div>
+  <h2>How FloodSight <em>Works</em></h2>
+  <p class="section-lead">
+    Four steps — from raw data to an alert on your phone — running automatically every morning.
+  </p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-icon">🛰</div>
+      <div class="step-num">01 · SENSE</div>
+      <div class="step-title">Terrain Analysis</div>
+      <div class="step-desc">We mapped every 100m² of Lagos using satellite elevation data, drainage patterns, and distance to water bodies.</div>
+    </div>
+    <div class="step">
+      <div class="step-icon">🤖</div>
+      <div class="step-num">02 · MODEL</div>
+      <div class="step-title">Machine Learning</div>
+      <div class="step-desc">A trained ML model scores each grid cell's inherent flood susceptibility — independent of any rainfall event.</div>
+    </div>
+    <div class="step">
+      <div class="step-icon">🛰</div>
+      <div class="step-num">03 · INTEGRATE</div>
+      <div class="step-title">Dual-Stream Rainfall</div>
+      <div class="step-desc">We combine what has already fallen (last 24h, via NOAA GFS weather analysis) with what is coming (72h NOAA GFS forecast) — because saturated ground floods faster even in moderate rain.</div>
+    </div>
+    <div class="step">
+      <div class="step-icon">📱</div>
+      <div class="step-num">04 · ALERT</div>
+      <div class="step-title">Morning Briefing</div>
+      <div class="step-desc">Every morning at 6am WAT, an automated SMS briefing is sent to registered responders with the day's flood outlook.</div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ░░ TRACK RECORD ░░ -->
+<section id="track-record">
+  <div class="eyebrow">◈ Back-tested on Real Events</div>
+  <h2>FloodSight's <em>Track Record</em></h2>
+  <p class="section-lead">
+    We tested FloodSight against eight documented Lagos flood events using actual
+    historical rainfall recorded by weather satellites. Here's how it performed.
+  </p>
+
+  <div class="accuracy-hero" id="accuracy-hero" style="display:none;">
+    <div class="accuracy-stat">
+      <div class="accuracy-num" id="accuracy-num">—</div>
+      <div class="accuracy-label">Events correctly flagged</div>
+    </div>
+    <div class="accuracy-desc" id="accuracy-desc"></div>
+  </div>
+
+  <div class="track-loading" id="track-loading">
+    <div class="spinner"></div>
+    <span>Loading validation data — this may take up to 30 seconds on first load…</span>
+  </div>
+
+  <div style="overflow-x:auto;" id="track-table-wrap" hidden>
+    <table class="event-table">
+      <thead>
+        <tr>
+          <th>Event</th>
+          <th>Actual rain (day)</th>
+          <th>Actual rain (3 days)</th>
+          <th>Documented</th>
+          <th>FloodSight predicted</th>
+          <th>% cells warned</th>
+          <th>Match</th>
+        </tr>
+      </thead>
+      <tbody id="track-tbody"></tbody>
+    </table>
+  </div>
+
+  <p style="font-size:12px;color:var(--muted);margin-top:20px;" id="track-note" hidden>
+    Rainfall data: Open-Meteo via NOAA GFS analysis (past 24h) + GFS forecast (72h).
+    FloodSight is considered "correct" if it issued Warning or Watch for any documented Warning event.
+    Sources: NEMA, LASEMA, Lagos State Government situation reports.
+  </p>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ░░ SUBSCRIBE ░░ -->
+<section id="subscribe">
+  <div class="subscribe-section">
+    <div class="subscribe-grid">
+
+      <!-- Left: pitch copy -->
+      <div class="subscribe-pitch">
+        <div class="eyebrow">🔔 Flood Alerts</div>
+        <h2>Get Warned <em>Before</em> the Water Rises</h2>
+        <p>
+          Sign up for free SMS flood alerts for your neighbourhood.
+          When FloodSight issues a Watch or Warning for your area,
+          you’ll receive a text so you can act — before roads flood and options narrow.
+        </p>
+        <div class="subscribe-benefit">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="7" stroke="#4fc3f7" stroke-width="1.5"/>
+            <path d="M5 8l2 2 4-4" stroke="#4fc3f7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Hyperlocal — alerts are specific to <em>your</em> street’s risk level, not generic city warnings</span>
+        </div>
+        <div class="subscribe-benefit">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="7" stroke="#4fc3f7" stroke-width="1.5"/>
+            <path d="M5 8l2 2 4-4" stroke="#4fc3f7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Updated hourly using live rainfall data from satellite and weather models</span>
+        </div>
+        <div class="subscribe-benefit">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="7" stroke="#4fc3f7" stroke-width="1.5"/>
+            <path d="M5 8l2 2 4-4" stroke="#4fc3f7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Free SMS — no app, no internet needed to receive alerts</span>
+        </div>
+      </div>
+
+      <!-- Right: form -->
+      <div class="subscribe-form-wrap">
+        <h3>Subscribe for free</h3>
+
+        <div class="sub-field">
+          <label for="sub-name">Your name <span style="font-weight:400;text-transform:none">(optional)</span></label>
+          <input type="text" id="sub-name" placeholder="e.g. Habeeb" />
+        </div>
+
+        <div class="sub-field">
+          <label for="sub-phone">Phone number <span style="color:var(--red)">*</span></label>
+          <input type="tel" id="sub-phone" placeholder="e.g. 08012345678 or +2348012345678"
+                 oninput="subCheckReady()" />
+        </div>
+
+        <div class="sub-field">
+          <label>Your location <span style="color:var(--red)">*</span></label>
+          <div class="sub-location-row">
+            <input type="text" id="sub-area" placeholder="Type your area or street…"
+                   oninput="subGeocode(this.value)" />
+            <button class="btn-locate" onclick="subUseMyLocation()" title="Use GPS location">
+              📍 Locate me
+            </button>
+          </div>
+        </div>
+
+        <div class="sub-risk-preview" id="sub-risk-preview"></div>
+
+        <label class="sub-consent-wrap" id="sub-consent-label">
+          <input type="checkbox" id="sub-consent" onchange="subCheckReady()" />
+          <span>
+            I consent to receive flood alert SMS messages. I have read and agree to the
+            <a href="privacy.html" target="_blank">Privacy Policy</a>.
+            I understand my phone number and location will be stored securely and I can
+            unsubscribe at any time by replying <strong>STOP</strong>.
+          </span>
+        </label>
+
+        <button id="sub-submit" onclick="submitSubscription()" disabled>
+          Subscribe to flood alerts
+        </button>
+
+        <div class="sub-status" id="sub-status"></div>
+        <p class="sub-note">
+          Alerts sent only during active Watch or Warning events.
+          Reply STOP at any time to opt out.
+          <a href="privacy.html" style="color:var(--muted);text-decoration:underline">Privacy Policy</a>
+        </p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ░░ CTA ░░ -->
+<section>
+  <div class="cta-banner">
+    <div class="eyebrow" style="justify-content:center;">⬡ Partner with Rankine</div>
+    <h2>Bring FloodSight to <em>Your Community</em></h2>
+    <p>
+      FloodSight is an active research project by Rankine Innovation Lab.
+      We are working with local government, NGOs, and community leaders to expand
+      coverage across Lagos and beyond. Get in touch to discuss partnership, data
+      access, or funding.
+    </p>
+    <div class="cta-actions">
+      <a href="mailto:admin@rankineinnovationlab.com" class="btn btn-primary">Start a Conversation</a>
+      <a href="https://www.rankineinnovationlab.com/research.html" class="btn btn-ghost">View All Research</a>
+    </div>
+  </div>
+</section>
+
+<!-- ░░ FOOTER ░░ -->
+<footer>
+  <div class="footer-inner">
+    <a class="footer-brand" href="https://www.rankineinnovationlab.com">
+      <img src="https://rankineinnovationlab.com/Images/rankine_logo.svg"
+           onerror="this.style.display='none'"
+           alt="Rankine Innovation Lab" />
+      <span>Rankine Innovation Lab — Intelligence for a Liveable Future</span>
+    </a>
+    <div class="footer-note">
+      FloodSight Lagos · 15 LGAs · Data: <a href="https://open-meteo.com">Open-Meteo</a> (NOAA GFS observed + forecast)<br />
+      © 2026 Rankine Innovation Lab
+    </div>
+  </div>
+</footer>
+
+
+<!-- ░░ LIVE DATA ░░ -->
+<script>
+const API = 'https://floodsight-starter.onrender.com';
+
+// ── Rainfall plain-English labels ──────────────────────────────────
+// period: 'obs' (past 24h observed) | 24 (forecast 24h) | 72 (cumulative)
+function describeRain(mm, period) {
+  const isObs = period === 'obs';
+  const isDay = period === 24;
+  if (mm < 5)   return isObs ? 'Dry — no significant rainfall recorded'
+                             : isDay ? 'Barely any rain — a few drops at most'
+                             : 'Dry conditions overall';
+  if (mm < 20)  return isObs ? 'Light rain fell — ground still mostly dry'
+                             : isDay ? 'Light shower — brief but noticeable'
+                             : 'Light rainfall across the period';
+  if (mm < 40)  return isObs ? 'Steady rain — ground is damp'
+                             : isDay ? 'Steady rain — umbrella weather'
+                             : 'Moderate cumulative rainfall';
+  if (mm < 80)  return isObs ? 'Heavy rain fell — drainage already stressed'
+                             : isDay ? 'Heavy downpour — drainage will struggle'
+                             : 'Significant rainfall — watch low areas';
+  if (mm < 150) return isObs ? 'Very heavy rain fell — soil likely saturated'
+                             : isDay ? 'Very heavy rain — flooding likely'
+                             : 'High cumulative rain — flooding risk elevated';
+  return isObs ? 'Extreme rain fell — flooding may already be underway'
+               : isDay ? 'Extreme rainfall — severe flooding possible'
+               : 'Extreme 3-day total — major flood risk';
+}
+
+function rainyLabel(mm) {
+  if (mm < 5)   return `${mm} mm — Barely any`;
+  if (mm < 20)  return `${mm} mm — Light shower`;
+  if (mm < 40)  return `${mm} mm — Steady rain`;
+  if (mm < 80)  return `${mm} mm — Heavy`;
+  if (mm < 150) return `${mm} mm — Very heavy`;
+  return `${mm} mm — Extreme`;
+}
+
+// ── Alert level language ──────────────────────────────────────────
+// Static fallback LGA names — always shown when the API lga_alerts is empty
+// (boundary file not available on server). Based on Phase 13 risk calibration.
+const STATIC_WATCH_AREAS = 'Alimosho, Kosofe, Mushin and Oshodi-Isolo';
+const STATIC_WARN_AREAS  = 'Kosofe, Alimosho, Eti-Osa and Lagos Island';
+
+function alertCopy(level, counts, lgaAlerts) {
+  const warn  = counts.Warning  || 0;
+  const watch = counts.Watch    || 0;
+
+  // Build a human-readable list of the top N most-alerted LGAs.
+  // Falls back to static known high-risk areas when lga_alerts is empty
+  // (e.g. boundary file not present on the server).
+  function topLgas(n, fallback) {
+    const names = Object.keys(lgaAlerts || {}).slice(0, n);
+    if (!names.length) return fallback;
+    if (names.length === 1) return names[0];
+    return names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+  }
+
+  if (level === 'Warning') {
+    const lgas = topLgas(3, STATIC_WARN_AREAS);
+    return {
+      dotClass: 'warn', labelClass: 'warn',
+      label: '🚨 Flood Warning',
+      headline: 'Flooding is expected in parts of Lagos',
+      summary: `Active flood warning in effect. Most affected areas: ${lgas}. Avoid low-lying roads. If you are in a red area on the map, move to higher ground now.`,
+      barClass: 'warn',
+      barText: '🚨 FLOOD WARNING ACTIVE — Check the map for affected areas in Lagos'
+    };
+  }
+  if (level === 'Watch') {
+    const lgas = topLgas(3, STATIC_WATCH_AREAS);
+    return {
+      dotClass: 'watch', labelClass: 'watch',
+      label: '⚠ Flood Watch',
+      headline: 'Flooding is possible in some parts of Lagos',
+      summary: `Areas most at risk: ${lgas}. Conditions may worsen. Avoid parking in low-lying streets and keep valuables off ground floors in at-risk areas.`,
+      barClass: 'watch',
+      barText: '⚠ FLOOD WATCH — Some Lagos areas are at elevated risk. Stay alert.'
+    };
+  }
+  return {
+    dotClass: 'safe', labelClass: 'safe',
+    label: '✓ All Clear',
+    headline: 'Lagos looks safe from flooding today',
+    summary: 'Current rainfall is below the threshold for flood alerts across all 15 monitored LGAs. Conditions are calm — check back after any heavy rain.',
+    barClass: '', barText: ''
+  };
+}
+
+// ── Render the status card ────────────────────────────────────────
+function renderStatus(data) {
+  const fc        = data.forecast;
+  const level     = data.highest_alert;
+  const counts    = data.alert_counts;
+  const lgaAlerts = data.lga_alerts || {};
+  const copy      = alertCopy(level, counts, lgaAlerts);
+
+  // Phase 11 dual-stream values (fall back gracefully to legacy fields)
+  const obs24  = Math.round(fc.observed_24h_mm ?? 0);
+  const fc24   = Math.round(fc.forecast_24h_mm ?? fc.rain_24h_mm ?? 0);
+  const fc48   = Math.round(fc.forecast_48h_mm ?? fc24 * 2);
+  const r72    = Math.round(fc.rain_72h_mm ?? 0);
+  const isDual = fc.data_mode === 'observed+forecast';
+
+  // Alert bar
+  const bar = document.getElementById('alert-bar');
+  if (copy.barClass) {
+    bar.textContent = copy.barText;
+    bar.className   = `alert-top-bar ${copy.barClass}`;
+  }
+
+  // Dot + label
+  document.getElementById('level-dot').className     = `level-dot ${copy.dotClass}`;
+  document.getElementById('level-label').className   = `level-label ${copy.labelClass}`;
+  document.getElementById('level-label').textContent = copy.label;
+
+  // Headline + summary
+  document.getElementById('status-headline').textContent = copy.headline;
+  document.getElementById('status-summary').textContent  = copy.summary;
+
+  // Rain boxes — Phase 11: observed 24h | forecast 24h
+  document.getElementById('rain-obs-val').textContent   = rainyLabel(obs24);
+  document.getElementById('rain-obs-plain').textContent = describeRain(obs24, 'obs');
+  document.getElementById('rain-fc-val').textContent    = rainyLabel(fc24);
+  document.getElementById('rain-fc-plain').textContent  = describeRain(fc24, 24);
+
+  // 72h combined note
+  const note72 = document.getElementById('rain-72-note');
+  if (note72 && isDual) {
+    note72.innerHTML =
+      `⟐ 72h risk window: <strong>${obs24} mm</strong> observed ` +
+      `+ <strong>${fc48} mm</strong> forecast = <strong>${r72} mm</strong> combined`;
+  } else if (note72) {
+    note72.innerHTML = `⟐ 72h forecast total: <strong>${r72} mm</strong>`;
+  }
+
+  // Updated time
+  const fetched = new Date(fc.fetched_at);
+  const timeStr = fetched.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Lagos' });
+  document.getElementById('status-updated').textContent =
+    isDual ? `🛰 Dual-stream · observed + forecast · ${timeStr} Lagos time`
+           : `Last updated ${timeStr} Lagos time`;
+
+  // Show content
+  document.getElementById('status-loading').style.display = 'none';
+  document.getElementById('status-content').style.display = 'block';
+}
+
+function renderError() {
+  document.getElementById('status-loading').innerHTML =
+    '<span style="color:var(--muted);font-size:13px;">⚠ Could not load live conditions. The server may be starting up — please refresh in 30 seconds.</span>';
+}
+
+// ── Track Record ─────────────────────────────────────────────────
+function levelBadge(level) {
+  if (level === 'Warning')  return '<span class="badge badge-warn">🚨 Warning</span>';
+  if (level === 'Watch')    return '<span class="badge badge-watch">⚠ Watch</span>';
+  if (level === 'No Alert') return '<span class="badge badge-safe">✓ All Clear</span>';
+  return '<span class="badge badge-na">—</span>';
+}
+
+function renderTrackRecord(data) {
+  const events  = data.events;
+  const summary = data.summary;
+
+  // Accuracy hero — show overall accuracy as the headline
+  const overallAcc  = summary.accuracy_pct ?? 0;
+  const totalEvents = summary.total_events  ?? 0;
+  const correct     = summary.correct       ?? 0;
+  document.getElementById('accuracy-num').textContent = correct + ' / ' + totalEvents;
+  const era5Misses = summary.era5_misses ?? 0;
+  const damMisses  = summary.dam_release_misses ?? 0;
+  const meaningfulAcc = summary.meaningful_accuracy_pct;
+  document.getElementById('accuracy-desc').innerHTML =
+    `<strong>FloodSight correctly issued an alert for ${correct} of ${totalEvents} ` +
+    `documented Lagos flood events</strong> (${overallAcc}% overall). ` +
+    (meaningfulAcc != null
+      ? `For the ${summary.meaningful_rain_events} events where ERA5 recorded meaningful rainfall ` +
+        `(≥10 mm on the peak day), accuracy was ${meaningfulAcc}%. `
+      : '') +
+    (era5Misses > 0
+      ? `${era5Misses} miss${era5Misses > 1 ? 'es are' : ' is'} due to ERA5 underestimating localised ` +
+        `Lagos convective storms — a known satellite-reanalysis limitation. `
+      : '') +
+    (damMisses > 0
+      ? `${damMisses} event${damMisses > 1 ? 's were' : ' was'} a dam-release flood, ` +
+        `undetectable by any rainfall-based system. `
+      : '');
+  document.getElementById('accuracy-hero').style.display = 'flex';
+
+  // Table rows
+  const tbody = document.getElementById('track-tbody');
+  tbody.innerHTML = events.map(r => {
+    const warnPct = r.warning_pct;
+    return `<tr>
+      <td>
+        <div class="event-name">${r.name}</div>
+        <div class="event-areas">${r.areas}</div>
+      </td>
+      <td class="event-rain">${r.rain_24h_mm} mm<br><span style="color:var(--muted);font-size:12px;">${r.rain_24h_label}</span></td>
+      <td class="event-rain">${r.rain_72h_mm} mm<br><span style="color:var(--muted);font-size:12px;">${r.rain_72h_label}</span></td>
+      <td>${levelBadge(r.reported_severity)}</td>
+      <td>${levelBadge(r.predicted_alert)}</td>
+      <td>
+        <div class="warn-bar"><div class="warn-bar-fill" style="width:${Math.min(warnPct,100)}%"></div></div>
+        <span style="font-size:12px;color:var(--muted);margin-top:4px;display:block;">${warnPct}% of grid</span>
+      </td>
+      <td class="match-tick">${r.correct ? '✅' : '⚠️'}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('track-loading').style.display   = 'none';
+  document.getElementById('track-table-wrap').hidden        = false;
+  document.getElementById('track-note').hidden              = false;
+}
+
+function renderTrackError() {
+  document.getElementById('track-loading').innerHTML =
+    '<span style="color:var(--muted);font-size:13px;">⚠ Validation data temporarily unavailable. The server may still be loading — please refresh in 60 seconds.</span>';
+}
+
+fetch(`${API}/validate/events`)
+  .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then(renderTrackRecord)
+  .catch(renderTrackError);
+
+// ── Fetch ─────────────────────────────────────────────────────────
+fetch(`${API}/forecast/summary`)
+  .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then(renderStatus)
+  .catch(renderError);
+
+// ═══════════════════════════════════════════════════════════════════
+// Phase 16 — Subscription form
+// ═══════════════════════════════════════════════════════════════════
+let _subLat = null, _subLon = null, _subGeoTimer = null;
+
+const RISK_COLORS_SUB = {
+  'Very High': '#f87171',
+  'High':      '#fb923c',
+  'Moderate':  '#fbbf24',
+  'Low':       '#34d399',
+};
+
+function subCheckReady() {
+  const phone   = document.getElementById('sub-phone').value.trim();
+  const consent = document.getElementById('sub-consent').checked;
+  const ready   = phone.length >= 7 && _subLat !== null && consent;
+  document.getElementById('sub-submit').disabled = !ready;
+}
+
+function subSetLocation(lat, lon, areaLabel) {
+  _subLat = lat;
+  _subLon = lon;
+  document.getElementById('sub-area').value = areaLabel;
+  subCheckReady();
+  // Fetch risk class for this location
+  fetch(`${API}/risk/point?lat=${lat}&lon=${lon}`)
+    .then(r => r.json())
+    .then(d => {
+      const rc    = d.risk_class || 'Unknown';
+      const color = RISK_COLORS_SUB[rc] || '#aaa';
+      document.getElementById('sub-risk-preview').innerHTML =
+        `Baseline flood risk for this location: <strong style="color:${color}">${rc}</strong>`;
+      subCheckReady();
+    })
+    .catch(() => {
+      document.getElementById('sub-risk-preview').textContent = '';
+    });
+}
+
+// Geocode typed area name (debounced 600 ms)
+function subGeocode(query) {
+  _subLat = null; _subLon = null;
+  document.getElementById('sub-risk-preview').textContent = '';
+  subCheckReady();
+  clearTimeout(_subGeoTimer);
+  if (query.trim().length < 3) return;
+  _subGeoTimer = setTimeout(() => {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query + ', Lagos, Nigeria')}&format=json&limit=1&accept-language=en`;
+    fetch(url, { headers: { 'User-Agent': 'FloodSight-Subscribe/1.0' } })
+      .then(r => r.json())
+      .then(results => {
+        if (results && results.length > 0) {
+          const { lat, lon, display_name } = results[0];
+          subSetLocation(parseFloat(lat), parseFloat(lon), display_name.split(',').slice(0,2).join(', '));
+        }
+      })
+      .catch(() => {});
+  }, 600);
+}
+
+// Use browser GPS
+function subUseMyLocation() {
+  if (!navigator.geolocation) {
+    alert('Geolocation is not supported by your browser.');
+    return;
+  }
+  const btn = document.querySelector('.btn-locate');
+  btn.textContent = 'Locating…';
+  btn.disabled = true;
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      btn.textContent = '📍 Locate me';
+      btn.disabled = false;
+      const lat = pos.coords.latitude, lon = pos.coords.longitude;
+      // Reverse geocode for a human label
+      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=14&accept-language=en`, {
+        headers: { 'User-Agent': 'FloodSight-Subscribe/1.0' }
+      })
+        .then(r => r.json())
+        .then(d => {
+          const a = d.address || {};
+          const label = a.neighbourhood || a.suburb || a.city_district || a.town || d.display_name.split(',')[0];
+          subSetLocation(lat, lon, label);
+        })
+        .catch(() => subSetLocation(lat, lon, `${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E`));
+    },
+    (err) => {
+      btn.textContent = '📍 Locate me';
+      btn.disabled = false;
+      alert('Could not get your location. Please type your area instead.');
+    },
+    { timeout: 10000 }
+  );
+}
+
+async function submitSubscription() {
+  const phone    = document.getElementById('sub-phone').value.trim();
+  const name     = document.getElementById('sub-name').value.trim();
+  const areaName = document.getElementById('sub-area').value.trim();
+  const statusEl = document.getElementById('sub-status');
+  const submitBtn= document.getElementById('sub-submit');
+
+  if (!phone || _subLat === null) return;
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Subscribing…';
+  statusEl.className = 'sub-status';
+  statusEl.style.display = 'none';
+
+  try {
+    const res = await fetch(`${API}/subscribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone, name: name || null,
+        lat: _subLat, lon: _subLon,
+        area_name: areaName || null,
+        consent: true,
+      }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.detail || `Error ${res.status}`);
+    }
+
+    const rc    = data.risk_class || '';
+    const area  = data.area_name  || areaName || 'your area';
+    const color = RISK_COLORS_SUB[rc] || '#4fc3f7';
+    statusEl.innerHTML =
+      `✓ Subscribed! Your area (<strong>${area}</strong>) has ` +
+      `<strong style="color:${color}">${rc || 'unknown'}</strong> baseline flood risk. ` +
+      `You’ll receive an SMS when a Watch or Warning is issued for your location.`;
+    statusEl.className = 'sub-status success';
+
+    // Reset form
+    document.getElementById('sub-phone').value   = '';
+    document.getElementById('sub-name').value    = '';
+    document.getElementById('sub-area').value    = '';
+    document.getElementById('sub-consent').checked = false;
+    document.getElementById('sub-risk-preview').textContent = '';
+    _subLat = null; _subLon = null;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Subscribe to flood alerts';
+
+  } catch (err) {
+    statusEl.textContent = `✗ ${err.message || 'Could not subscribe. Please try again.'}`;
+    statusEl.className = 'sub-status error';
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Subscribe to flood alerts';
+  }
+}
+</script>
+</body>
+</html>

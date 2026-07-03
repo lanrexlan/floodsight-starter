@@ -1,0 +1,86 @@
+{
+  "method": "Spatial join (UTM EPSG:32631, max_distance=500m) of SWMM junctions to scored risk grid",
+  "n_junctions_in_pilot": 1690,
+  "n_flooded": 969,
+  "n_non_flooded": 721,
+  "overall_flood_rate_pct": 57.3,
+  "flood_rate_by_risk_class": {
+    "Low": {
+      "flooded": 70,
+      "non_flooded": 72,
+      "total": 142,
+      "flood_rate_pct": 49.3
+    },
+    "Moderate": {
+      "flooded": 104,
+      "non_flooded": 107,
+      "total": 211,
+      "flood_rate_pct": 49.3
+    },
+    "High": {
+      "flooded": 338,
+      "non_flooded": 363,
+      "total": 701,
+      "flood_rate_pct": 48.2
+    },
+    "Very High": {
+      "flooded": 457,
+      "non_flooded": 179,
+      "total": 636,
+      "flood_rate_pct": 71.9
+    }
+  },
+  "chi2": 87.98,
+  "chi2_p": 0.0,
+  "chi2_dof": 3,
+  "mean_rate_cms_by_risk_class": {
+    "Low": {
+      "mean": 1.192,
+      "median": 0.606,
+      "max": 8.169,
+      "n": 70
+    },
+    "Moderate": {
+      "mean": 1.856,
+      "median": 0.771,
+      "max": 44.529,
+      "n": 104
+    },
+    "High": {
+      "mean": 2.957,
+      "median": 1.052,
+      "max": 159.693,
+      "n": 338
+    },
+    "Very High": {
+      "mean": 3.455,
+      "median": 1.015,
+      "max": 114.977,
+      "n": 457
+    }
+  },
+  "kruskal_wallis_H": 10.565,
+  "kruskal_wallis_p": 0.014329,
+  "design_storm": "150 mm / 4 h (1-in-100-year, Kosofe pilot)",
+  "kosofe_historical_events": {
+    "total": 3,
+    "correctly_flagged": 2,
+    "events": [
+      {
+        "name": "July 2011",
+        "predicted": "Watch",
+        "correct": true
+      },
+      {
+        "name": "June 2020",
+        "predicted": "Warning",
+        "correct": true
+      },
+      {
+        "name": "June 2023",
+        "predicted": "No Alert",
+        "correct": false
+      }
+    ]
+  }
+}

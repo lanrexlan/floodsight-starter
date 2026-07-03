@@ -1,0 +1,61 @@
+{
+  "2021-07-10": {
+    "n_total_junctions": 1739,
+    "n_swmm_flooded": 1005,
+    "n_swmm_nonflooded": 734,
+    "n_nodes_in_sar_extent": 7,
+    "true_positives_tp": 3,
+    "false_positives_fp": 1002,
+    "false_negatives_fn": 4,
+    "true_negatives_tn": 730,
+    "precision": 0.003,
+    "recall": 0.429,
+    "f1_score": 0.006,
+    "pct_swmm_flooded_in_sar": 0.3,
+    "pct_sar_in_swmm_flooded": 42.9,
+    "sar_date": "2021-07-10",
+    "sar_file": "flood_extent_20210710.tif",
+    "event_note": "Nearest available SAR archive to July 2011 Lagos floods (Kosofe/Alimosho/Ojo). NEMA: thousands displaced."
+  },
+  "2024-07-04": {
+    "n_total_junctions": 1739,
+    "n_swmm_flooded": 1005,
+    "n_swmm_nonflooded": 734,
+    "n_nodes_in_sar_extent": 100,
+    "true_positives_tp": 43,
+    "false_positives_fp": 962,
+    "false_negatives_fn": 57,
+    "true_negatives_tn": 677,
+    "precision": 0.043,
+    "recall": 0.43,
+    "f1_score": 0.078,
+    "pct_swmm_flooded_in_sar": 4.3,
+    "pct_sar_in_swmm_flooded": 43.0,
+    "sar_date": "2024-07-04",
+    "sar_file": "flood_extent_20240704.tif",
+    "event_note": "July 2024 Lagos floods \u2014 Ikorodu Road corridor / Kosofe LGA. Flash flooding following intense storm."
+  },
+  "phase10_kosofe_events": [
+    {
+      "id": "2011_07",
+      "name": "July 2011 Lagos Floods",
+      "areas": "Ojo, Alimosho, Badagry, Kosofe",
+      "predicted_alert": "Watch",
+      "correct": true
+    },
+    {
+      "id": "2020_06",
+      "name": "June 2020 Lagos Floods",
+      "areas": "Eti-Osa, Kosofe, Gbagada",
+      "predicted_alert": "Warning",
+      "correct": true
+    },
+    {
+      "id": "2023_06",
+      "name": "June 2023 Lagos Floods",
+      "areas": "Kosofe, Gbagada, Ikorodu Road",
+      "predicted_alert": "No Alert",
+      "correct": false
+    }
+  ]
+}

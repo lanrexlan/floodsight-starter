@@ -1,0 +1,36 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# Downloaded source data — large, regenerate with scripts/01_download_all.py
+data/raw/**
+!data/raw/.gitkeep
+
+# Processed/generated outputs — regenerate with scripts/02-04
+data/processed/**
+!data/processed/.gitkeep
+# Exception: scored_grid.gpkg is what the deployed API serves (see
+# api/data_provider.py) — small enough (~20MB) to commit directly,
+# rather than requiring a Render deploy to regenerate the whole
+# pipeline from scratch.
+!data/processed/scored_grid.gpkg
+# Exception: real labeled training dataset — hard to regenerate (requires
+# HyP3 SAR processing + FwDET + manual event curation), small enough to
+# commit directly (~80KB).
+!data/processed/real_training_dataset.csv
+# Exception: SWMM Phase 17 flood results for Kosofe pilot — served by /risk/swmm-flooding
+!data/processed/swmm_flooding.geojson
+!data/processed/swmm_summary.json
+
+# Trained models — regenerate with floodsight/ml/train.py
+data/models/**
+!data/models/.gitkeep
+# Exception: real trained model — trained on real labeled events, commit
+# directly so Render serves real predictions without requiring a full
+# retrain (~644KB).
+!data/models/depth_model.joblib
+
+.pytest_cache/
+.DS_Store

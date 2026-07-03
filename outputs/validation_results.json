@@ -1,0 +1,186 @@
+{
+  "events": [
+    {
+      "id": "2011_07",
+      "name": "July 2011 Lagos Floods",
+      "peak_date": "2011-07-10",
+      "areas": "Ojo, Alimosho, Badagry, Kosofe",
+      "description": "Severe flooding across multiple mainland LGAs. NEMA reported thousands displaced.",
+      "source": "NEMA Lagos State Report, 2011",
+      "reported_severity": "Warning",
+      "rain_24h_mm": 58.0,
+      "rain_72h_mm": 75.2,
+      "rain_24h_label": "Heavy downpour",
+      "rain_72h_label": "Heavy downpour",
+      "alert_counts": {
+        "Warning": 0,
+        "Watch": 27057,
+        "No Alert": 27058
+      },
+      "predicted_alert": "Watch",
+      "correct": true,
+      "warning_pct": 0.0,
+      "watch_pct": 50.0
+    },
+    {
+      "id": "2012_07",
+      "name": "July 2012 Lagos Floods",
+      "peak_date": "2012-07-04",
+      "areas": "Mushin, Agege, Ikeja, Lagos Island",
+      "description": "Widespread flooding following sustained rainfall. Lagos State declared emergency in affected LGAs.",
+      "source": "Lagos State Emergency Management Agency, 2012",
+      "reported_severity": "Warning",
+      "rain_24h_mm": 15.3,
+      "rain_72h_mm": 60.7,
+      "rain_24h_label": "Light shower",
+      "rain_72h_label": "Heavy downpour",
+      "alert_counts": {
+        "Warning": 0,
+        "Watch": 27057,
+        "No Alert": 27058
+      },
+      "predicted_alert": "Watch",
+      "correct": true,
+      "warning_pct": 0.0,
+      "watch_pct": 50.0
+    },
+    {
+      "id": "2017_06",
+      "name": "June 2017 Lagos Floods",
+      "peak_date": "2017-06-22",
+      "areas": "Surulere, Mushin, Lagos Island, Eti-Osa",
+      "description": "Intense rainfall caused flooding on major roads and markets. Several deaths recorded.",
+      "source": "Punch Newspapers / LASEMA, June 2017",
+      "reported_severity": "Warning",
+      "rain_24h_mm": 10.1,
+      "rain_72h_mm": 40.1,
+      "rain_24h_label": "Light shower",
+      "rain_72h_label": "Heavy downpour",
+      "alert_counts": {
+        "Warning": 0,
+        "Watch": 27057,
+        "No Alert": 27058
+      },
+      "predicted_alert": "Watch",
+      "correct": true,
+      "warning_pct": 0.0,
+      "watch_pct": 50.0
+    },
+    {
+      "id": "2019_07",
+      "name": "July 2019 Lagos Floods",
+      "peak_date": "2019-07-08",
+      "areas": "Lagos Island, Victoria Island, Lekki",
+      "description": "Heavy overnight rain inundated low-lying communities and the Eko Bridge axis.",
+      "source": "The Guardian Nigeria, July 2019",
+      "reported_severity": "Warning",
+      "rain_24h_mm": 3.8,
+      "rain_72h_mm": 8.8,
+      "rain_24h_label": "Barely any rain",
+      "rain_72h_label": "Light shower",
+      "alert_counts": {
+        "Warning": 0,
+        "Watch": 0,
+        "No Alert": 54115
+      },
+      "predicted_alert": "No Alert",
+      "correct": false,
+      "warning_pct": 0.0,
+      "watch_pct": 0.0
+    },
+    {
+      "id": "2020_06",
+      "name": "June 2020 Lagos Floods",
+      "peak_date": "2020-06-18",
+      "areas": "Eti-Osa, Kosofe, Gbagada",
+      "description": "Flooding in coastal areas of Eti-Osa and Kosofe following a long wet spell.",
+      "source": "Vanguard Newspaper, June 2020",
+      "reported_severity": "Warning",
+      "rain_24h_mm": 110.5,
+      "rain_72h_mm": 120.6,
+      "rain_24h_label": "Very heavy rain",
+      "rain_72h_label": "Very heavy rain",
+      "alert_counts": {
+        "Warning": 27057,
+        "Watch": 13529,
+        "No Alert": 13529
+      },
+      "predicted_alert": "Warning",
+      "correct": true,
+      "warning_pct": 50.0,
+      "watch_pct": 25.0
+    },
+    {
+      "id": "2022_07",
+      "name": "July 2022 Lagos Floods",
+      "peak_date": "2022-07-07",
+      "areas": "Lagos Mainland, Apapa, Mushin",
+      "description": "Major flooding following days of heavy rain. Critical roads impassable for 48 hours.",
+      "source": "NAN / Lagos State Govt. Sitrep, July 2022",
+      "reported_severity": "Warning",
+      "rain_24h_mm": 1.5,
+      "rain_72h_mm": 28.5,
+      "rain_24h_label": "Barely any rain",
+      "rain_72h_label": "Steady rain",
+      "alert_counts": {
+        "Warning": 0,
+        "Watch": 0,
+        "No Alert": 54115
+      },
+      "predicted_alert": "No Alert",
+      "correct": false,
+      "warning_pct": 0.0,
+      "watch_pct": 0.0
+    },
+    {
+      "id": "2022_10",
+      "name": "October 2022 Dam-Release Flooding",
+      "peak_date": "2022-10-12",
+      "areas": "Lagos Island, Badagry, coastal areas",
+      "description": "Flooding exacerbated by upstream dam releases on the Niger and Benue. Widespread coastal inundation.",
+      "source": "Federal Ministry of Humanitarian Affairs, Oct 2022",
+      "reported_severity": "Warning",
+      "rain_24h_mm": 5.3,
+      "rain_72h_mm": 14.3,
+      "rain_24h_label": "Light shower",
+      "rain_72h_label": "Light shower",
+      "alert_counts": {
+        "Warning": 0,
+        "Watch": 0,
+        "No Alert": 54115
+      },
+      "predicted_alert": "No Alert",
+      "correct": false,
+      "warning_pct": 0.0,
+      "watch_pct": 0.0
+    },
+    {
+      "id": "2023_06",
+      "name": "June 2023 Lagos Floods",
+      "peak_date": "2023-06-20",
+      "areas": "Kosofe, Gbagada, Ikorodu Road",
+      "description": "Flash flooding on the Ikorodu Road corridor following an intense storm.",
+      "source": "Channels TV, June 2023",
+      "reported_severity": "Watch",
+      "rain_24h_mm": 6.4,
+      "rain_72h_mm": 18.3,
+      "rain_24h_label": "Light shower",
+      "rain_72h_label": "Light shower",
+      "alert_counts": {
+        "Warning": 0,
+        "Watch": 0,
+        "No Alert": 54115
+      },
+      "predicted_alert": "No Alert",
+      "correct": false,
+      "warning_pct": 0.0,
+      "watch_pct": 0.0
+    }
+  ],
+  "summary": {
+    "total_events": 8,
+    "correct": 4,
+    "accuracy_pct": 50,
+    "note": "FloodSight is considered 'correct' if it issued Warning or Watch for a documented Warning event, and Warning for a Warning event."
+  }
+}
