@@ -128,10 +128,17 @@ def get_grid_alerts(
     dam     = try_dam_summary()
     _COASTAL_LGAS    = {"Eti-Osa", "Lagos Island", "Apapa", "Amuwo-Odofin", "Lagos Mainland"}
     _COASTAL_UPGRADE = {"No Alert": "Watch", "Watch": "Warning", "Warning": "Warning"}
+    # Ogun river floodplain LGAs — promoted when dam discharge advisory is active.
+    # Agege/Ifako-Ijaiye sit astride the Ogun lower reaches; Alimosho (Agbado
+    # Creek) is the main inland overflow corridor.  Same one-tier upgrade logic
+    # as the coastal signal — Watch→Warning if already Watch, else Watch.
+    _OGUN_LGAS       = {"Agege", "Ifako-Ijaiye", "Alimosho"}
+    _DAM_UPGRADE     = {"No Alert": "Watch", "Watch": "Warning", "Warning": "Warning"}
     has_lga = "lga_name" in gdf.columns
     _coastal_active  = bool(coastal and coastal.get("advisory") and has_lga)
+    _dam_active      = bool(dam     and dam.get("advisory")     and has_lga)
 
-    # 5. Compute per-cell alert levels (coastal-LGA cells promoted when advisory)
+    # 5. Compute per-cell alert levels (coastal/dam LGA cells promoted when advisory)
     alert_levels = []
     for i, (rc, r24, r72) in enumerate(zip(
         gdf["risk_class"],
@@ -139,8 +146,11 @@ def get_grid_alerts(
         cell_rain["rain_72h_mm"],
     )):
         level = compute_alert_level(rc, r24, r72)
-        if _coastal_active and str(gdf["lga_name"].iloc[i]) in _COASTAL_LGAS:
+        lga   = str(gdf["lga_name"].iloc[i]) if has_lga else ""
+        if _coastal_active and lga in _COASTAL_LGAS:
             level = _COASTAL_UPGRADE.get(level, level)
+        if _dam_active and lga in _OGUN_LGAS:
+            level = _DAM_UPGRADE.get(level, level)
         alert_levels.append(level)
 
     # 6. Count levels + per-LGA breakdown
@@ -242,9 +252,13 @@ def get_alert_summary(
     dam     = try_dam_summary()
     _COASTAL_LGAS    = {"Eti-Osa", "Lagos Island", "Apapa", "Amuwo-Odofin", "Lagos Mainland"}
     _COASTAL_UPGRADE = {"No Alert": "Watch", "Watch": "Warning", "Warning": "Warning"}
-    _coastal_active  = bool(coastal and coastal.get("advisory") and "lga_name" in gdf.columns)
+    _OGUN_LGAS       = {"Agege", "Ifako-Ijaiye", "Alimosho"}
+    _DAM_UPGRADE     = {"No Alert": "Watch", "Watch": "Warning", "Warning": "Warning"}
+    has_lga          = "lga_name" in gdf.columns
+    _coastal_active  = bool(coastal and coastal.get("advisory") and has_lga)
+    _dam_active      = bool(dam     and dam.get("advisory")     and has_lga)
 
-    # 3. Count alert levels (coastal-LGA cells promoted when advisory)
+    # 3. Count alert levels (coastal/dam LGA cells promoted when advisory)
     counts: dict = {"Warning": 0, "Watch": 0, "No Alert": 0}
     for i, (rc, r24, r72) in enumerate(zip(
         gdf["risk_class"],
@@ -252,8 +266,11 @@ def get_alert_summary(
         cell_rain["rain_72h_mm"],
     )):
         level = compute_alert_level(rc, r24, r72)
-        if _coastal_active and str(gdf["lga_name"].iloc[i]) in _COASTAL_LGAS:
+        lga   = str(gdf["lga_name"].iloc[i]) if has_lga else ""
+        if _coastal_active and lga in _COASTAL_LGAS:
             level = _COASTAL_UPGRADE.get(level, level)
+        if _dam_active and lga in _OGUN_LGAS:
+            level = _DAM_UPGRADE.get(level, level)
         counts[level] = counts.get(level, 0) + 1
 
     highest = (

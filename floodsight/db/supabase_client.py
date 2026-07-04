@@ -151,8 +151,9 @@ def get_subscriber_count() -> int:
     client = _get_client()
     result = (
         client.table("subscribers")
-        .select("id", count="exact", head=True)
+        .select("id", count="exact")
         .eq("active", True)
+        .limit(0)
         .execute()
     )
     return result.count or 0

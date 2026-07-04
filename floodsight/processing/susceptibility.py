@@ -4,8 +4,9 @@ README formula, kept as the v0 baseline layer (fast, explainable,
 zero training data required) that both the dashboard and the HAND depth
 model (depth_hand.py) can fall back on or cross-check against.
 
-flood_score = 0.25*risk_elev + 0.15*risk_slope + 0.20*risk_flow
-            + 0.15*risk_waterdist + 0.15*risk_landcover + 0.10*risk_pop
+hazard_score = 0.278*risk_elev + 0.167*risk_slope + 0.222*risk_flow
+             + 0.167*risk_waterdist + 0.167*risk_landcover  ← risk_class
+flood_score  = hazard_score weighted sum + 0.10*risk_pop    ← kept for exposure stats
 
 NOTE on the skew flagged in the roadmap doc: normalization here is
 min-max per factor over the AOI. If your risk_class distribution comes
@@ -24,7 +25,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-from floodsight.config import RISK_CLASS_BREAKS, SUSCEPTIBILITY_WEIGHTS
+from floodsight.config import HAZARD_WEIGHTS, RISK_CLASS_BREAKS, SUSCEPTIBILITY_WEIGHTS
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -123,17 +124,36 @@ def compute_flood_score(df: pd.DataFrame, use_quantile_breaks: bool = False) -> 
             {k: round(v, 3) for k, v in active_weights.items()},
         )
 
+    # Exposure-aware flood_score (includes population) — kept as a column for
+    # operator dashboards, exposure statistics, and backward compatibility.
     df["flood_score"] = sum(df[factor] * weight for factor, weight in active_weights.items())
 
+    # Pure hazard_score (no population) — this drives risk_class.
+    # Dense-but-dry areas no longer get inflated alert levels because of
+    # population density alone. (IMPROVEMENTS.md item 15)
+    _hazard_active = {
+        k: v for k, v in HAZARD_WEIGHTS.items()
+        if k not in dropped
+    }
+    if _hazard_active:
+        _total_h = sum(_hazard_active.values())
+        df["hazard_score"] = sum(
+            df[k] * (v / _total_h)
+            for k, v in _hazard_active.items()
+            if k in df.columns
+        )
+    else:
+        df["hazard_score"] = df["flood_score"]   # fallback: all hazard factors missing
+
     if use_quantile_breaks:
-        df["risk_class"] = _classify_quantile(df["flood_score"])
+        df["risk_class"] = _classify_quantile(df["hazard_score"])
         log.info(
             "Using QUANTILE-based risk classes (each class ~25%% of "
             "scored cells, boundaries specific to this AOI's score "
             "distribution, not comparable across cities)."
         )
     else:
-        df["risk_class"] = df["flood_score"].apply(_classify)
+        df["risk_class"] = df["hazard_score"].apply(_classify)
 
     log.info("Risk class distribution:\n%s", df["risk_class"].value_counts())
     return df

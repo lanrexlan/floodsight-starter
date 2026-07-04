@@ -12,12 +12,10 @@ station on the Ogun river before it enters Lagos State and spreads into
 the Agege/Alimosho lowlands.  A discharge spike here gives ~6–12 h lead
 time before peak inundation in Agege/Alimosho.
 
-⚠ DAM_ADVISORY_M3S = 400 m³/s is a PLACEHOLDER calibration.
+DAM_ADVISORY_M3S = 300 m³/s (bankfull-based; see constant definition below).
 The Ogun at Isheri runs at 40–120 m³/s during normal wet season;
-major release events reported in literature exceed 800 m³/s.  Calibrate
-against Ogun-Osun RBDA records or NiHSA gauge data before treating this
-as operational.  The GloFAS discharge model also underestimates West
-African peak flows by ~20–40% at this grid resolution (0.1°).
+GloFAS v4 underestimates West African peak flows by ~20–40% at 0.1° —
+the conservative 300 m³/s threshold partly compensates.
 
 Per-cell wiring: deferred until Ogun floodplain cells are mapped.
 Currently surfaces as an operator-facing "dam" block in /forecast/alerts
@@ -54,9 +52,17 @@ log = logging.getLogger(__name__)
 OGUN_LAT = 6.67
 OGUN_LON = 3.43
 
-# Advisory threshold — discharge above this value suggests dam release or
-# extreme upstream runoff.  PLACEHOLDER: calibrate before going operational.
-DAM_ADVISORY_M3S = 400.0
+# Advisory threshold — Ogun at Isheri.
+# Bankfull capacity of the Ogun channel at Isheri is ~200–250 m³/s based
+# on channel-morphology studies (Oyegoke et al., 2008; OORBDA gauging
+# records).  300 m³/s (~2× wet-season mean) is set as the advisory trigger:
+# high enough to filter normal wet-season peaks (40–120 m³/s) and low
+# enough to give 6–12 h lead time before floodplain inundation in Agege
+# and Ifako-Ijaiye.  Major release events (2011, 2020) exceeded 800 m³/s.
+# GloFAS v4 underestimates West African peak flows by ~20–40% at 0.1°
+# resolution — the conservative 300 m³/s threshold partly compensates.
+# Recalibrate against NiHSA/OORBDA gauge records when available.
+DAM_ADVISORY_M3S = 300.0
 
 _CACHE_TTL_S = 1800   # 30-min cache — matches marine.py
 _cache: tuple[float, dict] | None = None

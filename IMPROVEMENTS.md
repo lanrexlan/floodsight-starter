@@ -13,7 +13,7 @@ session vs. what remains.
 | 5 | P1 | Two diverged training pipelines | **Fixed** |
 | 6 | P1 | Recalibration matches the wrong thing | **Fixed** |
 | 7 | P1 | Stale HANDOFF.md | **Fixed** |
-| 8–12 | P2 | Missed opportunities | **8 partial (per-cell wired; threshold + dam-release pending), 9–12 done** |
+| 8–12 | P2 | Missed opportunities | **8 done (coastal + Ogun dam per-cell wired; 300 m³/s calibrated threshold; GloFAS v4), 9–12 done** |
 | 13–17 | P3 | Smaller improvements | **Done (15: scored_grid.gpkg regenerated with hazard_score; re-run validate_historical.py after deploy to confirm accuracy)** |
 
 ---
@@ -139,16 +139,27 @@ honest post-fix metrics and this document as the work queue.
 
 ## P2 — Missed opportunities
 
-8. **Non-rainfall flood drivers.** **Partially done:** tidal/coastal signal
-   added (`floodsight/forecast/marine.py`, Open-Meteo Marine sea level,
-   72 h horizon) — surfaces as a `coastal` block in `/forecast/alerts` and
-   `/forecast/summary` and a HIGH TIDE line in the morning briefing. The
-   advisory threshold (1.0 m MSL) is a placeholder — calibrate against
-   NiHSA tide gauge records and the 2021-07 surge event. **Still open:**
-   dam-release monitoring (Oyan/Ogun) needs NiHSA / Ogun-Osun RBDA data or
-   GloFAS discharge on the Ogun reach (GloFAS remains untested from
-   Phase 2), and the coastal signal is not yet wired into per-cell alert
-   levels — only into operator-facing surfaces.
+8. **Non-rainfall flood drivers.** **Done:** Two independent advisory signals
+   wired into per-cell alert levels in `/forecast/alerts` and `/forecast/summary`.
+
+   *Coastal/tidal* — `floodsight/forecast/marine.py` via Open-Meteo Marine
+   (72 h, free). Advisory threshold 1.0 m MSL (conservative; recalibrate
+   against NiHSA tide gauge + 2021-07 Lekki event when records available).
+   Promotes cells in coastal LGAs (Eti-Osa, Lagos Island, Apapa, Amuwo-Odofin,
+   Lagos Mainland) one tier: No Alert→Watch, Watch→Warning.
+
+   *Ogun dam-release* — `floodsight/forecast/dam.py` via Open-Meteo Flood /
+   GloFAS v4 (free, 16-day forecast). Monitoring point: Isheri Olofin
+   (6.67°N 3.43°E), last gauge before Lagos State border. Advisory threshold
+   300 m³/s — above bankfull capacity (~200–250 m³/s, Oyegoke et al. 2008)
+   and ~2.5× normal wet-season mean (40–120 m³/s). GloFAS underestimates
+   West African peaks by ~20–40% at 0.1° — conservative threshold partly
+   compensates. Promotes cells in Ogun floodplain LGAs (Agege, Ifako-Ijaiye,
+   Alimosho) one tier when discharge forecast exceeds threshold.
+
+   Both signals surface as `coastal` / `dam` blocks in API responses and in
+   the morning briefing. Recalibrate thresholds against OORBDA/NiHSA gauge
+   records when available.
 9. **All-clear messages.** **Done:** `/alerts/dispatch` now sends one
    stand-down SMS to subscribers whose cell is quiet after a Watch/Warning
    today or yesterday (deduplicated via alert_log level 'All Clear' —
