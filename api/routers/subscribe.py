@@ -330,12 +330,16 @@ def subscriber_count():
     """
     try:
         count = get_subscriber_count()
+        return {"active_subscribers": count}
     except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        # Supabase not configured — return null rather than 503 so the
+        # dashboard badge stays blank instead of logging a noisy error.
+        log.warning("subscriber_count: Supabase not configured: %s", exc)
+        return {"active_subscribers": None, "data_source": "unavailable"}
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-    return {"active_subscribers": count}
+        # Supabase API error (table missing, auth, network) — degrade gracefully.
+        log.warning("subscriber_count: Supabase error (non-fatal): %s", exc)
+        return {"active_subscribers": None, "data_source": "unavailable"}
 
 
 # ---------------------------------------------------------------------------
