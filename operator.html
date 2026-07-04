@@ -543,3 +543,42 @@ function renderHistory(history) {
         backgroundColor: levelCol,
         borderRadius: 4,
       }]
+    },
+    options: {
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { title: ctx => sorted[ctx[0].dataIndex].event_date,
+                     label:  ctx => ` ${ctx.parsed.y} recipients` }
+      }},
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { beginAtZero: true, ticks: { font: { size: 10 } } }
+      },
+      animation: { duration: 500 },
+    }
+  });
+
+  // ── Delivery mini-bars (per dispatch, compact)
+  const barsHtml = sorted.slice(-5).map(r => `
+    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem;font-size:.78rem">
+      <span style="width:42px;color:var(--grey)">${r.event_date.slice(5)}</span>
+      <div class="bar-bg" style="flex:1">
+        <div class="bar-fill" style="width:${(r.delivery_rate*100).toFixed(0)}%;background:${
+          r.delivery_rate >= 0.9 ? 'var(--green)' : r.delivery_rate >= 0.8 ? 'var(--yellow)' : 'var(--red)'
+        }"></div>
+      </div>
+      <span style="width:34px;text-align:right">${(r.delivery_rate*100).toFixed(0)}%</span>
+    </div>
+  `).join('');
+  document.getElementById('deliveryBars').innerHTML = barsHtml ||
+    '<span style="font-size:.8rem;color:var(--grey)">No dispatch data yet</span>';
+
+  // Now that history is available, refresh KPI delivery avg
+  const statsEl = document.getElementById('kpiRow').querySelector('.stat-card.red .val');
+  if (statsEl) {
+    const avg = rows.reduce((a, d) => a + d.delivery_rate, 0) / Math.max(rows.length, 1);
+    statsEl.textContent = (avg * 100).toFixed(1) + '%';
+  }
+}
+</script>
+</body>
+</html>
