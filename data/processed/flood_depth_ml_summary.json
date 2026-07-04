@@ -1,0 +1,137 @@
+{
+  "phase": "Phase 21 — ML Flood Depth Prediction",
+  "model": "GradientBoostingRegressor (sklearn)",
+  "design_storm": {
+    "rain_24h_mm": 150.0,
+    "rain_72h_mm": 150.0,
+    "description": "100-year return period design storm — Lagos"
+  },
+  "training_data": {
+    "historical_rows": 2536,
+    "swmm_rows": 2288,
+    "total_rows": 4824
+  },
+  "grid": {
+    "n_cells": 24933,
+    "crs": "EPSG:32631",
+    "resolution_m": 200
+  },
+  "depth_stats": {
+    "min_m": 0.596,
+    "mean_m": 1.263,
+    "median_m": 1.251,
+    "max_m": 2.484,
+    "p90_m": 1.52,
+    "p99_m": 1.835
+  },
+  "depth_class_counts": {
+    "High": 22980,
+    "Medium": 1888,
+    "Extreme": 65
+  },
+  "top_flood_cells": [
+    {
+      "cell_id": "53094",
+      "predicted_depth_m": 2.484,
+      "depth_class": "Extreme",
+      "risk_class": "Low"
+    },
+    {
+      "cell_id": "75274",
+      "predicted_depth_m": 2.357,
+      "depth_class": "Extreme",
+      "risk_class": "Low"
+    },
+    {
+      "cell_id": "52544",
+      "predicted_depth_m": 2.356,
+      "depth_class": "Extreme",
+      "risk_class": "Low"
+    },
+    {
+      "cell_id": "51063",
+      "predicted_depth_m": 2.307,
+      "depth_class": "Extreme",
+      "risk_class": "Very High"
+    },
+    {
+      "cell_id": "63883",
+      "predicted_depth_m": 2.303,
+      "depth_class": "Extreme",
+      "risk_class": "Very High"
+    },
+    {
+      "cell_id": "43080",
+      "predicted_depth_m": 2.29,
+      "depth_class": "Extreme",
+      "risk_class": "Moderate"
+    },
+    {
+      "cell_id": "76660",
+      "predicted_depth_m": 2.279,
+      "depth_class": "Extreme",
+      "risk_class": "Low"
+    },
+    {
+      "cell_id": "51340",
+      "predicted_depth_m": 2.249,
+      "depth_class": "Extreme",
+      "risk_class": "Very High"
+    },
+    {
+      "cell_id": "52489",
+      "predicted_depth_m": 2.209,
+      "depth_class": "Extreme",
+      "risk_class": "Very High"
+    },
+    {
+      "cell_id": "61084",
+      "predicted_depth_m": 2.188,
+      "depth_class": "Extreme",
+      "risk_class": "Very High"
+    }
+  ],
+  "model_metrics": {
+    "mae_m": 0.24431270159764312,
+    "rmse_m": 0.38785888183043804,
+    "r2": 0.4090085598478309,
+    "n": 449,
+    "n_train": 4375,
+    "n_test": 449,
+    "split_strategy": "grouped_by_event",
+    "held_out_events": [
+      "2015_07",
+      "2018_06",
+      "2023_06",
+      "lekki_2021_07_12"
+    ],
+    "trained_on_synthetic_data": false,
+    "hand_impute_median_m": 1.9985,
+    "label_provenance": {
+      "real_rows": 616,
+      "synthetic_rows": 4208,
+      "synthetic_fraction": 0.872,
+      "real_label_sources": [
+        "sar_fwdet"
+      ]
+    },
+    "holdout_real_rows_only": {
+      "mae_m": 0.1740112068179363,
+      "rmse_m": 0.20602043074299198,
+      "r2": -9.031933928016757,
+      "n": 89
+    },
+    "feature_importance": {
+      "elevation_m": 0.082,
+      "slope_deg": 0.07,
+      "flow_accum": 0.023,
+      "hand_m": 0.123,
+      "dist_to_water_m": 0.048,
+      "landcover_class": 0.006,
+      "population_density": 0.079,
+      "rain_24h_mm": 0.422,
+      "rain_72h_mm": 0.146
+    }
+  },
+  "elapsed_s": 6.9
+}

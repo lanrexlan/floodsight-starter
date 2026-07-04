@@ -421,7 +421,7 @@ function selectPlace(lat, lon, name) {
   hideDropdown();
   searchInput.value = name.split(",")[0];
   searchClear.hidden = false;
-  map.flyTo({ center: [lon, lat], zoom: 15, pitch: PILOT_PITCH, bearing: PILOT_BEARING, duration: 1400, essential: true });
+  if (isFinite(lat) && isFinite(lon)) map.flyTo({ center: [lon, lat], zoom: 15, pitch: PILOT_PITCH, bearing: PILOT_BEARING, duration: 1400, essential: true });
   queryPoint(lat, lon, name);
 }
 function hideDropdown() { searchResults.hidden = true; searchResults.innerHTML = ""; }
@@ -434,7 +434,7 @@ document.querySelectorAll(".lga-btn").forEach(btn => {
     const lat  = parseFloat(btn.dataset.lat);
     const lon  = parseFloat(btn.dataset.lon);
     const zoom = parseFloat(btn.dataset.zoom);
-    map.flyTo({ center: [lon, lat], zoom, pitch: PILOT_PITCH, bearing: PILOT_BEARING, duration: 1200, essential: true });
+    if (isFinite(lat) && isFinite(lon)) map.flyTo({ center: [lon, lat], zoom, pitch: PILOT_PITCH, bearing: PILOT_BEARING, duration: 1200, essential: true });
     queryPoint(lat, lon, btn.textContent.trim());
   });
 });
@@ -822,8 +822,24 @@ async function dashSubscribe() {
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ phone, lat, lon, area_name: areaName || undefined, consent: true }),
     });
-    const data = await res.json();
+    let data = await res.json();
     if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+
+    // OTP flow (REQUIRE_OTP=true on the server): a 6-digit code was texted
+    // to the number; the subscription completes via /subscribe/confirm.
+    if (data.status === "pending_confirmation") {
+      statusEl.style.color = "#90CAF9";
+      statusEl.textContent = "Code sent by SMS — check your phone";
+      const code = (window.prompt("Enter the 6-digit code we sent to " + phone) || "").trim();
+      if (!code) throw new Error("Confirmation cancelled");
+      const confRes = await fetch(`${API_BASE_URL}/subscribe/confirm`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ phone, code }),
+      });
+      data = await confRes.json();
+      if (!confRes.ok) throw new Error(data.detail || `HTTP ${confRes.status}`);
+    }
 
     statusEl.style.color = "#81C784";
     statusEl.textContent = `✓ Subscribed — ${data.risk_class || "?"} risk area`;
@@ -966,31 +982,4 @@ async function _loadMlDepthLayer() {
     const meta = geojson.metadata || {};
     console.log(
       `ML depth layer loaded — ${(geojson.features || []).length} cells ` +
-      `(design storm ${meta.design_rain_24h_mm || 150} mm/24h)`
-    );
-  } catch (err) {
-    console.warn("ML depth layer failed to load:", err);
-    if (btn) { btn.textContent = "ML depth (error)"; btn.disabled = true; }
-  } finally {
-    _mlDepthLoading = false;
-  }
-}
-
-// ── Toggle ML depth layer visibility ──────────────────────────────────────
-function toggleMlDepthLayer() {
-  _mlDepthVisible = !_mlDepthVisible;
-  const btn = document.getElementById("ml-depth-toggle");
-
-  if (!_mlDepthLoaded) {
-    // Lazy-load on first toggle
-    _loadMlDepthLayer();
-    if (btn) btn.textContent = "Loading ML depth…";
-    return;
-  }
-
-  const vis = _mlDepthVisible ? "visible" : "none";
-  ["ml-depth-glow", "ml-depth-dots"].forEach(id => {
-    if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", vis);
-  });
-  if (btn) btn.textContent = _mlDepthVisible ? "Hide ML depth" : "Show ML depth";
-}
+      `(desi

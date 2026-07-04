@@ -23,6 +23,8 @@ data/processed/**
 # Exception: SWMM Phase 17 flood results for Kosofe pilot — served by /risk/swmm-flooding
 !data/processed/swmm_flooding.geojson
 !data/processed/swmm_summary.json
+!data/processed/flood_depth_ml.geojson
+!data/processed/flood_depth_ml_summary.json
 
 # Trained models — regenerate with floodsight/ml/train.py
 data/models/**

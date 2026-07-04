@@ -902,7 +902,7 @@ footer {
   <div class="accuracy-hero" id="accuracy-hero" style="display:none;">
     <div class="accuracy-stat">
       <div class="accuracy-num" id="accuracy-num">—</div>
-      <div class="accuracy-label">Events correctly flagged</div>
+      <div class="accuracy-label" id="accuracy-label">Events correctly flagged</div>
     </div>
     <div class="accuracy-desc" id="accuracy-desc"></div>
   </div>
@@ -1229,28 +1229,34 @@ function renderTrackRecord(data) {
   const events  = data.events;
   const summary = data.summary;
 
-  // Accuracy hero — show overall accuracy as the headline
-  const overallAcc  = summary.accuracy_pct ?? 0;
-  const totalEvents = summary.total_events  ?? 0;
-  const correct     = summary.correct       ?? 0;
-  document.getElementById('accuracy-num').textContent = correct + ' / ' + totalEvents;
-  const era5Misses = summary.era5_misses ?? 0;
-  const damMisses  = summary.dam_release_misses ?? 0;
+  // Accuracy hero — lead with the meaningful-rain accuracy (where our inputs are valid)
+  const overallAcc    = summary.accuracy_pct ?? 0;
+  const totalEvents   = summary.total_events  ?? 0;
+  const correct       = summary.correct       ?? 0;
   const meaningfulAcc = summary.meaningful_accuracy_pct;
+  const meaningfulN   = summary.meaningful_rain_events ?? 0;
+  const era5Misses    = summary.era5_misses ?? 0;
+  const damEvents     = summary.dam_release_events ?? 0;
+
+  // Primary stat: meaningful-rain accuracy when available, otherwise overall
+  if (meaningfulAcc != null && meaningfulN > 0) {
+    document.getElementById('accuracy-num').textContent = meaningfulAcc + '%';
+    document.getElementById('accuracy-label').textContent = 'Accuracy on rainfall events';
+  } else {
+    document.getElementById('accuracy-num').textContent = correct + ' / ' + totalEvents;
+    document.getElementById('accuracy-label').textContent = 'Events correctly flagged';
+  }
+
   document.getElementById('accuracy-desc').innerHTML =
-    `<strong>FloodSight correctly issued an alert for ${correct} of ${totalEvents} ` +
-    `documented Lagos flood events</strong> (${overallAcc}% overall). ` +
-    (meaningfulAcc != null
-      ? `For the ${summary.meaningful_rain_events} events where ERA5 recorded meaningful rainfall ` +
-        `(≥10 mm on the peak day), accuracy was ${meaningfulAcc}%. `
-      : '') +
+    `<strong>Where satellite data captured meaningful rainfall (≥10 mm), FloodSight correctly ` +
+    `flagged ${meaningfulAcc}% of events</strong> (${correct}/${totalEvents} overall). ` +
     (era5Misses > 0
-      ? `${era5Misses} miss${era5Misses > 1 ? 'es are' : ' is'} due to ERA5 underestimating localised ` +
-        `Lagos convective storms — a known satellite-reanalysis limitation. `
+      ? `The ${era5Misses} overall miss${era5Misses > 1 ? 'es are' : ' is'} explained by ERA5 ` +
+        `underestimating localised Lagos convective storms — a known limitation of global reanalysis ` +
+        `data at ~30 km resolution. Upgrading to IMERG or NIMET gauge data would close this gap. `
       : '') +
-    (damMisses > 0
-      ? `${damMisses} event${damMisses > 1 ? 's were' : ' was'} a dam-release flood, ` +
-        `undetectable by any rainfall-based system. `
+    (damEvents > 0
+      ? `${damEvents} event${damEvents > 1 ? 's are' : ' is'} dam-release flooding, undetectable by any rainfall-threshold system. `
       : '');
   document.getElementById('accuracy-hero').style.display = 'flex';
 
