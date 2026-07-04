@@ -73,9 +73,9 @@ FLOOD_EVENTS: list[dict] = [
         "id": "2020_06",
         "name": "June 2020 Lagos Floods",
         "peak_date": "2020-06-18",
-        "areas": "Eti-Osa, Kosofe, Gbagada",
-        "description": "Flooding in coastal areas of Eti-Osa and Kosofe following a long wet spell.",
-        "source": "Vanguard Newspaper, June 2020",
+        "areas": "Eti-Osa, Kosofe, Gbagada, Orile-Agege, Ogudu",
+        "description": "Almost 90mm of rain fell 18-19 June. 20 families displaced at Orile-Agege; child swept away. House collapsed in Ogudu.",
+        "source": "FloodList / LASEMA, June 2020",
         "reported_severity": "Warning",
     },
     {
@@ -104,6 +104,97 @@ FLOOD_EVENTS: list[dict] = [
         "description": "Flash flooding on the Ikorodu Road corridor following an intense storm.",
         "source": "Channels TV, June 2023",
         "reported_severity": "Watch",
+    },
+    # ── Additional events added Phase 22 ─────────────────────────────
+    {
+        "id": "2015_07",
+        "name": "July 2015 Lagos Floods",
+        "peak_date": "2015-07-14",
+        "areas": "Mushin, Surulere, Lagos Island, Festac",
+        "description": "Widespread flooding after sustained July rains. LASEMA deployed to multiple hotspots.",
+        "source": "Vanguard Newspaper / LASEMA Sitrep, July 2015",
+        "reported_severity": "Warning",
+    },
+    {
+        "id": "2016_07",
+        "name": "July 2016 Lagos Floods",
+        "peak_date": "2016-07-19",
+        "areas": "Ajah, Lagos Island, Victoria Island, Lekki Phase II",
+        "description": "Severe flooding across coastal LGAs. Roads impassable for 24+ hours.",
+        "source": "Punch Newspapers / NEMA, July 2016",
+        "reported_severity": "Warning",
+    },
+    {
+        "id": "2018_06",
+        "name": "June 2018 Lagos Floods",
+        "peak_date": "2018-06-21",
+        "areas": "Ikeja, Agege, Alimosho, Surulere",
+        "description": "Heavy overnight storm triggered flash flooding on major arterial roads.",
+        "source": "The Guardian Nigeria / LASEMA, June 2018",
+        "reported_severity": "Warning",
+    },
+    {
+        "id": "2019_10",
+        "name": "October 2019 Oyan Dam Flooding",
+        "peak_date": "2019-10-21",
+        "areas": "Badagry, Epe, coastal Lagos LGAs",
+        "description": "Flooding amplified by release of water from Oyan Dam (Abeokuta). Six deaths reported in Lagos.",
+        "source": "FloodList / NEMA Sitrep, October 2019",
+        "reported_severity": "Warning",
+    },
+    {
+        "id": "2021_07a",
+        "name": "July 2021 Lagos Tidal-Rain Surge",
+        "peak_date": "2021-07-10",
+        "areas": "Lagos Island, Victoria Island, Lekki, Ikoyi",
+        "description": "Major flooding from combination of heavy rain and high tides raising sea level 122cm above normal. Cars submerged, 4,000+ displaced.",
+        "source": "LASEMA / Interconnected Disaster Risks Report, 2021",
+        "reported_severity": "Warning",
+    },
+    {
+        "id": "2021_07b",
+        "name": "July 2021 Lagos Flash Floods",
+        "peak_date": "2021-07-16",
+        "areas": "Lagos Mainland, Gbagada, Mushin, Oshodi",
+        "description": "Heavy rainfall caused flood depths up to 50 cm in residential areas. Significant vehicle damage reported.",
+        "source": "FloodList, July 2021",
+        "reported_severity": "Watch",
+    },
+    {
+        "id": "2022_06",
+        "name": "June 2022 Lagos Pre-Peak Floods",
+        "peak_date": "2022-06-18",
+        "areas": "Lagos Mainland, Apapa, Mushin",
+        "description": "Roads and houses flooded after a downpour. Event preceded the larger July 2022 flooding by three weeks.",
+        "source": "FloodList / NAN, June 2022",
+        "reported_severity": "Watch",
+    },
+    {
+        "id": "2023_09",
+        "name": "September 2023 Lagos Floods",
+        "peak_date": "2023-09-14",
+        "areas": "Ikorodu, Kosofe, Gbagada, Ketu",
+        "description": "End-of-season heavy rains flooded Ikorodu Road and surrounding communities. LASEMA reported over N10bn cumulative losses for 2023.",
+        "source": "LASEMA Annual Report 2023 / Channels TV",
+        "reported_severity": "Watch",
+    },
+    {
+        "id": "2024_06",
+        "name": "June 2024 Lagos Floods",
+        "peak_date": "2024-06-28",
+        "areas": "Oshodi, Mushin, Surulere, Egbeda, Gbagada, Ilupeju",
+        "description": "Hours of heavy rainfall put major roads and residential communities under water. Multiple LGAs affected simultaneously.",
+        "source": "Punch Newspapers / LASEMA, June 2024",
+        "reported_severity": "Warning",
+    },
+    {
+        "id": "2024_07",
+        "name": "July 2024 Lekki Floods",
+        "peak_date": "2024-07-03",
+        "areas": "Lekki, Ibeju-Lekki, Ikoyi, Mushin, Ketu",
+        "description": "10-hour rainfall caused buildings to collapse and cars to be swept away in Lekki. Student carried away by floods in Ketu.",
+        "source": "Wikipedia / Punch / TheCable, July 2024",
+        "reported_severity": "Warning",
     },
 ]
 
@@ -240,6 +331,10 @@ def get_validation_events(refresh: bool = False):
 
     Results are cached after the first call (historical data never changes).
     Pass ?refresh=true to force a re-fetch.
+
+    Now covers 18 events (Phase 22 expansion from 8 original).
+    Dam-release events (2019_10, 2022_10) are included but noted as
+    structurally hard for a rainfall-threshold model to detect.
     """
     global _cached_results
     if _cached_results is None or refresh:
@@ -252,12 +347,12 @@ def get_validation_events(refresh: bool = False):
     total = len(_cached_results)
     correct = sum(1 for r in _cached_results if r["correct"])
 
-    # Of events where ERA5 recorded ≥10mm (meaningful signal), how many correct?
+    # Of events where ERA5 recorded >=10mm (meaningful signal), how many correct?
     meaningful = [r for r in _cached_results if r["rain_24h_mm"] >= 10]
     meaningful_correct = sum(1 for r in meaningful if r["correct"])
 
     # Dam-release / antecedent-saturation events (unfixable by rainfall threshold)
-    dam_events = [r for r in _cached_results if r["rain_24h_mm"] < 5 and not r["correct"]]
+    dam_events = [r for r in _cached_results if r["id"] in ("2019_10", "2022_10")]
 
     return {
         "events": _cached_results,
@@ -270,15 +365,16 @@ def get_validation_events(refresh: bool = False):
             "meaningful_accuracy_pct": round(meaningful_correct / len(meaningful) * 100) if meaningful else 0,
             "era5_misses": sum(
                 1 for r in _cached_results
-                if not r["correct"] and r["rain_24h_mm"] < 10 and r["id"] != "2022_10"
+                if not r["correct"] and r["rain_24h_mm"] < 10
+                and r["id"] not in ("2019_10", "2022_10")
             ),
-            "dam_release_misses": len(dam_events),
+            "dam_release_events": len(dam_events),
             "note": (
-                "Overall accuracy uses all 8 events. "
-                "'Meaningful rain' accuracy counts only events where ERA5 recorded ≥10 mm on the peak day — "
+                "Overall accuracy uses all 18 events (8 original + 10 added Phase 22). "
+                "Meaningful rain accuracy counts only events where ERA5 recorded >=10 mm on the peak day — "
                 "below that threshold, the global reanalysis model is known to underestimate localised "
                 "convective storms common in Lagos. Dam-release and antecedent-saturation events "
-                "are structurally undetectable by rainfall thresholds alone."
+                "(2019_10, 2022_10) are structurally undetectable by rainfall thresholds alone."
             ),
         },
     }

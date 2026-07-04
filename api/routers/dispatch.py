@@ -12,7 +12,7 @@ Logic
 3. For each subscriber, find their nearest grid cell → alert_level.
 4. If alert_level is Watch or Warning:
    a. Check alert_log: already sent today at this level?  → skip.
-   b. Not yet sent → send SMS via Twilio, write to alert_log.
+   b. Not yet sent → send SMS via Africa's Talking, write to alert_log.
 5. Return dispatch summary (dispatched, skipped, errors).
 
 Deduplication
@@ -50,16 +50,8 @@ router = APIRouter(tags=["dispatch"])
 # Bearer token auth (simple shared secret)
 # ---------------------------------------------------------------------------
 
-def _check_auth(request: Request) -> None:
-    secret = os.getenv("DISPATCH_SECRET", "").strip()
-    if not secret:
-        raise HTTPException(
-            status_code=503,
-            detail="DISPATCH_SECRET environment variable not set.",
-        )
-    auth_header = request.headers.get("Authorization", "")
-    if auth_header != f"Bearer {secret}":
-        raise HTTPException(status_code=401, detail="Unauthorized.")
+# Shared, constant-time implementation — see api/auth.py
+from api.auth import require_dispatch_secret as _check_auth
 
 
 # ---------------------------------------------------------------------------
@@ -74,15 +66,28 @@ def dispatch_alerts(request: Request):
     This endpoint is meant to be called by an automated cron job every hour.
     Protect it with ``Authorization: Bearer <DISPATCH_SECRET>``.
 
+    Response includes a per-subscriber breakdown to make it easy to diagnose
+    why specific subscribers received or did not receive an SMS:
+
+    - ``skipped_no_alert``: subscriber's nearest grid cell has No Alert
+      right now (their area's risk class + current rainfall below threshold)
+    - ``skipped_dedup``: already sent this alert level to them today
+
     Response::
 
         {
-          "highest_alert":  "Watch",
-          "dispatched":     12,
-          "skipped":        85,
-          "errors":         0,
-          "subscribers":    97,
-          "event_date":     "2026-06-30"
+          "highest_alert":    "Watch",
+          "dispatched":       12,
+          "skipped_no_alert": 2,
+          "skipped_dedup":    83,
+          "errors":           0,
+          "subscribers":      97,
+          "event_date":       "2026-07-04",
+          "subscriber_detail": [
+            {"area": "Kosofe",   "level": "Watch",    "outcome": "sent"},
+            {"area": "Lekki",    "level": "No Alert", "outcome": "skipped_no_alert"},
+            ...
+          ]
         }
     """
     _check_auth(request)
@@ -99,6 +104,7 @@ def dispatch_alerts(request: Request):
         already_alerted,
         get_active_subscribers,
         log_alert_sent,
+        log_dispatch_cells,
         today_lagos,
     )
     from floodsight.notifications.sms import send_sms
@@ -127,6 +133,30 @@ def dispatch_alerts(request: Request):
     grid_coords = np.column_stack([centroids.y, centroids.x])  # (lat, lon)
     tree        = cKDTree(grid_coords)
 
+    # 2b. Snapshot every Watch/Warning cell to Supabase. This is what
+    # recalibration (scripts/recalibrate.py --analyse) compares field
+    # verifications against — the alerts the system actually dispatched,
+    # not dashboard clicks. Non-fatal: dispatch proceeds even if it fails.
+    try:
+        has_cell_id = "cell_id" in gdf.columns
+        alerted_cells = [
+            {
+                "cell_id": str(gdf["cell_id"].iloc[i]) if has_cell_id else str(i),
+                "lat": float(grid_coords[i][0]),
+                "lon": float(grid_coords[i][1]),
+                "alert_level": lvl,
+            }
+            for i, lvl in enumerate(cell_alerts)
+            if lvl in ("Watch", "Warning")
+        ]
+        if alerted_cells:
+            n_snap = log_dispatch_cells(today_lagos(), alerted_cells)
+            log.info("Dispatch cell snapshot: %d Watch/Warning cells recorded", n_snap)
+    except RuntimeError:
+        log.warning("Supabase not configured — dispatch cell snapshot skipped")
+    except Exception as exc:
+        log.warning("Dispatch cell snapshot failed (non-fatal): %s", exc)
+
     # 3. Load subscribers
     try:
         subscribers = get_active_subscribers()
@@ -135,61 +165,86 @@ def dispatch_alerts(request: Request):
 
     if not subscribers:
         return {
-            "highest_alert": _highest(cell_alerts),
-            "dispatched":    0,
-            "skipped":       0,
-            "errors":        0,
-            "subscribers":   0,
-            "event_date":    today_lagos(),
+            "highest_alert":    _highest(cell_alerts),
+            "dispatched":       0,
+            "skipped_no_alert": 0,
+            "skipped_dedup":    0,
+            "errors":           0,
+            "subscribers":      0,
+            "event_date":       today_lagos(),
+            "subscriber_detail": [],
+            "skipped":          0,
         }
 
     # 4. For each subscriber, find nearest cell → alert level → SMS
-    event_date  = today_lagos()
-    dispatched  = 0
-    skipped     = 0
-    errors      = 0
+    event_date        = today_lagos()
+    dispatched        = 0
+    skipped_no_alert  = 0   # subscriber's area has no Watch/Warning right now
+    skipped_dedup     = 0   # already sent this alert level to them today
+    errors            = 0
+    subscriber_detail = []  # per-subscriber outcome for diagnostics
 
     sub_coords = np.array([[s["lat"], s["lon"]] for s in subscribers])
     _, nearest_idx = tree.query(sub_coords, k=1)
 
     for i, sub in enumerate(subscribers):
-        level = cell_alerts[nearest_idx[i]]
+        level  = cell_alerts[nearest_idx[i]]
+        sub_id = str(sub["id"])
+        area   = sub.get("area_name") or "Unknown"
 
         if level == "No Alert":
-            skipped += 1
+            skipped_no_alert += 1
+            subscriber_detail.append({
+                "area":    area,
+                "level":   level,
+                "outcome": "skipped_no_alert",
+            })
             continue
 
-        sub_id = str(sub["id"])
         if already_alerted(sub_id, level, event_date):
-            skipped += 1
+            skipped_dedup += 1
+            subscriber_detail.append({
+                "area":    area,
+                "level":   level,
+                "outcome": "skipped_already_sent_today",
+            })
             continue
 
         # Send SMS
         try:
             send_sms(
-                to_number  = sub["phone"],
-                alert_level= level,
-                area_name  = sub.get("area_name"),
+                to_number   = sub["phone"],
+                alert_level = level,
+                area_name   = area,
             )
             log_alert_sent(sub_id, level, event_date)
             dispatched += 1
-            log.info(
-                "Dispatched %s alert to %s (%s)",
-                level, sub["phone"], sub.get("area_name", "?"),
-            )
+            subscriber_detail.append({
+                "area":    area,
+                "level":   level,
+                "outcome": "sent",
+            })
+            log.info("Dispatched %s alert to %s (%s)", level, sub["phone"], area)
         except Exception as exc:
             errors += 1
-            log.error(
-                "SMS failed for %s: %s", sub.get("phone", "?"), exc
-            )
+            subscriber_detail.append({
+                "area":    area,
+                "level":   level,
+                "outcome": f"error: {exc}",
+            })
+            log.error("SMS failed for %s: %s", sub.get("phone", "?"), exc)
 
     return {
-        "highest_alert": _highest(cell_alerts),
-        "dispatched":    dispatched,
-        "skipped":       skipped,
-        "errors":        errors,
-        "subscribers":   len(subscribers),
-        "event_date":    event_date,
+        "highest_alert":    _highest(cell_alerts),
+        "dispatched":       dispatched,
+        "skipped_no_alert": skipped_no_alert,
+        "skipped_dedup":    skipped_dedup,
+        "errors":           errors,
+        "subscribers":      len(subscribers),
+        "event_date":       event_date,
+        "subscriber_detail": subscriber_detail,
+        # Legacy field kept for backward compatibility
+        "skipped":          skipped_no_alert + skipped_dedup,
     }
 
 
@@ -197,3 +252,101 @@ def _highest(levels: list[str]) -> str:
     if "Warning" in levels: return "Warning"
     if "Watch"   in levels: return "Watch"
     return "No Alert"
+
+
+# ---------------------------------------------------------------------------
+# POST /alerts/test-sms  — send a test SMS to one number, bypassing weather
+# ---------------------------------------------------------------------------
+
+@router.post("/alerts/test-sms")
+def test_sms(phone: str, request: Request):
+    """
+    Send a single test SMS to verify Africa's Talking credentials and delivery.
+    Bypasses all weather/alert logic — always sends a 'Watch'-level message.
+
+    Protected by the same DISPATCH_SECRET as /alerts/dispatch.
+
+    Usage::
+
+        curl -X POST "https://your-app.onrender.com/alerts/test-sms?phone=%2B2348012345678" \\
+             -H "Authorization: Bearer <DISPATCH_SECRET>"
+
+    Response::
+
+        {"status": "sent", "phone": "+2348012345678", "mode": "live"}
+    """
+    _check_auth(request)
+
+    from floodsight.notifications.sms import send_sms
+    import os
+
+    username = os.getenv("AT_USERNAME", "").strip()
+    if not username:
+        raise HTTPException(status_code=503, detail="AT_USERNAME not set in environment.")
+
+    mode = "sandbox" if username == "sandbox" else "live"
+
+    try:
+        send_sms(
+            to_number   = phone,
+            alert_level = "Watch",
+            area_name   = "Test Area",
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"SMS failed: {exc}") from exc
+
+    return {"status": "sent", "phone": phone, "mode": mode}
+
+
+# ---------------------------------------------------------------------------
+# POST /alerts/dispatch/force  — force Watch to ALL subscribers (testing)
+# ---------------------------------------------------------------------------
+
+@router.post("/alerts/dispatch/force")
+def dispatch_force(request: Request):
+    """
+    Send a Watch-level SMS to ALL active subscribers regardless of current
+    weather conditions.  Use for end-to-end testing before the first real event.
+
+    Protected by DISPATCH_SECRET.  Does NOT write to alert_log so it won't
+    block real alerts later.
+
+    Response::
+
+        {"dispatched": 3, "errors": 0, "subscribers": 3, "note": "force-send; no dedup log written"}
+    """
+    _check_auth(request)
+
+    from floodsight.db.supabase_client import get_active_subscribers
+    from floodsight.notifications.sms import send_sms
+
+    try:
+        subscribers = get_active_subscribers()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    if not subscribers:
+        return {"dispatched": 0, "errors": 0, "subscribers": 0,
+                "note": "force-send; no dedup log written"}
+
+    dispatched = 0
+    errors     = 0
+    for sub in subscribers:
+        try:
+            send_sms(
+                to_number   = sub["phone"],
+                alert_level = "Watch",
+                area_name   = sub.get("area_name"),
+            )
+            dispatched += 1
+            log.info("Force-sent test Watch to %s", sub["phone"])
+        except Exception as exc:
+            errors += 1
+            log.error("Force-send failed for %s: %s", sub.get("phone"), exc)
+
+    return {
+        "dispatched":  dispatched,
+        "errors":      errors,
+        "subscribers": len(subscribers),
+        "note":        "force-send; no dedup log written",
+    }
