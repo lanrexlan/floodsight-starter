@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 
 import geopandas as gpd
 import numpy as np
@@ -39,6 +40,7 @@ _cached_source: str | None = None
 # Caching the final dict keeps persistent memory at ~300 MB (GDF + dict) and
 # removes the per-request serialisation spike entirely.
 _cached_grid_geojson: tuple[dict, str] | None = None
+_grid_lock = threading.Lock()  # guards get_grid_geojson() cache population
 
 
 def _build_synthetic_demo_grid(n_cells_per_side: int = 35) -> gpd.GeoDataFrame:
@@ -165,17 +167,24 @@ def get_grid_geojson() -> tuple[dict, str]:
     if _cached_grid_geojson is not None:
         return _cached_grid_geojson
 
-    gdf, source = get_grid()
-    log.info(
-        "Serialising %d-cell grid to GeoJSON (one-time; cached for all future requests) …",
-        len(gdf),
-    )
-    gdf_wgs84 = gdf.to_crs(WGS84)
-    geojson = json.loads(gdf_wgs84.to_json())
-    geojson["data_source"] = source
-    _cached_grid_geojson = (geojson, source)
-    log.info("Grid GeoJSON cached — %d features.", len(geojson.get("features", [])))
-    return _cached_grid_geojson
+    with _grid_lock:
+        # Double-checked locking: re-test after acquiring so the startup
+        # warmup thread and a simultaneous first user request don't both
+        # re-load the 9 MB GPKG.
+        if _cached_grid_geojson is not None:
+            return _cached_grid_geojson
+
+        gdf, source = get_grid()
+        log.info(
+            "Serialising %d-cell grid to GeoJSON (one-time; cached for all future requests) …",
+            len(gdf),
+        )
+        gdf_wgs84 = gdf.to_crs(WGS84)
+        geojson = json.loads(gdf_wgs84.to_json())
+        geojson["data_source"] = source
+        _cached_grid_geojson = (geojson, source)
+        log.info("Grid GeoJSON cached — %d features.", len(geojson.get("features", [])))
+        return _cached_grid_geojson
 
 
 STREETS_RISK_PATH = PROCESSED_DIR / "streets_risk.gpkg"

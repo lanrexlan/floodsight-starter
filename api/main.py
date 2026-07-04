@@ -19,6 +19,9 @@ any of the data download/processing scripts — see api/data_provider.py.
 
 from __future__ import annotations
 
+import logging
+import threading
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -27,10 +30,40 @@ from fastapi.staticfiles import StaticFiles
 
 from api.routers import alerts, depth, dispatch, forecast, incoming, risk, subscribe, validate, verify
 
+log = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Pre-warm the grid GeoJSON cache at startup.
+
+    Without this, the first dashboard visitor after a cold start (Render
+    free-tier spin-up, or a new deploy) triggers a synchronous 9 MB GPKG
+    load + 24,933-cell WGS84 reproject + JSON serialisation.  On the 512 MB
+    free tier that takes 15–30 s and appears as a blank map or 502.
+
+    We spin a daemon thread so startup is non-blocking — Render's health
+    check passes immediately and requests are accepted while the cache is
+    still warming.  Subsequent requests block on the cached copy (< 1 ms).
+    """
+    def _warm():
+        try:
+            from api.data_provider import get_grid_geojson
+            get_grid_geojson()
+            log.info("Startup warmup complete — grid GeoJSON cached.")
+        except Exception as exc:
+            log.warning("Startup warmup failed (non-fatal): %s", exc)
+
+    threading.Thread(target=_warm, daemon=True, name="cache-warmup").start()
+    yield  # app runs
+
+
 app = FastAPI(
     title="FloodSight API",
     description="Flood susceptibility, depth prediction, and alert API for the Lagos pilot.",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
