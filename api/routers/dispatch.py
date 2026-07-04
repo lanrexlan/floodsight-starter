@@ -101,8 +101,10 @@ def dispatch_alerts(request: Request):
     )
     from api.data_provider import get_grid
     from floodsight.db.supabase_client import (
+        LAGOS_TZ,
         already_alerted,
         get_active_subscribers,
+        get_recent_alert_levels,
         log_alert_sent,
         log_dispatch_cells,
         today_lagos,
@@ -169,6 +171,7 @@ def dispatch_alerts(request: Request):
             "dispatched":       0,
             "skipped_no_alert": 0,
             "skipped_dedup":    0,
+            "all_clear_sent":   0,
             "errors":           0,
             "subscribers":      0,
             "event_date":       today_lagos(),
@@ -181,8 +184,10 @@ def dispatch_alerts(request: Request):
     dispatched        = 0
     skipped_no_alert  = 0   # subscriber's area has no Watch/Warning right now
     skipped_dedup     = 0   # already sent this alert level to them today
+    all_clear_sent    = 0   # stand-down messages after a recent alert
     errors            = 0
     subscriber_detail = []  # per-subscriber outcome for diagnostics
+    no_alert_subs     = []  # (sub, sub_id, area) — evaluated for all-clear below
 
     sub_coords = np.array([[s["lat"], s["lon"]] for s in subscribers])
     _, nearest_idx = tree.query(sub_coords, k=1)
@@ -193,12 +198,9 @@ def dispatch_alerts(request: Request):
         area   = sub.get("area_name") or "Unknown"
 
         if level == "No Alert":
-            skipped_no_alert += 1
-            subscriber_detail.append({
-                "area":    area,
-                "level":   level,
-                "outcome": "skipped_no_alert",
-            })
+            # Not skipped yet — the all-clear pass below decides whether
+            # this subscriber gets a stand-down message (P2 item 9).
+            no_alert_subs.append((sub, sub_id, area))
             continue
 
         if already_alerted(sub_id, level, event_date):
@@ -234,11 +236,69 @@ def dispatch_alerts(request: Request):
             })
             log.error("SMS failed for %s: %s", sub.get("phone", "?"), exc)
 
+    # 5. All-clear pass: subscribers whose cell is quiet NOW but who
+    # received a Watch/Warning today or yesterday get ONE stand-down SMS
+    # (deduplicated per day via alert_log, level 'All Clear' — requires
+    # scripts/sql/04_inbound_otp.sql). Builds trust and reduces alarm
+    # fatigue: residents learn alerts have an explicit end, not a fade-out.
+    if no_alert_subs:
+        from datetime import datetime, timedelta
+
+        yesterday = (datetime.now(LAGOS_TZ) - timedelta(days=1)).strftime("%Y-%m-%d")
+        try:
+            recent = get_recent_alert_levels([event_date, yesterday])
+        except Exception as exc:
+            log.warning("All-clear pass skipped — alert_log fetch failed: %s", exc)
+            recent = []
+
+        alerted_recently = {
+            str(r["subscriber_id"]) for r in recent
+            if r.get("alert_level") in ("Watch", "Warning")
+        }
+        allclear_today = {
+            str(r["subscriber_id"]) for r in recent
+            if r.get("alert_level") == "All Clear"
+            and str(r.get("event_date")) == event_date
+        }
+
+        for sub, sub_id, area in no_alert_subs:
+            if sub_id in alerted_recently and sub_id not in allclear_today:
+                try:
+                    send_sms(
+                        to_number   = sub["phone"],
+                        alert_level = "All Clear",
+                        area_name   = area,
+                    )
+                    log_alert_sent(sub_id, "All Clear", event_date)
+                    all_clear_sent += 1
+                    subscriber_detail.append({
+                        "area":    area,
+                        "level":   "All Clear",
+                        "outcome": "all_clear_sent",
+                    })
+                    log.info("All-clear sent to %s (%s)", sub["phone"], area)
+                except Exception as exc:
+                    errors += 1
+                    subscriber_detail.append({
+                        "area":    area,
+                        "level":   "All Clear",
+                        "outcome": f"error: {exc}",
+                    })
+                    log.error("All-clear SMS failed for %s: %s", sub.get("phone", "?"), exc)
+            else:
+                skipped_no_alert += 1
+                subscriber_detail.append({
+                    "area":    area,
+                    "level":   "No Alert",
+                    "outcome": "skipped_no_alert",
+                })
+
     return {
         "highest_alert":    _highest(cell_alerts),
         "dispatched":       dispatched,
         "skipped_no_alert": skipped_no_alert,
         "skipped_dedup":    skipped_dedup,
+        "all_clear_sent":   all_clear_sent,
         "errors":           errors,
         "subscribers":      len(subscribers),
         "event_date":       event_date,

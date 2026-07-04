@@ -34,6 +34,8 @@ jobs:
           AT_API_KEY:     ${{ secrets.AT_API_KEY }}
           AT_SENDER_ID:   ${{ secrets.AT_SENDER_ID }}
           AT_RECIPIENTS:  ${{ secrets.AT_RECIPIENTS }}
+          SUPABASE_URL:   ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY:   ${{ secrets.SUPABASE_KEY }}
           FLOODSIGHT_API: ${{ secrets.FLOODSIGHT_API }}
         run: |
           DRY_RUN="${{ github.event.inputs.dry_run }}"

@@ -510,7 +510,8 @@ def main() -> None:
     # ------------------------------------------------------------------
     if not args.skip_gpkg:
         log.info("Writing GPKG (polygon layer — this may take ~60s) …")
-        tmp_gpkg = Path("/tmp/flood_depth_ml.gpkg")
+        import tempfile
+        tmp_gpkg = Path(tempfile.gettempdir()) / "flood_depth_ml.gpkg"
         tmp_gpkg.unlink(missing_ok=True)
         result_gdf.to_file(str(tmp_gpkg), driver="GPKG", layer="flood_depth_ml", engine="fiona")
         shutil.copy2(tmp_gpkg, OUT_GPKG)
