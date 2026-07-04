@@ -37,6 +37,19 @@ VALIDATION_POINTS: list[tuple[float, float]] = [
 ]
 _CENTRE = (6.55, 3.40)   # used for antecedent (city-level aggregate)
 
+# ── Historical dam/coastal monitoring ──────────────────────────────────────
+# Dam: Ogun at Isheri (matches live floodsight/forecast/dam.py)
+_DAM_LAT, _DAM_LON = 6.67, 3.43
+
+# Coastal: just offshore Lagos (ERA5-Ocean gives sea_level_height_msl here)
+_COAST_LAT, _COAST_LON = 6.30, 3.35
+
+# LGA tier-upgrade sets — mirror get_grid_alerts() in forecast.py
+_COASTAL_LGAS   = {"Eti-Osa", "Lagos Island", "Apapa", "Amuwo-Odofin", "Lagos Mainland"}
+_OGUN_LGAS      = {"Agege", "Ifako-Ijaiye", "Alimosho"}
+_COASTAL_UPGRADE = {"No Alert": "Watch", "Watch": "Warning", "Warning": "Warning"}
+_DAM_UPGRADE     = {"No Alert": "Watch", "Watch": "Warning", "Warning": "Warning"}
+
 # ── Documented Lagos flood events ─────────────────────────────────────────
 # Each entry is a confirmed flood event with a cited source.
 # "peak_date" is the day of peak flooding (or first day of a multi-day event).
@@ -325,7 +338,7 @@ def _fetch_era5_openmeteo(peak_date: str, retries: int = 3) -> tuple[float, floa
 
     url = (
         "https://archive-api.open-meteo.com/v1/archive"
-        f"?latitude={LAGOS_LAT}&longitude={LAGOS_LON}"
+        f"?latitude={_CENTRE[0]}&longitude={_CENTRE[1]}"
         f"&start_date={start}&end_date={end}"
         "&daily=precipitation_sum"
         "&timezone=UTC"
@@ -375,6 +388,87 @@ def _fetch_rainfall_archive(peak_date: str, retries: int = 3) -> tuple[float, fl
     return _fetch_era5_openmeteo(peak_date, retries=retries)
 
 
+def _fetch_historical_dam(peak_date: str, window_days: int = 5) -> dict | None:
+    """
+    Fetch GloFAS v4 river discharge at Isheri for [peak-window_days, peak+2d].
+    Uses the same Open-Meteo Flood API as the live dam signal, but with
+    start_date/end_date instead of forecast_days — available back to 1984.
+    Returns None on fetch failure (non-fatal).
+    """
+    from floodsight.forecast.dam import DAM_ADVISORY_M3S
+    d = date.fromisoformat(peak_date)
+    start = (d - timedelta(days=window_days)).isoformat()
+    end   = (d + timedelta(days=2)).isoformat()
+    url = (
+        "https://flood-api.open-meteo.com/v1/flood"
+        f"?latitude={_DAM_LAT}&longitude={_DAM_LON}"
+        "&daily=river_discharge"
+        f"&start_date={start}&end_date={end}"
+    )
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "FloodSight/1.0"})
+        with urllib.request.urlopen(req, timeout=25) as resp:
+            data = json.loads(resp.read())
+        flows = data["daily"]["river_discharge"]
+        dates = data["daily"]["time"]
+        valid  = [(d2, q) for d2, q in zip(dates, flows) if q is not None]
+        if not valid:
+            return None
+        peak_day, max_q = max(valid, key=lambda p: p[1])
+        result = {
+            "advisory":          bool(max_q >= DAM_ADVISORY_M3S),
+            "max_discharge_m3s": round(float(max_q), 1),
+            "peak_day":          peak_day,
+            "threshold_m3s":     DAM_ADVISORY_M3S,
+        }
+        log.debug("Hist dam %s: max=%.1f m3/s (threshold=%.0f)",
+                  peak_date, max_q, DAM_ADVISORY_M3S)
+        return result
+    except Exception as exc:
+        log.warning("Historical dam fetch failed for %s: %s", peak_date, exc)
+        return None
+
+
+def _fetch_historical_coastal(peak_date: str, window_days: int = 3) -> dict | None:
+    """
+    Fetch ERA5-Ocean hourly sea_level_height_msl at the Lagos coast for
+    [peak-1d, peak+window_days].  ERA5-Ocean covers 1940–present.
+    Uses the same Open-Meteo Marine API as the live coastal signal.
+    Returns None on fetch failure (non-fatal).
+    """
+    from floodsight.forecast.marine import COASTAL_ADVISORY_M
+    d = date.fromisoformat(peak_date)
+    start = (d - timedelta(days=1)).isoformat()
+    end   = (d + timedelta(days=window_days)).isoformat()
+    url = (
+        "https://marine-api.open-meteo.com/v1/marine"
+        f"?latitude={_COAST_LAT}&longitude={_COAST_LON}"
+        "&hourly=sea_level_height_msl"
+        "&models=era5_ocean"
+        f"&start_date={start}&end_date={end}"
+    )
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "FloodSight/1.0"})
+        with urllib.request.urlopen(req, timeout=25) as resp:
+            data = json.loads(resp.read())
+        heights = [h for h in data["hourly"].get("sea_level_height_msl", [])
+                   if h is not None]
+        if not heights:
+            return None
+        max_h = max(heights)
+        result = {
+            "advisory":       bool(max_h >= COASTAL_ADVISORY_M),
+            "max_sea_level_m": round(float(max_h), 3),
+            "threshold_m":    COASTAL_ADVISORY_M,
+        }
+        log.debug("Hist coastal %s: max=%.3f m (threshold=%.1f)",
+                  peak_date, max_h, COASTAL_ADVISORY_M)
+        return result
+    except Exception as exc:
+        log.warning("Historical coastal fetch failed for %s: %s", peak_date, exc)
+        return None
+
+
 def _describe_rain(mm: float) -> str:
     if mm < 5:   return "Barely any rain"
     if mm < 20:  return "Light shower"
@@ -407,13 +501,37 @@ def _compute_results() -> list[dict]:
         antecedent_30d = _fetch_antecedent_30d(event["peak_date"])
         log.info("  %s — 30-day antecedent: %.0f mm", event["id"], antecedent_30d)
 
-        # Count alert levels across the whole grid
+        # Historical non-rainfall signals (GloFAS dam + ERA5-Ocean coastal)
+        hist_dam     = _fetch_historical_dam(event["peak_date"])
+        hist_coastal = _fetch_historical_coastal(event["peak_date"])
+
+        coastal_active = bool(hist_coastal and hist_coastal.get("advisory"))
+        dam_active     = bool(hist_dam     and hist_dam.get("advisory"))
+        has_lga        = "lga_name" in gdf.columns
+
+        if coastal_active:
+            log.info("  %s — coastal advisory ACTIVE (%.3f m MSL)",
+                     event["id"], hist_coastal["max_sea_level_m"])
+        if dam_active:
+            log.info("  %s — dam advisory ACTIVE (%.1f m3/s)",
+                     event["id"], hist_dam["max_discharge_m3s"])
+
+        # Pre-extract LGA names for fast per-cell lookup
+        lga_list = gdf["lga_name"].tolist() if has_lga else None
+
+        # Count alert levels across the whole grid (with LGA-based tier upgrades)
         counts: dict[str, int] = {"Warning": 0, "Watch": 0, "No Alert": 0}
-        for risk_class in gdf["risk_class"]:
+        for i, risk_class in enumerate(gdf["risk_class"]):
             level = compute_alert_level(
                 risk_class, rain_24h, rain_72h,
                 antecedent_30d_mm=antecedent_30d,
             )
+            if has_lga and lga_list:
+                lga = str(lga_list[i])
+                if coastal_active and lga in _COASTAL_LGAS:
+                    level = _COASTAL_UPGRADE.get(level, level)
+                if dam_active and lga in _OGUN_LGAS:
+                    level = _DAM_UPGRADE.get(level, level)
             counts[level] = counts.get(level, 0) + 1
 
         total = len(gdf)
@@ -434,6 +552,10 @@ def _compute_results() -> list[dict]:
             "rain_24h_mm":       rain_24h,
             "rain_72h_mm":       rain_72h,
             "antecedent_30d_mm": antecedent_30d,
+            "hist_dam":          hist_dam,
+            "hist_coastal":      hist_coastal,
+            "dam_advisory":      dam_active,
+            "coastal_advisory":  coastal_active,
             "rain_24h_label": _describe_rain(rain_24h),
             "rain_72h_label": _describe_rain(rain_72h),
             "alert_counts":   counts,

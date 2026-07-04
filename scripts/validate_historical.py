@@ -86,8 +86,8 @@ def print_report(data: dict) -> None:
     events  = data["events"]
     summary = data["summary"]
 
-    col_w = [30, 13, 13, 14, 14, 8, 5]
-    header = ["Event", "24h Rain", "3-day Rain", "Reported", "FloodSight", "Correct", "%Warn"]
+    col_w = [30, 13, 13, 14, 14, 8, 5, 9]
+    header = ["Event", "24h Rain", "3-day Rain", "Reported", "FloodSight", "Correct", "%Warn", "Signals"]
     sep    = "─" * (sum(col_w) + len(col_w) * 3 + 1)
 
     print(f"\n{BOLD}FloodSight Historical Validation{RESET}")
@@ -104,7 +104,11 @@ def print_report(data: dict) -> None:
         pred    = colour_alert(r["predicted_alert"])
         correct = tick_cross(r["correct"])
         warn_pct = f"{r['warning_pct']}%"
-        row = [name, r24, r72, rep, pred, correct, warn_pct]
+        sigs = (
+            ("D" if r.get("dam_advisory") else "-") +
+            ("C" if r.get("coastal_advisory") else "-")
+        )
+        row = [name, r24, r72, rep, pred, correct, warn_pct, sigs]
         print("  ".join(v.ljust(w) for v, w in zip(row, col_w)))
 
     print(sep)
