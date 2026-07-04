@@ -23,6 +23,3 @@ h5py>=3.10
 supabase==2.7.4
 africastalking==1.2.8
 
-# P2: Africa's Talking inbound webhook posts form-encoded bodies —
-# FastAPI's Form(...) requires python-multipart at import time.
-python-multipart==0.0.9
