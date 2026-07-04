@@ -1,150 +1,152 @@
 # FloodSight — Cowork Handoff Note
 
-Please read `README.md` and `ROADMAP.md` before doing anything else. This note
-summarises where we are and exactly what to do next.
+Please read `README.md`, `ROADMAP.md`, and **`IMPROVEMENTS.md`** (the
+July 2026 prioritized review — it is the current work queue) before doing
+anything else.
+
+> This note was rewritten in July 2026. The previous version described the
+> Phase 5 state (616 rows, 3 LGAs, 30 m grid, R2=0.106) long after the repo
+> had moved to Phase 22 — exactly the docs-vs-repo drift ROADMAP.md warns
+> about. If numbers here ever disagree with the repo again, trust the repo
+> and fix this file.
 
 ---
 
 ## What this project is
 
 FloodSight is an open-data flood intelligence platform for Lagos, Nigeria.
-The pilot covers three LGAs: Eti-Osa, Lagos Island, and Kosofe.
+Coverage: **15 flood-prone LGAs city-wide on a 200 m grid (~25k cells)**
+(expanded in Phase 13 from the original 3-LGA / 30 m pilot).
 
 The codebase has five main layers:
 - **Data download** (`floodsight/download/`) — DEM, land cover, population,
   OSM, CHIRPS rainfall, Sentinel-1 SAR via Element84 / ASF / HyP3
 - **Processing** (`floodsight/processing/`) — terrain derivatives (slope,
   flow accumulation, HAND), susceptibility scoring, HAND-based depth
-- **Labeling** (`floodsight/labeling/`) — SAR-based flood extent detection
-  (FwDET), Otsu thresholding, depth estimation from SAR extent + DEM
-- **ML** (`floodsight/ml/`) — gradient-boosting depth model, now trained on
-  real labeled events (616 rows, two events)
-- **API + dashboard** (`api/`, `dashboard/`) — FastAPI backend, Leaflet
-  frontend, deployed live on Render
+- **Labeling** (`floodsight/labeling/`) — SAR flood extent (Otsu), FwDET
+  depth estimation from extent + DEM
+- **ML** (`floodsight/ml/`) — gradient-boosting depth model;
+  `floodsight/ml/train.py` is the **single canonical trainer** (grouped
+  split, provenance-aware metrics; scripts/09 delegates to it)
+- **API + dashboard + alerting** (`api/`, `dashboard/`) — FastAPI backend
+  and Leaflet frontend on Render; SMS alerts via Africa's Talking;
+  subscribers + feedback logs in Supabase
 
----
+## Current state (as of July 2026)
 
-## Current state (as of this handoff)
+| Phase | Status | Description |
+|---|---|---|
+| 0-5 | Done | Susceptibility, HAND depth, pipeline, dashboard, first real labels |
+| 13 | Done | City-wide expansion: 15 LGAs, 200 m grid |
+| 14 | Done | Spatial rainfall (GFS 9-point + IMERG observed) |
+| 16 | Done | Resident SMS subscriptions (Supabase + Africa's Talking) |
+| 17-18 | Done | SWMM drainage models (Kosofe, Alimosho, Eti-Osa), NDPR consent |
+| 21 | Done | ML depth grid under 100-yr design storm (/depth/ml-grid) |
+| 22 | Done, then **corrected** | Training data augmentation — see warning below |
+| Review fixes | **Done (July 2026)** | See IMPROVEMENTS.md items 1-7 |
+| 6 (pilot loop) | **In progress — pick up here** | Rainy-season verification + recalibration |
 
-### Completed phases
+## WARNING: Training data & metrics — read before quoting ANY accuracy number
 
-- **Phase 0:** Claims aligned with reality, risk class skew fixed
-- **Phase 1:** HAND-based physical depth (`depth_hand.py`)
-- **Phase 2 (partial):** CHIRPS rainfall pipeline working; GloFAS not tested
-- **Phase 3:** API + dashboard live on Render (auto-deploys on push to main)
-- **Phase 4:** Real labeled training dataset built — **DONE**
-- **Phase 5:** ML depth model trained on real data — **DONE**
+`data/processed/real_training_dataset.csv` (2,536 rows) is **mixed
+provenance**, tracked by the `label_source` column:
 
-### Phase 4+5 outcomes
+- 616 rows `sar_fwdet` — real SAR/FwDET-labeled observations
+  (lekki_2024_07_03: 527, lekki_2021_07_12: 89)
+- 1,920 rows `synthetic_augmented` — Phase 22 pseudo-labels: depths drawn
+  from a severity-scaled lognormal, terrain resampled from Lekki cells
 
-**Training dataset** (`data/processed/real_training_dataset.csv`) — 616 rows:
-- 527 rows: `lekki_2024_07_03` — 2024 Lekki flood, depth 0.01–1.30m,
-  rain_24h=22.54mm, rain_72h=67.54mm
-- 89 rows: `lekki_2021_07_12` — 2021 Lagos tidal surge, depth 0.012–0.262m,
-  rain_24h and rain_72h from CHIRPS (downloaded and patched in)
+The previously-quoted Phase 22 numbers (R2=0.31, MAE=0.31 m) came from a
+random row split that leaked every event into both train and test, on
+76%-synthetic data, with the bundle mislabeled `trained_on_synthetic_data:
+False`. **Do not quote them.**
 
-**Model** (`data/models/depth_model.joblib`) — GradientBoostingRegressor:
-- 300 estimators, max_depth=4, learning_rate=0.05, subsample=0.8
-- Trained on 492 rows / tested on 124 rows
-- MAE=0.130m, RMSE=0.200m, R²=0.106
-- Feature importances: slope_deg=0.308, dist_to_water_m=0.253,
-  hand_m=0.167, flow_accum=0.126, elevation_m=0.088, landcover_class=0.032,
-  population_density=0.018, rain_24h_mm=0.005, rain_72h_mm=0.003
+The canonical trainer now (a) splits by event group and (b) reports
+`metrics.holdout_real_rows_only` — performance on real-labeled held-out
+rows. That is the only externally quotable number. Check the live values
+via `GET /depth/model_info`. Expect it to be poor until more real events
+are labeled — that is the honest state, and growing the real-labeled set
+is the whole point of Phase 6.
 
-R²=0.106 is expected at this stage: only two events from the same location
-means the model is fitting terrain variation more than rainfall variation.
-R² improves once more geographically diverse events (different wards,
-different storm tracks) are added.
+To retrain (single path — do not resurrect a second trainer):
 
----
+    python -m floodsight.ml.train --data data/processed/real_training_dataset.csv
+    # or scripts/recalibrate.py --retrain (wraps the same module)
 
-## What is in progress — pick up HERE
+`scripts/09_train_flood_depth.py` (design-storm grid product) and
+`scripts/10_augment_training_data.py` (event augmentation) both delegate
+training to the canonical module and tag their rows with `label_source`
+(`swmm_synthetic` / `synthetic_augmented`). Script 10 only seeds terrain
+from real rows.
 
-**Phase 6: Pilot season + recalibration** (see ROADMAP.md §Phase 6).
+## Infrastructure changes made in the July 2026 review
 
-The core loop:
-1. Run the live system (API + alerting) through the 2025 rainy season
-   (April–October) in the 3 pilot LGAs
-2. Collect community / field verification reports for each warning issued —
-   specifically: was the warned area actually flooded? depth estimate
-   reasonable?
-3. Use that feedback to:
-   a. **Recalibrate susceptibility weights** — the v0 weights
-      (`SUSCEPTIBILITY_WEIGHTS` in `floodsight/config.py`) were set from
-      the README heuristics, not ground truth. Compare flagged vs. verified
-      flood locations and adjust the weight vector.
-   b. **Retrain the ML model** — add the new labeled events from the pilot
-      season to `data/processed/real_training_dataset.csv` (same format as
-      the 616 rows already there) and re-run:
-      `python -m floodsight.ml.train --data data/processed/real_training_dataset.csv`
-   c. **Fix false-positive / false-negative hot spots** — cells that
-      trigger warnings but never flood (lower susceptibility weight or add
-      exclusion mask), or cells that flood but aren't warned (increase
-      sensitivity for that HAND tier).
-4. Target: after ≥ one full season and ≥ 3 new labeled events, R² should
-   be above 0.4 and the ±0.3m accuracy claim in the pitch deck becomes
-   defensible.
+- **Feedback logs persist in Supabase** (`prediction_log`, `verifications`,
+  `dispatch_cells`) — run `scripts/sql/03_logs.sql` in the Supabase SQL
+  editor once. Local JSONL under `data/logs/` is a dev-only fallback;
+  Render's disk is EPHEMERAL and is wiped on every deploy.
+- **Dispatch snapshots**: every `/alerts/dispatch` run records the
+  Watch/Warning cells for that Lagos date. `scripts/recalibrate.py
+  --analyse` computes FP/FN against this snapshot (matched by event_date +
+  location), not against dashboard clicks.
+- **Auth**: `DELETE /subscribe/{phone}`, `POST /verify`,
+  `GET /depth/predictions_log`, and verification entries now require
+  bearer secrets (`DISPATCH_SECRET`; `VERIFY_SECRET` optionally for field
+  partners). Set both in Render. Comparison is constant-time (`api/auth.py`).
+- **SMS templates** fit one GSM-7 segment and always end with the STOP
+  opt-out (tests: `tests/test_sms_and_training.py`).
+- Keep-alive workflow pings `/health` instead of recomputing the full
+  alert grid every 14 minutes.
 
-**Concrete next step:**
-Instrument the API to log every `/depth/predict` call with timestamp, grid
-cell ID, predicted depth, and alert level. Store logs in
-`data/logs/predictions.jsonl` (append-only). After each flood event during
-the rainy season, add a verification column (field-confirmed depth or
-boolean flooded/not-flooded) and use `build_event_training_rows.py` (extend
-`build_2021_training_rows.py` to accept any event date + depth raster) to
-grow the dataset.
+## What to do next — Phase 6 pilot loop
 
----
+1. Run the live system through the rainy season (April-October) across the
+   15 LGAs.
+2. After each event, field partners submit `POST /verify` (with
+   VERIFY_SECRET) for warned and unwarned locations.
+3. `python scripts/recalibrate.py --analyse` -> FP/FN vs dispatched alerts.
+4. Label new events properly (SAR + FwDET via `floodsight/labeling/`,
+   rows tagged `label_source="sar_fwdet"`), append via
+   `scripts/build_event_training_rows.py`, then `--retrain`.
+5. Recalibrate `SUSCEPTIBILITY_WEIGHTS` (floodsight/config.py) from
+   verified vs flagged locations.
+6. The +/-0.3 m deck claim stays retired until
+   `metrics.holdout_real_rows_only` supports it on >=3 held-out real events.
 
-## SAR data source chain (important — Planetary Computer is dead for this)
+Then work down IMPROVEMENTS.md P2 (dam-release/tidal drivers, all-clear
+SMS, OTP subscribe + STOP webhook, briefing->subscriber unification,
+inbound SMS verification) and P3.
 
-`floodsight/labeling/sar_extent.py` was rewritten in Phase 4. The source
-chain for Sentinel-1 SAR VV data is now:
+## SAR data source chain (unchanged — Planetary Computer is dead for this)
 
-1. **Element84 Earth Search v1** (`sentinel-1-grd` collection) — discovers
-   scenes by date + AOI. Asset URLs are `s3://sentinel-s1-l1c/...`
-   (requester-pays), so direct download fails.
-2. **ASF fallback** — for each Element84 scene, `_download_vv_via_asf()`
-   searches ASF using `absoluteOrbit` + `intersectsWith` (AOI bbox WKT) +
-   a ±5min/+30min time window around the scene's start timestamp. This
-   finds the right geographic segment even though Element84 scene IDs
-   don't match ASF's CMR catalog names.
-3. **HyP3 RTC fallback** — if ASF direct download fails (auth or missing
-   scene), `_water_mask_from_element84_item()` submits an RTC job via
-   HyP3 SDK and downloads the calibrated sigma0 GeoTiff. The HyP3 output
-   zip name differs from the input scene name; detection uses the shared
-   start timestamp (`scene_name.split("_")[4]`).
+`floodsight/labeling/sar_extent.py` source chain for Sentinel-1 VV:
 
-**One-time setup required for ASF downloads:**
-The Earthdata account must pre-authorize the ASF Cumulus app — visit once:
-`https://urs.earthdata.nasa.gov/approve_app?client_id=BO_n7nTIlMljdvU6kRRB3g`
+1. **Element84 Earth Search v1** (`sentinel-1-grd`) — scene discovery by
+   date + AOI (asset URLs are requester-pays; direct download fails).
+2. **ASF fallback** — `_download_vv_via_asf()` matches by absoluteOrbit +
+   AOI WKT + time window.
+3. **HyP3 RTC fallback** — submits an RTC job and downloads calibrated
+   sigma0; output matched on the shared start timestamp.
 
-**Cached SAR files** (large, in `.gitignore`):
-- `data/raw/sentinel1/cache/*20210630T180159*_VV.tif` (HyP3 pre-event 2021)
-- `data/raw/sentinel1/cache/*20210712T180159*_VV.tif` (HyP3 during-event 2021)
-- `data/raw/sentinel1/flood_extent_20210710.tif` (2021 flood extent mask)
-- `data/processed/depth_lekki_20210712.tif` (FwDET depth raster, 2021)
-- `data/raw/sentinel1/flood_extent_20240704.tif` (2024 flood extent mask)
-
----
+One-time setup: pre-authorize the ASF Cumulus app with your Earthdata
+account: `https://urs.earthdata.nasa.gov/approve_app?client_id=BO_n7nTIlMljdvU6kRRB3g`
 
 ## Known issues / caveats
 
 1. **Copernicus DEM GLO-30 is a DSM** — rooftop heights inflate slope/HAND
-   in dense urban cells. Documented in `floodsight/processing/depth_hand.py`.
-2. **HAND is NaN for ~5,149 cells** — ~3,952 are confirmed lagoon/creek;
-   ~1,197 are DEM conditioning edge effects. Imputed to 0 in training data.
-3. **R²=0.106** — low but expected. Two events from the same location means
-   terrain dominates. More diverse events will fix this.
-4. **Rainfall features have near-zero importance** (rain_24h=0.005,
-   rain_72h=0.003) — because both events have similar CHIRPS totals. As
-   events from different storm tracks are added, this will flip.
-5. **2024 SAR "during" scene (July 3) was pre-peak** — the real flood peak
-   was July 4. rain_24h/72h for 2024 rows are conservative.
-6. **SAR water threshold** uses Otsu's method (per-scene automatic) —
-   confirmed working: -10.51 dB (2021-06-30), -10.73 dB (2021-07-12).
-
----
+   in dense urban cells (documented in `depth_hand.py`).
+2. **HAND is NaN for lagoon/creek + DEM edge cells** — imputed with the
+   training-set median, which is saved in the model bundle and reused at
+   serving time (`hand_impute_median`).
+3. **Rainfall feature importance is still low** — the real events span too
+   few storm tracks; only more real labeled events fix this.
+4. **2024 SAR "during" scene (July 3) was pre-peak** (peak July 4) —
+   rain features for those rows are conservative.
+5. **Dam-release and tidal floods are undetectable by rainfall alone**
+   (2 of 8 back-test misses) — see IMPROVEMENTS.md item 8.
+6. **`POST /subscribe` upsert is still unverified** — an attacker who knows
+   a phone number can move that subscriber's location. OTP confirmation is
+   IMPROVEMENTS.md item 10.
 
 ## Environment
 
@@ -152,19 +154,9 @@ The Earthdata account must pre-authorize the ASF Cumulus app — visit once:
 - Activate: `conda activate floodsight`
 - Run from project root: `cd C:\Users\User\Downloads\floodsight-starter\floodsight-starter`
 - Credentials: `.env` in project root (NASA Earthdata + Africa's Talking)
+- Render env vars: SUPABASE_URL, SUPABASE_KEY, AT_*, DISPATCH_SECRET,
+  VERIFY_SECRET (new)
 - API locally: `uvicorn api.main:app --reload --port 8080`
 - Live deployment: Render (auto-deploys on push to GitHub main)
-
----
-
-## Roadmap phases reference
-
-| Phase | Status | Description |
-|---|---|---|
-| 0 | Done | Align claims with reality, fix risk class skew |
-| 1 | Done | HAND-based physical depth |
-| 2 | Partial | CHIRPS working; GloFAS not tested |
-| 3 | Done | API + dashboard live on Render |
-| 4 | **Done** | Real labeled training dataset (616 rows, 2 events) |
-| 5 | **Done** | ML depth model trained on real data (MAE=0.130m) |
-| 6 | **In progress** | Pilot season + recalibration — see above |
+- Tests: `pytest tests/ -v` (now also covers SMS encoding, trainer
+  provenance, phone normalization)

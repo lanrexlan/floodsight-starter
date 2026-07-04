@@ -15,9 +15,10 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, field_validator
 
+from api.auth import require_dispatch_secret
 from api.data_provider import nearest_cell
 from floodsight.db.supabase_client import (
     add_subscriber,
@@ -267,15 +268,24 @@ def alert_history(limit: int = 20):
 # ---------------------------------------------------------------------------
 
 @router.delete("/subscribe/{phone}")
-def unsubscribe(phone: str):
+def unsubscribe(phone: str, request: Request):
     """
     Deactivate a subscriber by phone number.
-    Africa's Talking STOP keyword also triggers deactivation via webhook.
+
+    Operator-only: requires ``Authorization: Bearer <DISPATCH_SECRET>``.
+    This endpoint was previously unauthenticated, which let anyone on the
+    internet unsubscribe any resident from flood warnings by guessing or
+    enumerating phone numbers — unacceptable for a life-safety system.
+
+    Residents self-unsubscribe by replying STOP to any alert SMS (inbound
+    webhook pending — IMPROVEMENTS.md item 10).
 
     Response::
 
         {"status": "unsubscribed", "phone": "+2348012345678"}
     """
+    require_dispatch_secret(request)
+
     try:
         norm  = normalize_phone(phone)
         found = deactivate_subscriber(norm)

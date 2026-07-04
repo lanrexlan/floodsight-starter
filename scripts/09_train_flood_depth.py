@@ -56,6 +56,7 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 ROOT      = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))  # make `floodsight` importable when run directly
 DATA      = ROOT / "data"
 PROCESSED = DATA / "processed"
 MODELS    = DATA / "models"
@@ -129,8 +130,14 @@ def load_historical(path: Path) -> pd.DataFrame:
         "Historical data loaded: %d rows | depth range %.3f – %.3f m",
         len(df), df[TARGET].min(), df[TARGET].max(),
     )
-    # Keep only model features + target; drop event metadata
-    return df[FEATURES + [TARGET]].copy()
+    # Keep features + target + provenance/grouping metadata — the canonical
+    # trainer uses event_name for the grouped split and label_source for
+    # honest real-vs-synthetic metric reporting.
+    keep = FEATURES + [TARGET]
+    for meta_col in ("event_name", "label_source"):
+        if meta_col in df.columns:
+            keep.append(meta_col)
+    return df[keep].copy()
 
 
 # ---------------------------------------------------------------------------
@@ -220,6 +227,12 @@ def build_swmm_samples(
             "rain_24h_mm":        rain24,
             "rain_72h_mm":        rain72,
             TARGET:               depth,
+            # Provenance: these depths are drawn from a lognormal calibrated
+            # to SWMM flood classes — simulation-derived pseudo-labels, NOT
+            # observed. The canonical trainer excludes them from the honest
+            # (real-rows-only) metric.
+            "event_name":         "swmm_design_storm",
+            "label_source":       "swmm_synthetic",
         })
 
     df_swmm = pd.DataFrame(rows)
@@ -236,60 +249,20 @@ def build_swmm_samples(
 
 def train(df: pd.DataFrame) -> tuple:
     """
-    Train a GradientBoostingRegressor on df.
-    Returns (fitted_model, metrics_dict, hand_impute_median).
+    Train via the CANONICAL trainer (floodsight/ml/train.py).
+
+    This script previously contained its own diverged copy of the training
+    logic (different hyperparameters, different bundle keys, a random
+    row-wise split that leaked events between train and test). It now
+    delegates so there is exactly one training code path.
+
+    Returns (fitted_model, metrics_dict, hand_impute_median) for backward
+    compatibility with the rest of this script.
     """
-    log.info("Training on %d samples with %d features …", len(df), len(FEATURES))
+    from floodsight.ml.train import train_model
 
-    X = df[FEATURES].copy()
-    y = df[TARGET].values
-
-    # Impute NaN in hand_m with the column median
-    # (some grid cells on ridges have no HAND value)
-    hand_median = float(X["hand_m"].median())
-    X["hand_m"] = X["hand_m"].fillna(hand_median)
-    log.info("hand_m imputed with median = %.2f m", hand_median)
-
-    X_tr, X_te, y_tr, y_te = train_test_split(
-        X.values, y, test_size=0.20, random_state=42
-    )
-
-    model = GradientBoostingRegressor(
-        n_estimators=300,
-        learning_rate=0.08,
-        max_depth=5,
-        min_samples_leaf=8,
-        subsample=0.8,
-        random_state=42,
-    )
-    model.fit(X_tr, y_tr)
-
-    y_pred = np.clip(model.predict(X_te), 0.0, None)
-    rmse = float(np.sqrt(mean_squared_error(y_te, y_pred)))
-    mae  = float(mean_absolute_error(y_te, y_pred))
-    r2   = float(r2_score(y_te, y_pred))
-
-    log.info(
-        "Hold-out (20%%)  RMSE=%.4f m  MAE=%.4f m  R²=%.4f", rmse, mae, r2
-    )
-
-    importances = {
-        feat: round(float(imp), 4)
-        for feat, imp in zip(FEATURES, model.feature_importances_)
-    }
-    top5 = sorted(importances.items(), key=lambda x: -x[1])[:5]
-    log.info("Top-5 features: %s", top5)
-
-    metrics = {
-        "n_train":               int(len(X_tr)),
-        "n_test":                int(len(X_te)),
-        "rmse_m":                round(rmse, 4),
-        "mae_m":                 round(mae, 4),
-        "r2":                    round(r2, 4),
-        "trained_on_synthetic_data": False,
-        "hand_impute_median_m":  round(hand_median, 3),
-        "feature_importance":    importances,
-    }
+    model, metrics = train_model(df, is_synthetic=False)
+    hand_median = float(metrics.get("hand_impute_median_m", 0.0))
     return model, metrics, hand_median
 
 
@@ -494,17 +467,11 @@ def main() -> None:
     model, metrics, hand_median = train(df_train)
 
     # ------------------------------------------------------------------
-    # 5. Save model (compatible with floodsight/ml/predict.py)
+    # 5. Save model via the canonical trainer's bundle format
     # ------------------------------------------------------------------
-    bundle = {
-        "model":               model,
-        "features":            FEATURES,
-        "target":              TARGET,
-        "hand_impute_median":  hand_median,
-        "metrics":             metrics,
-    }
-    joblib.dump(bundle, MODEL_PATH)
-    log.info("Model saved → %s", MODEL_PATH)
+    from floodsight.ml.train import save_model
+
+    save_model(model, metrics, path=MODEL_PATH)
 
     # ------------------------------------------------------------------
     # 6. Predict on full grid

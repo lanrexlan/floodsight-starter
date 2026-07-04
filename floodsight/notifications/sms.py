@@ -2,7 +2,7 @@
 SMS alert sender for FloodSight — Africa's Talking.
 
 Africa's Talking has direct connections to MTN, Airtel, Glo, and 9mobile
-and is ~10× cheaper than Twilio for Nigerian SMS delivery.
+and is ~10x cheaper than Twilio for Nigerian SMS delivery.
 
 Environment variables required (set in Render dashboard):
     AT_USERNAME   — your Africa's Talking username (use 'sandbox' for testing)
@@ -14,12 +14,18 @@ If any required env var is missing, send_sms() raises RuntimeError.
 All other exceptions (AT API errors) are propagated so dispatch.py can log
 them and count failed sends.
 
-Message guidelines
-------------------
-- Keep under 160 characters to avoid split-billing (GSM-7 encoding).
-- Include area name so recipients know the message is relevant to them.
-- Always include a STOP opt-out instruction.
-- Use a clear, calm tone — panic phrasing is counterproductive.
+Message guidelines (enforced by _build_message, tested in tests/)
+------------------------------------------------------------------
+- <=160 chars in GSM-7 so every alert bills as ONE segment. The previous
+  template was 178 chars with a typical area name; the trim cut the
+  "Reply STOP" opt-out (an NDPR compliance problem) and appended a U+2026
+  ellipsis — a non-GSM-7 character that silently switched the whole
+  message to UCS-2 encoding, splitting it into 3 billed segments.
+- The opt-out instruction is composed LAST and is never truncated;
+  the details section shrinks instead.
+- GSM-7-safe characters only (no em dashes, no Unicode ellipsis).
+- Include the area name so recipients know the message is relevant.
+- Clear, calm tone — panic phrasing is counterproductive.
 """
 
 from __future__ import annotations
@@ -28,8 +34,27 @@ import logging
 
 log = logging.getLogger(__name__)
 
-# Max SMS length before split-billing kicks in (GSM-7 encoding)
+# Max SMS length for a single segment (GSM-7 encoding)
 _MAX_CHARS = 160
+
+# Opt-out suffix — REQUIRED on every message, never truncated.
+_STOP_SUFFIX = " Reply STOP to opt out"
+
+# Basic GSM-7 alphabet (plus extension chars we allow). Anything outside
+# this set forces UCS-2 encoding for the WHOLE message -> 70-char segments.
+_GSM7 = set(
+    "@£$¥èéùìòÇ\nØø\rÅå"
+    "Δ_ΦΓΛΩΠΨΣΘΞ"
+    "ÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?"
+    "¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§"
+    "¿abcdefghijklmnopqrstuvwxyzäöñüà"
+    "^{}\\[~]|€"
+)
+
+
+def is_gsm7(text: str) -> bool:
+    """True if every character fits the GSM-7 alphabet (single-segment safe)."""
+    return all(ch in _GSM7 for ch in text)
 
 
 # ---------------------------------------------------------------------------
@@ -37,24 +62,48 @@ _MAX_CHARS = 160
 # ---------------------------------------------------------------------------
 
 def _build_message(alert_level: str, area_name: str | None) -> str:
-    area = area_name or "your area"
+    """
+    Compose an alert SMS that is guaranteed to:
+      1. end with the STOP opt-out instruction (never truncated),
+      2. fit in one GSM-7 segment (<=160 chars),
+      3. contain only GSM-7 characters.
+
+    If the message would exceed 160 chars, the safety advice is kept and
+    the map URL dropped first; pathological area names are word-trimmed.
+    The opt-out suffix always stays.
+    """
+    area = (area_name or "your area").strip()
 
     if alert_level == "Warning":
-        msg = (
-            f"FloodSight Lagos ALERT: Flood Warning issued for {area}. "
-            "Avoid low-lying roads. Seek higher ground if needed. "
-            "Details: rankineinnovationlab.com/floodsight | Reply STOP to opt out"
-        )
+        head   = f"FloodSight ALERT: Flood Warning for {area}."
+        detail = " Avoid low roads. Move to higher ground if needed."
+    elif alert_level == "All Clear":
+        head   = f"FloodSight: All clear for {area}."
+        detail = " Flood alert has ended. Stay careful near drains and canals."
     else:  # Watch
-        msg = (
-            f"FloodSight Lagos: Flood Watch for {area}. "
-            "Heavy rain expected — avoid flood-prone streets. "
-            "Track live: rankineinnovationlab.com/floodsight | Reply STOP to opt out"
-        )
+        head   = f"FloodSight: Flood Watch for {area}."
+        detail = " Heavy rain expected - avoid flood-prone streets."
 
-    # Trim to 160 chars without cutting mid-word
-    if len(msg) > _MAX_CHARS:
-        msg = msg[:_MAX_CHARS - 1].rsplit(" ", 1)[0] + "…"
+    url = " Map: rankineinnovationlab.com/floodsight"
+
+    budget = _MAX_CHARS - len(_STOP_SUFFIX)
+
+    # Add optional parts only while they fit: safety advice first, URL last.
+    msg = head
+    if len(msg + detail) <= budget:
+        msg += detail
+    if len(msg + url) <= budget:
+        msg += url
+    if len(msg) > budget:
+        # Extreme area names: hard-trim at a word boundary
+        msg = msg[:budget].rsplit(" ", 1)[0]
+
+    msg = msg + _STOP_SUFFIX
+
+    # Belt and braces — a non-GSM-7 char would triple the billing
+    if not is_gsm7(msg):
+        msg = "".join(ch if ch in _GSM7 else "?" for ch in msg)
+        log.warning("Non-GSM-7 characters replaced in SMS body: %r", msg)
 
     return msg
 
@@ -63,6 +112,24 @@ def _build_message(alert_level: str, area_name: str | None) -> str:
 # Africa's Talking sender
 # ---------------------------------------------------------------------------
 
+def send_otp(to_number: str, code: str) -> None:
+    """
+    Send a subscription confirmation code (REQUIRE_OTP flow).
+
+    Kept intentionally terse: single GSM-7 segment, no links (links in an
+    unexpected first-contact SMS look like phishing).
+    """
+    from floodsight.notifications.africastalking import send_sms as _at_send
+
+    body = (
+        f"FloodSight code: {code}. "
+        "Enter it to confirm your flood alert subscription. "
+        "Not you? Ignore this message."
+    )
+    _at_send(message=body, recipients=[to_number])
+    log.info("OTP sent to %s", to_number)
+
+
 def send_sms(to_number: str, alert_level: str, area_name: str | None = None) -> None:
     """
     Send a flood alert SMS via Africa's Talking.
@@ -70,7 +137,7 @@ def send_sms(to_number: str, alert_level: str, area_name: str | None = None) -> 
     Parameters
     ----------
     to_number   : E.164 recipient number, e.g. +2348012345678
-    alert_level : "Watch" or "Warning"
+    alert_level : "Watch", "Warning", or "All Clear"
     area_name   : human-readable location name (optional but recommended)
 
     Raises
@@ -80,7 +147,7 @@ def send_sms(to_number: str, alert_level: str, area_name: str | None = None) -> 
     from floodsight.notifications.africastalking import send_sms as _at_send
 
     body = _build_message(alert_level, area_name)
-    log.debug("SMS → %s | %s | %d chars", to_number, alert_level, len(body))
+    log.debug("SMS -> %s | %s | %d chars", to_number, alert_level, len(body))
 
     _at_send(message=body, recipients=[to_number])
 

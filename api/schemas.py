@@ -39,6 +39,10 @@ class DepthPredictionResponse(BaseModel):
 
     predicted_depth_m: float
     model_trained_on_synthetic_data: bool
+    # Fraction of training labels that are synthetic/pseudo-labeled
+    # (SWMM- or severity-model-derived rather than SAR/FwDET-observed).
+    # None only for old bundles that predate provenance tracking.
+    synthetic_label_fraction: float | None = None
     note: str | None = None
 
 

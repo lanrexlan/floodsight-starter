@@ -6,8 +6,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 
+from api.auth import require_dispatch_secret
 from api.schemas import DepthPredictionRequest, DepthPredictionResponse
 from floodsight.config import DATA_DIR, ML_MODEL_PATH
 
@@ -19,9 +20,14 @@ PREDICTIONS_LOG = LOGS_DIR / "predictions.jsonl"
 
 
 def _log_prediction(req: DepthPredictionRequest, predicted_depth_m: float) -> None:
-    """Append one prediction to the JSONL log (fire-and-forget, non-fatal)."""
+    """
+    Persist one prediction (fire-and-forget, non-fatal).
+
+    Writes to Supabase (survives Render deploys/restarts); falls back to a
+    local JSONL file when Supabase is not configured (local dev only —
+    Render's disk is ephemeral, so the JSONL fallback is NOT durable there).
+    """
     try:
-        LOGS_DIR.mkdir(parents=True, exist_ok=True)
         entry = {
             "ts": datetime.now(timezone.utc).isoformat(),
             "lat": req.lat,
@@ -40,6 +46,17 @@ def _log_prediction(req: DepthPredictionRequest, predicted_depth_m: float) -> No
             },
             "predicted_depth_m": predicted_depth_m,
         }
+        try:
+            from floodsight.db.supabase_client import log_prediction
+
+            log_prediction(entry)
+            return
+        except RuntimeError:
+            pass  # Supabase not configured — local JSONL fallback below
+        except Exception as exc:
+            log.warning("Supabase prediction log failed (%s) — JSONL fallback", exc)
+
+        LOGS_DIR.mkdir(parents=True, exist_ok=True)
         with open(PREDICTIONS_LOG, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry) + "\n")
     except Exception as exc:  # never crash the API over logging
@@ -62,18 +79,32 @@ def predict_depth(req: DepthPredictionRequest):
 
     depth = predict_fn(req.model_dump())
     meta = model_metadata()
-    note = (
-        "Model trained on SYNTHETIC data — this number is for pipeline "
-        "testing only, not a real depth estimate."
-        if meta["metrics"].get("trained_on_synthetic_data")
-        else None
-    )
+
+    prov = meta.get("label_provenance") or {}
+    synth_frac = prov.get("synthetic_fraction")
+
+    if meta["metrics"].get("trained_on_synthetic_data"):
+        note = (
+            "Model trained on SYNTHETIC data — this number is for pipeline "
+            "testing only, not a real depth estimate."
+        )
+    elif synth_frac and synth_frac > 0:
+        note = (
+            f"Model trained on mixed-provenance labels: "
+            f"{prov.get('real_rows', '?')} SAR/FwDET-observed rows and "
+            f"{prov.get('synthetic_rows', '?')} synthetic/pseudo-labeled rows "
+            f"({synth_frac:.0%} synthetic). Treat depth as indicative, not "
+            f"validated — see metrics.holdout_real_rows_only in /depth/model_info."
+        )
+    else:
+        note = None
 
     _log_prediction(req, depth)
 
     return DepthPredictionResponse(
         predicted_depth_m=round(depth, 3),
         model_trained_on_synthetic_data=bool(meta["metrics"].get("trained_on_synthetic_data")),
+        synthetic_label_fraction=synth_frac,
         note=note,
     )
 
@@ -88,14 +119,32 @@ def model_info():
 
 
 @router.get("/predictions_log")
-def predictions_log(limit: int = 100):
-    """Return the most recent prediction log entries (newest first)."""
+def predictions_log(request: Request, limit: int = 100):
+    """
+    Return the most recent prediction log entries (newest first).
+
+    Operator-only: requires ``Authorization: Bearer <DISPATCH_SECRET>``
+    (was previously public).
+    """
+    require_dispatch_secret(request)
+
+    # Supabase first; JSONL fallback for local dev
+    try:
+        from floodsight.db.supabase_client import get_predictions
+
+        entries = get_predictions(limit=limit)
+        return {"entries": entries, "total": len(entries), "data_source": "supabase"}
+    except RuntimeError:
+        pass
+    except Exception as exc:
+        log.warning("Supabase predictions read failed (%s) — JSONL fallback", exc)
+
     if not PREDICTIONS_LOG.exists():
-        return {"entries": [], "total": 0}
+        return {"entries": [], "total": 0, "data_source": "local_jsonl"}
     lines = PREDICTIONS_LOG.read_text(encoding="utf-8").splitlines()
     entries = [json.loads(ln) for ln in lines if ln.strip()]
     entries.reverse()
-    return {"entries": entries[:limit], "total": len(entries)}
+    return {"entries": entries[:limit], "total": len(entries), "data_source": "local_jsonl"}
 
 
 # ---------------------------------------------------------------------------

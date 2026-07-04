@@ -158,6 +158,36 @@ def get_subscriber_count() -> int:
     return result.count or 0
 
 
+def get_subscriber_by_phone(phone: str) -> dict[str, Any] | None:
+    """Return the subscriber row for a phone number (active or not)."""
+    client = _get_client()
+    phone  = normalize_phone(phone)
+    result = (
+        client.table("subscribers")
+        .select("id, name, phone, lat, lon, area_name, risk_class, active")
+        .eq("phone", phone)
+        .limit(1)
+        .execute()
+    )
+    rows = result.data or []
+    return rows[0] if rows else None
+
+
+def reactivate_subscriber(phone: str) -> bool:
+    """Set active=TRUE for a phone number (START / re-subscribe keyword)."""
+    client = _get_client()
+    phone  = normalize_phone(phone)
+    result = (
+        client.table("subscribers")
+        .update({"active": True})
+        .eq("phone", phone)
+        .execute()
+    )
+    updated = result.data or []
+    log.info("Reactivated %d subscriber(s) for %s", len(updated), phone)
+    return len(updated) > 0
+
+
 def deactivate_subscriber(phone: str) -> bool:
     """Set active=FALSE for a phone number (STOP / unsubscribe)."""
     client = _get_client()
@@ -218,6 +248,160 @@ def log_alert_sent(subscriber_id: str, alert_level: str, event_date: str) -> Non
                       subscriber_id, alert_level, event_date)
         else:
             raise
+
+
+def get_recent_alert_levels(event_dates: list[str]) -> list[dict[str, Any]]:
+    """
+    alert_log rows for the given Lagos event dates. Used by the all-clear
+    pass in /alerts/dispatch: a subscriber who received Watch/Warning
+    recently and whose cell is now quiet gets one stand-down SMS.
+    """
+    client = _get_client()
+    result = (
+        client.table("alert_log")
+        .select("subscriber_id, alert_level, event_date")
+        .in_("event_date", event_dates)
+        .execute()
+    )
+    return result.data or []
+
+
+# ---------------------------------------------------------------------------
+# OTP-confirmed subscriptions (REQUIRE_OTP=true) — pending_subscriptions
+# ---------------------------------------------------------------------------
+
+def create_pending_subscription(
+    phone: str, code_hash: str, payload: dict[str, Any], expires_at: str
+) -> None:
+    """Upsert the pending OTP row for a phone (re-requesting replaces it)."""
+    client = _get_client()
+    client.table("pending_subscriptions").upsert(
+        {
+            "phone":      phone,
+            "code_hash":  code_hash,
+            "payload":    payload,
+            "attempts":   0,
+            "expires_at": expires_at,
+        },
+        on_conflict="phone",
+    ).execute()
+
+
+def get_pending_subscription(phone: str) -> dict[str, Any] | None:
+    client = _get_client()
+    result = (
+        client.table("pending_subscriptions")
+        .select("*")
+        .eq("phone", phone)
+        .limit(1)
+        .execute()
+    )
+    rows = result.data or []
+    return rows[0] if rows else None
+
+
+def bump_pending_attempts(phone: str, attempts: int) -> None:
+    client = _get_client()
+    client.table("pending_subscriptions").update(
+        {"attempts": attempts}
+    ).eq("phone", phone).execute()
+
+
+def delete_pending_subscription(phone: str) -> None:
+    client = _get_client()
+    client.table("pending_subscriptions").delete().eq("phone", phone).execute()
+
+
+# ---------------------------------------------------------------------------
+# Feedback-loop logs (Phase 6) — predictions, verifications, dispatch cells
+#
+# These previously lived in data/logs/*.jsonl on Render's EPHEMERAL disk and
+# were wiped on every deploy/restart, silently destroying the recalibration
+# feedback loop. They now persist in Supabase (schema:
+# scripts/sql/03_logs.sql). Callers fall back to local JSONL when Supabase
+# is not configured (local dev).
+# ---------------------------------------------------------------------------
+
+def log_prediction(entry: dict[str, Any]) -> None:
+    """Insert one /depth/predict call record into prediction_log."""
+    client = _get_client()
+    client.table("prediction_log").insert(entry).execute()
+
+
+def get_predictions(limit: int = 1000) -> list[dict[str, Any]]:
+    """Most recent prediction_log rows, newest first."""
+    client = _get_client()
+    result = (
+        client.table("prediction_log")
+        .select("*")
+        .order("ts", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return result.data or []
+
+
+def add_verification(entry: dict[str, Any]) -> None:
+    """Insert one field verification report."""
+    client = _get_client()
+    client.table("verifications").insert(entry).execute()
+
+
+def get_verifications(limit: int = 5000) -> list[dict[str, Any]]:
+    """All verification reports, newest first."""
+    client = _get_client()
+    result = (
+        client.table("verifications")
+        .select("*")
+        .order("ts", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return result.data or []
+
+
+def log_dispatch_cells(event_date: str, cells: list[dict[str, Any]]) -> int:
+    """
+    Snapshot the grid cells that were at Watch/Warning when a dispatch ran.
+
+    This is what recalibration must compare field verifications against —
+    what the system *dispatched*, not what someone clicked on the dashboard.
+
+    Upserts on (event_date, cell_id) so an hourly cron only records each
+    cell once per day (last write wins — the level reflects the most
+    recent dispatch run). Inserts in chunks to stay under request limits.
+
+    Returns the number of rows sent.
+    """
+    client = _get_client()
+    sent = 0
+    CHUNK = 500
+    for i in range(0, len(cells), CHUNK):
+        chunk = [
+            {
+                "event_date":  event_date,
+                "cell_id":     str(c["cell_id"]),
+                "lat":         c["lat"],
+                "lon":         c["lon"],
+                "alert_level": c["alert_level"],
+            }
+            for c in cells[i : i + CHUNK]
+        ]
+        client.table("dispatch_cells").upsert(
+            chunk, on_conflict="event_date,cell_id"
+        ).execute()
+        sent += len(chunk)
+    return sent
+
+
+def get_dispatch_cells(event_date: str | None = None) -> list[dict[str, Any]]:
+    """Dispatch cell snapshots, optionally filtered to one event date."""
+    client = _get_client()
+    q = client.table("dispatch_cells").select("*")
+    if event_date:
+        q = q.eq("event_date", event_date)
+    result = q.limit(50000).execute()
+    return result.data or []
 
 
 # ---------------------------------------------------------------------------

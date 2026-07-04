@@ -19,9 +19,11 @@ jobs:
       - name: Ping API
         run: |
           echo "Pinging FloodSight API..."
+          # /health is a no-op endpoint — /forecast/summary (used previously)
+          # recomputed alert levels over ~25k grid cells every 14 minutes.
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             --max-time 60 \
-            https://floodsight-starter.onrender.com/forecast/summary)
+            https://floodsight-starter.onrender.com/health)
           echo "HTTP status: $STATUS"
           if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 500 ]; then
             echo "API is alive."

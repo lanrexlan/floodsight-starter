@@ -2,11 +2,24 @@
 Phase 6 recalibration script.
 
 Does two things:
-  1. Retrains the ML depth model on the current real_training_dataset.csv.
-  2. Analyses the verification log (data/logs/verifications.jsonl) against
-     the prediction log (data/logs/predictions.jsonl) to compute
-     false-positive and false-negative rates, and flags cells that are
+  1. Retrains the ML depth model on the current real_training_dataset.csv
+     (via the canonical trainer, floodsight/ml/train.py — grouped split,
+     provenance-aware metrics).
+  2. Analyses field verifications against the DISPATCH CELL SNAPSHOT —
+     the Watch/Warning cells the system actually alerted on (recorded by
+     /alerts/dispatch into Supabase `dispatch_cells`) — to compute
+     false-positive and false-negative rates and flag cells that are
      systematically wrong.
+
+     The old behaviour (matching verifications against /depth/predict
+     calls, i.e. dashboard clicks, with no event-date check) measured the
+     wrong thing and is kept only as a clearly-labelled fallback for
+     event dates that predate dispatch snapshotting.
+
+Data sources (preferred -> fallback):
+  verifications : Supabase `verifications`  -> data/logs/verifications.jsonl
+  dispatches    : Supabase `dispatch_cells` -> (none)
+  predictions   : Supabase `prediction_log` -> data/logs/predictions.jsonl
 
 Usage (from project root, conda activate floodsight):
 
@@ -33,12 +46,15 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+# Make `floodsight` importable when the script is run directly
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 DATA_DIR       = Path("data")
 LOGS_DIR       = DATA_DIR / "logs"
 TRAIN_CSV      = DATA_DIR / "processed" / "real_training_dataset.csv"
 PRED_LOG       = LOGS_DIR / "predictions.jsonl"
 VERIFY_LOG     = LOGS_DIR / "verifications.jsonl"
-MATCH_RADIUS_M = 100   # metres — max distance to match a prediction to a verification
+MATCH_RADIUS_M = 100   # metres — max distance to match a verification to an alerted cell
 
 
 # ---------------------------------------------------------------------------
@@ -61,6 +77,53 @@ def _haversine_m(lat1, lon1, lat2, lon2) -> float:
     return R * 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
 
 
+def _load_verifications() -> list[dict]:
+    try:
+        from floodsight.db.supabase_client import get_verifications
+
+        rows = get_verifications()
+        print(f"  Verifications loaded from Supabase: {len(rows)}")
+        return rows
+    except RuntimeError:
+        rows = _load_jsonl(VERIFY_LOG)
+        print(f"  Supabase not configured — verifications from local JSONL: {len(rows)}")
+        return rows
+    except Exception as exc:
+        print(f"  Supabase verifications read failed ({exc}) — local JSONL fallback")
+        return _load_jsonl(VERIFY_LOG)
+
+
+def _load_dispatch_cells() -> dict[str, list[dict]]:
+    """All dispatch cell snapshots, grouped by event_date."""
+    try:
+        from floodsight.db.supabase_client import get_dispatch_cells
+
+        rows = get_dispatch_cells()
+    except RuntimeError:
+        print("  Supabase not configured — no dispatch snapshots available")
+        return {}
+    except Exception as exc:
+        print(f"  Supabase dispatch_cells read failed ({exc})")
+        return {}
+
+    by_date: dict[str, list[dict]] = {}
+    for r in rows:
+        by_date.setdefault(str(r["event_date"]), []).append(r)
+    print(f"  Dispatch snapshots loaded: {len(rows)} cells across {len(by_date)} event date(s)")
+    return by_date
+
+
+def _load_predictions() -> list[dict]:
+    try:
+        from floodsight.db.supabase_client import get_predictions
+
+        return get_predictions(limit=10000)
+    except RuntimeError:
+        return _load_jsonl(PRED_LOG)
+    except Exception:
+        return _load_jsonl(PRED_LOG)
+
+
 # ---------------------------------------------------------------------------
 # Retrain
 # ---------------------------------------------------------------------------
@@ -72,6 +135,8 @@ def retrain() -> None:
 
     df = pd.read_csv(TRAIN_CSV)
     print(f"Training dataset: {len(df)} rows across {df['event_name'].nunique()} event(s)")
+    if "label_source" in df.columns:
+        print(df["label_source"].value_counts().to_string())
     print(df.groupby("event_name")[["depth_m", "rain_24h_mm"]].describe().round(2))
 
     import subprocess
@@ -83,6 +148,7 @@ def retrain() -> None:
         print("ERROR: training failed.")
         raise SystemExit(result.returncode)
     print("\nModel retrained and saved to data/models/depth_model.joblib")
+    print("Quote ONLY metrics.holdout_real_rows_only externally.")
     print("Push to GitHub to update the live Render deployment.")
 
 
@@ -91,34 +157,37 @@ def retrain() -> None:
 # ---------------------------------------------------------------------------
 
 def analyse() -> None:
-    preds = _load_jsonl(PRED_LOG)
-    verifs = _load_jsonl(VERIFY_LOG)
+    print("\n=== Verification gap analysis ===")
 
-    print(f"\n=== Verification gap analysis ===")
-    print(f"  Prediction log entries : {len(preds)}")
-    print(f"  Verification entries   : {len(verifs)}")
-
+    verifs = _load_verifications()
     if not verifs:
-        print("\n  No verifications filed yet. Submit reports via POST /verify after each flood event.")
+        print("\n  No verifications filed yet. Submit reports via POST /verify "
+              "(with the VERIFY_SECRET bearer token) after each flood event.")
         return
 
-    # --- match each verification to nearest prediction on same event date ---
-    results = []
+    dispatch_by_date = _load_dispatch_cells()
+
+    # ------------------------------------------------------------------
+    # Primary path: verification vs dispatched Watch/Warning cells,
+    # matched on event_date + location.
+    # ------------------------------------------------------------------
+    results: list[dict] = []
+    no_snapshot_dates: set[str] = set()
+
     for v in verifs:
         if v.get("lat") is None or v.get("lon") is None:
             continue
-        event_date = v.get("event_date", "")
-        # predictions don't carry event_date; match by proximity
-        preds_with_loc = [p for p in preds if p.get("lat") and p.get("lon")]
-        if not preds_with_loc:
+        event_date = str(v.get("event_date", ""))
+        cells = dispatch_by_date.get(event_date)
+        if not cells:
+            no_snapshot_dates.add(event_date)
             continue
-        dists = [_haversine_m(v["lat"], v["lon"], p["lat"], p["lon"]) for p in preds_with_loc]
-        best_idx = int(np.argmin(dists))
-        best_dist = dists[best_idx]
-        if best_dist > MATCH_RADIUS_M:
-            matched_pred = None
-        else:
-            matched_pred = preds_with_loc[best_idx]
+
+        dists = [
+            _haversine_m(v["lat"], v["lon"], c["lat"], c["lon"]) for c in cells
+        ]
+        best = int(np.argmin(dists))
+        matched = cells[best] if dists[best] <= MATCH_RADIUS_M else None
 
         results.append({
             "event_date":       event_date,
@@ -126,66 +195,112 @@ def analyse() -> None:
             "lon":              v["lon"],
             "observed_flooded": v["observed_flooded"],
             "observed_depth_m": v.get("observed_depth_m"),
-            "predicted_depth_m": matched_pred["predicted_depth_m"] if matched_pred else None,
-            "match_dist_m":     best_dist if matched_pred else None,
+            # warned = a Watch/Warning cell was dispatched within radius
+            "warned":           matched is not None,
+            "alert_level":      matched["alert_level"] if matched else None,
+            "match_dist_m":     dists[best] if matched else None,
+        })
+
+    if results:
+        _report(pd.DataFrame(results), basis="dispatched alerts (dispatch_cells)")
+
+    if no_snapshot_dates:
+        print(f"\n  No dispatch snapshot for event date(s): {sorted(no_snapshot_dates)}")
+        print("  Falling back to prediction-log matching for those dates "
+              "(legacy behaviour — measures dashboard clicks, not dispatched alerts).")
+        _analyse_against_predictions(
+            [v for v in verifs if str(v.get("event_date", "")) in no_snapshot_dates]
+        )
+
+
+def _analyse_against_predictions(verifs: list[dict]) -> None:
+    """Legacy fallback: match verifications to /depth/predict calls.
+
+    Only used for event dates without a dispatch snapshot. Predictions are
+    filtered to the verification's event_date (same UTC day) — the old code
+    matched across ALL dates by proximity alone, which was meaningless.
+    """
+    preds = _load_predictions()
+    preds = [p for p in preds if p.get("lat") and p.get("lon")]
+    if not preds:
+        print("  No usable prediction log entries — nothing to fall back on.")
+        return
+
+    FLOOD_DEPTH_THRESH = 0.05  # m — predicted above this => "warning issued"
+    results = []
+    for v in verifs:
+        if v.get("lat") is None or v.get("lon") is None:
+            continue
+        event_date = str(v.get("event_date", ""))
+        same_day = [p for p in preds if str(p.get("ts", ""))[:10] == event_date]
+        if not same_day:
+            continue
+        dists = [_haversine_m(v["lat"], v["lon"], p["lat"], p["lon"]) for p in same_day]
+        best = int(np.argmin(dists))
+        matched = same_day[best] if dists[best] <= MATCH_RADIUS_M else None
+        results.append({
+            "event_date":       event_date,
+            "lat":              v["lat"],
+            "lon":              v["lon"],
+            "observed_flooded": v["observed_flooded"],
+            "observed_depth_m": v.get("observed_depth_m"),
+            "warned":           bool(matched and matched["predicted_depth_m"] >= FLOOD_DEPTH_THRESH),
+            "alert_level":      None,
+            "match_dist_m":     dists[best] if matched else None,
+            "predicted_depth_m": matched["predicted_depth_m"] if matched else None,
         })
 
     if not results:
-        print("  No verifications could be matched to predictions (predictions missing lat/lon?).")
+        print("  No same-day predictions could be matched to these verifications.")
         return
 
-    df = pd.DataFrame(results)
-    matched = df[df["predicted_depth_m"].notna()].copy()
-    unmatched = len(df) - len(matched)
-    print(f"\n  Matched to predictions : {len(matched)}  (unmatched: {unmatched})")
+    _report(pd.DataFrame(results), basis="prediction log (legacy fallback)")
 
-    if matched.empty:
-        print("  No matched pairs — start including lat/lon in /depth/predict calls.")
-        return
 
-    # Classify each matched pair
-    FLOOD_DEPTH_THRESH = 0.05  # m — predicted above this => "warning issued"
-    matched["warned"] = matched["predicted_depth_m"] >= FLOOD_DEPTH_THRESH
-    tp = matched[ matched["warned"] &  matched["observed_flooded"]]
-    fp = matched[ matched["warned"] & ~matched["observed_flooded"]]
-    fn = matched[~matched["warned"] &  matched["observed_flooded"]]
-    tn = matched[~matched["warned"] & ~matched["observed_flooded"]]
+def _report(df: pd.DataFrame, basis: str) -> None:
+    print(f"\n  --- Results (basis: {basis}) ---")
+    print(f"  Verifications analysed : {len(df)}")
+
+    tp = df[ df["warned"] &  df["observed_flooded"]]
+    fp = df[ df["warned"] & ~df["observed_flooded"]]
+    fn = df[~df["warned"] &  df["observed_flooded"]]
+    tn = df[~df["warned"] & ~df["observed_flooded"]]
 
     precision = len(tp) / (len(tp) + len(fp)) if (len(tp) + len(fp)) > 0 else float("nan")
     recall    = len(tp) / (len(tp) + len(fn)) if (len(tp) + len(fn)) > 0 else float("nan")
 
-    print(f"\n  Warning threshold: predicted_depth_m >= {FLOOD_DEPTH_THRESH} m")
-    print(f"  True positives  (warned,  flooded)  : {len(tp)}")
-    print(f"  False positives (warned,  not flooded): {len(fp)}  ← over-alerts")
-    print(f"  False negatives (no warn, flooded)  : {len(fn)}  ← missed floods")
+    print(f"  True positives  (warned,  flooded)    : {len(tp)}")
+    print(f"  False positives (warned,  not flooded): {len(fp)}  <- over-alerts")
+    print(f"  False negatives (no warn, flooded)    : {len(fn)}  <- missed floods")
     print(f"  True negatives  (no warn, not flooded): {len(tn)}")
     print(f"  Precision: {precision:.2f}   Recall: {recall:.2f}")
 
-    # Depth accuracy on flooded, warned cells
-    flooded_matched = matched[matched["observed_flooded"] & matched["warned"]].copy()
-    if len(flooded_matched) > 0 and flooded_matched["observed_depth_m"].notna().any():
-        flooded_matched = flooded_matched[flooded_matched["observed_depth_m"].notna()]
-        errors = flooded_matched["predicted_depth_m"] - flooded_matched["observed_depth_m"]
-        mae = errors.abs().mean()
-        bias = errors.mean()
-        print(f"\n  Depth accuracy on confirmed-flooded cells (n={len(flooded_matched)}):")
-        print(f"    MAE={mae:.3f} m   bias={bias:+.3f} m (positive = over-predict)")
+    # Depth accuracy where we have both a prediction and an observed depth
+    if "predicted_depth_m" in df.columns:
+        both = df[df["observed_depth_m"].notna() & df["predicted_depth_m"].notna()]
+        if len(both) > 0:
+            errors = both["predicted_depth_m"] - both["observed_depth_m"]
+            print(f"\n  Depth accuracy (n={len(both)}): "
+                  f"MAE={errors.abs().mean():.3f} m   "
+                  f"bias={errors.mean():+.3f} m (positive = over-predict)")
 
-    # Flag systematic false-positive locations
     if len(fp) >= 2:
-        print(f"\n  Systematic false-positive locations (warned but never flooded):")
+        print("\n  Systematic false-positive locations (warned but not flooded):")
         for _, row in fp.iterrows():
-            print(f"    ({row['lat']:.4f}, {row['lon']:.4f})  predicted={row['predicted_depth_m']:.3f} m  date={row['event_date']}")
-        print("\n  → Consider lowering susceptibility weight for these cells or adding an exclusion mask.")
+            print(f"    ({row['lat']:.4f}, {row['lon']:.4f})  "
+                  f"level={row.get('alert_level')}  date={row['event_date']}")
+        print("  -> Consider lowering susceptibility weight for these cells "
+              "or adding an exclusion mask.")
 
-    # Flag systematic false-negative locations
     if len(fn) >= 2:
-        print(f"\n  Systematic false-negative locations (flooded but no warning issued):")
+        print("\n  Systematic false-negative locations (flooded but no warning):")
         for _, row in fn.iterrows():
-            print(f"    ({row['lat']:.4f}, {row['lon']:.4f})  observed_depth={row.get('observed_depth_m', '?')} m  date={row['event_date']}")
-        print("\n  → These cells need lower warning threshold or additional training rows.")
+            print(f"    ({row['lat']:.4f}, {row['lon']:.4f})  "
+                  f"observed_depth={row.get('observed_depth_m', '?')}  date={row['event_date']}")
+        print("  -> These cells need a lower warning threshold or additional "
+              "training rows.")
 
-    print("\n  To improve the model, add the verified depth values as training rows via:")
+    print("\n  To improve the model, add verified depths as training rows via:")
     print("  python scripts/build_event_training_rows.py --event-name <name> --depth-raster <path> ...")
     print("  Then re-run: python scripts/recalibrate.py --retrain")
 
@@ -198,7 +313,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Phase 6 recalibration")
     parser.add_argument("--retrain", action="store_true", help="Retrain the ML model")
     parser.add_argument("--analyse", action="store_true",
-                        help="Analyse verification vs prediction gap")
+                        help="Analyse verification vs dispatched-alert gap")
     args = parser.parse_args()
 
     if not args.retrain and not args.analyse:

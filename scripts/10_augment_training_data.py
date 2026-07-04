@@ -144,9 +144,22 @@ def _depth_for_cell(hand_m: float, rain_24h: float, severity: str, rng: random.R
 # ── Load seed rows from existing CSV ─────────────────────────────────────
 
 def load_seed_rows() -> list[dict]:
-    """Load existing CSV rows to use as terrain feature seeds."""
+    """
+    Load REAL-labeled CSV rows to use as terrain feature seeds.
+
+    Only rows with label_source == 'sar_fwdet' are used — sampling from
+    previously augmented (synthetic) rows would compound assumptions on
+    top of assumptions each time this script runs.
+    """
     with open(CSV_PATH, newline="") as f:
-        return list(csv.DictReader(f))
+        rows = list(csv.DictReader(f))
+    real = [r for r in rows if r.get("label_source", "sar_fwdet") == "sar_fwdet"]
+    if not real:
+        raise SystemExit(
+            "No real-labeled (label_source='sar_fwdet') rows found in "
+            f"{CSV_PATH} — refusing to augment from synthetic seeds."
+        )
+    return real
 
 
 # ── Generate augmented rows for one event ────────────────────────────────
@@ -185,6 +198,11 @@ def generate_event_rows(
             "depth_m":            depth,
             "event":              event["id"],
             "event_name":         event["id"],
+            # Provenance: depth is model-assumed (severity-scaled lognormal
+            # with HAND decay), terrain resampled from Lekki cells. These
+            # rows are pseudo-labels, NOT observations — the canonical
+            # trainer excludes them from the honest (real-rows-only) metric.
+            "label_source":       "synthetic_augmented",
         })
     return new_rows
 
@@ -239,6 +257,7 @@ def main():
         "elevation_m", "slope_deg", "flow_accum", "hand_m",
         "dist_to_water_m", "landcover_class", "population_density",
         "rain_24h_mm", "rain_72h_mm", "depth_m", "event", "event_name",
+        "label_source",
     ]
     import os, shutil
     tmp = CSV_PATH.with_suffix(".tmp")
