@@ -156,6 +156,10 @@ ML_GRID_SUMMARY = DATA_DIR / "processed" / "flood_depth_ml_summary.json"
 
 _VALID_CLASSES = {"None", "Low", "Medium", "High", "Extreme"}
 
+# In-process cache — 6.5 MB file; re-reading it on every request adds
+# ~1 s latency on Render free tier.  Cached once per process lifetime.
+_ml_grid_cache: dict | None = None
+
 
 @router.get("/ml-grid")
 def ml_grid(
@@ -201,7 +205,10 @@ def ml_grid(
             ),
         )
 
-    data = json.loads(ML_GRID_GEOJSON.read_text(encoding="utf-8"))
+    global _ml_grid_cache
+    if _ml_grid_cache is None:
+        _ml_grid_cache = json.loads(ML_GRID_GEOJSON.read_text(encoding="utf-8"))
+    data = _ml_grid_cache
     features = data.get("features", [])
 
     # Filter by depth class if requested

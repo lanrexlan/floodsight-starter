@@ -434,8 +434,10 @@ document.querySelectorAll(".lga-btn").forEach(btn => {
     const lat  = parseFloat(btn.dataset.lat);
     const lon  = parseFloat(btn.dataset.lon);
     const zoom = parseFloat(btn.dataset.zoom);
-    if (isFinite(lat) && isFinite(lon)) map.flyTo({ center: [lon, lat], zoom, pitch: PILOT_PITCH, bearing: PILOT_BEARING, duration: 1200, essential: true });
-    queryPoint(lat, lon, btn.textContent.trim());
+    if (isFinite(lat) && isFinite(lon)) {
+      map.flyTo({ center: [lon, lat], zoom, pitch: PILOT_PITCH, bearing: PILOT_BEARING, duration: 1200, essential: true });
+      queryPoint(lat, lon, btn.textContent.trim());
+    }
   });
 });
 
