@@ -40,3 +40,7 @@ data/logs/
 
 .pytest_cache/
 .DS_Store
+
+# Intermediate/temporary files — never commit
+*-journal
+*.tmp

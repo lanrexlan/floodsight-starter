@@ -13,8 +13,8 @@ session vs. what remains.
 | 5 | P1 | Two diverged training pipelines | **Fixed** |
 | 6 | P1 | Recalibration matches the wrong thing | **Fixed** |
 | 7 | P1 | Stale HANDOFF.md | **Fixed** |
-| 8–12 | P2 | Missed opportunities | Pending |
-| 13–17 | P3 | Smaller improvements | Partially fixed |
+| 8–12 | P2 | Missed opportunities | **8 partial (per-cell wired; threshold + dam-release pending), 9–12 done** |
+| 13–17 | P3 | Smaller improvements | **13 done, 14 done, 16 done, 17 done; 15 deferred** |
 
 ---
 
@@ -137,24 +137,37 @@ honest post-fix metrics and this document as the work queue.
 
 ---
 
-## P2 — Missed opportunities (next up)
+## P2 — Missed opportunities
 
-8. **Non-rainfall flood drivers.** Config itself notes dam-release floods
-   are "structurally undetectable by rainfall alone"; one of the two real
-   labeled events was a tidal surge. Add Oyan dam release monitoring
-   (Ogun-Osun RBDA / NiHSA), lagoon/tide levels, and GloFAS discharge
-   (Phase 2 left GloFAS untested).
-9. **All-clear messages.** Subscribers get Watch/Warning but never a
-   stand-down. Cheap trust-building; reduces alarm fatigue.
-10. **OTP subscription confirmation** (closes the upsert-hijack hole in
-    item 3) and inbound SMS webhook for STOP handling — the sms.py
-    docstring claims STOP works but no webhook exists. Africa's Talking
-    supports both.
-11. **Morning briefing bypasses subscribers.** It sends to a hardcoded
-    `AT_RECIPIENTS` secret, not the Supabase subscriber base. Unify.
-12. **Inbound verification channel.** Field partners are more likely to
-    reply to an SMS than call `POST /verify`. AT inbound webhooks would
-    also enable structured "FLOOD <depth>" reports.
+8. **Non-rainfall flood drivers.** **Partially done:** tidal/coastal signal
+   added (`floodsight/forecast/marine.py`, Open-Meteo Marine sea level,
+   72 h horizon) — surfaces as a `coastal` block in `/forecast/alerts` and
+   `/forecast/summary` and a HIGH TIDE line in the morning briefing. The
+   advisory threshold (1.0 m MSL) is a placeholder — calibrate against
+   NiHSA tide gauge records and the 2021-07 surge event. **Still open:**
+   dam-release monitoring (Oyan/Ogun) needs NiHSA / Ogun-Osun RBDA data or
+   GloFAS discharge on the Ogun reach (GloFAS remains untested from
+   Phase 2), and the coastal signal is not yet wired into per-cell alert
+   levels — only into operator-facing surfaces.
+9. **All-clear messages.** **Done:** `/alerts/dispatch` now sends one
+   stand-down SMS to subscribers whose cell is quiet after a Watch/Warning
+   today or yesterday (deduplicated via alert_log level 'All Clear' —
+   requires `scripts/sql/04_inbound_otp.sql`).
+10. **OTP subscription confirmation + STOP webhook.** **Done:**
+    `POST /at/incoming` (token-protected) handles STOP/START keywords, and
+    `REQUIRE_OTP=true` gates subscriptions behind a 6-digit SMS code
+    (`/subscribe` → `/subscribe/confirm`; pending table in
+    `scripts/sql/04_inbound_otp.sql`; dashboard prompts for the code).
+    OTP defaults OFF until tested in the AT sandbox — the upsert-hijack
+    hole stays open until it is switched on.
+11. **Morning briefing → subscriber base.** **Done:** the briefing sends to
+    all active Supabase subscribers when SUPABASE_URL/KEY are set
+    (`AT_RECIPIENTS` is now the fallback). Add both secrets to the GitHub
+    Actions repo settings.
+12. **Inbound verification channel.** **Done:** the same webhook accepts
+    "FLOOD", "FLOOD 0.5", "FLOOD 50CM", and "NOFLOOD"/"DRY" from
+    registered subscribers, creating verification records identical to
+    `POST /verify` (keyed to their registered location, today's date).
 
 ## P3 — Smaller improvements
 

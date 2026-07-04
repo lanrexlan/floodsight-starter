@@ -113,9 +113,13 @@ from real rows.
 6. The +/-0.3 m deck claim stays retired until
    `metrics.holdout_real_rows_only` supports it on >=3 held-out real events.
 
-Then work down IMPROVEMENTS.md P2 (dam-release/tidal drivers, all-clear
-SMS, OTP subscribe + STOP webhook, briefing->subscriber unification,
-inbound SMS verification) and P3.
+P2 items 9-12 are now built (all-clear SMS, STOP/START webhook, inbound
+SMS verification, OTP subscribe, briefing->subscribers) and item 8 is
+half-built (tidal signal live; dam-release monitoring still open) — see
+IMPROVEMENTS.md for what each needs before it is fully live:
+run `scripts/sql/04_inbound_otp.sql`, set AT_WEBHOOK_TOKEN, configure the
+AT inbound callback URL, and flip REQUIRE_OTP after sandbox testing.
+Then work down IMPROVEMENTS.md P3.
 
 ## SAR data source chain (unchanged — Planetary Computer is dead for this)
 
@@ -155,7 +159,10 @@ account: `https://urs.earthdata.nasa.gov/approve_app?client_id=BO_n7nTIlMljdvU6k
 - Run from project root: `cd C:\Users\User\Downloads\floodsight-starter\floodsight-starter`
 - Credentials: `.env` in project root (NASA Earthdata + Africa's Talking)
 - Render env vars: SUPABASE_URL, SUPABASE_KEY, AT_*, DISPATCH_SECRET,
-  VERIFY_SECRET (new)
+  VERIFY_SECRET, AT_WEBHOOK_TOKEN (inbound SMS), REQUIRE_OTP (optional,
+  default off)
+- GitHub Actions secrets (morning briefing): add SUPABASE_URL,
+  SUPABASE_KEY so the briefing reaches subscribers
 - API locally: `uvicorn api.main:app --reload --port 8080`
 - Live deployment: Render (auto-deploys on push to GitHub main)
 - Tests: `pytest tests/ -v` (now also covers SMS encoding, trainer

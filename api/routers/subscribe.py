@@ -12,8 +12,10 @@ Endpoints that need Supabase return synthetic demo data when it is unavailable.
 
 from __future__ import annotations
 
+import hmac
 import logging
-from datetime import datetime, timezone
+import secrets as pysecrets
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, field_validator
@@ -22,14 +24,72 @@ from api.auth import require_dispatch_secret
 from api.data_provider import nearest_cell
 from floodsight.db.supabase_client import (
     add_subscriber,
+    bump_pending_attempts,
+    create_pending_subscription,
     deactivate_subscriber,
+    delete_pending_subscription,
+    get_pending_subscription,
     get_subscriber_count,
     get_subscriber_stats,
     get_alert_history,
     normalize_phone,
 )
 
+# ---------------------------------------------------------------------------
+# OTP confirmation (P2 item 10 — closes the upsert-hijack hole)
+#
+# When REQUIRE_OTP=true, POST /subscribe no longer writes the subscriber
+# directly: it stores a pending record + texts a 6-digit code, and only
+# POST /subscribe/confirm (phone + code) completes the upsert. Without
+# this, anyone who knows a resident's phone number could silently move
+# that resident's alert location.
+#
+# Default is OFF so existing deployments/dashboards keep working until the
+# flow has been tested end-to-end in the AT sandbox.
+# Helpers live in api/otp.py (unit-testable without the geo stack).
+# ---------------------------------------------------------------------------
+
+from api.otp import OTP_MAX_ATTEMPTS, OTP_TTL_MINUTES
+from api.otp import hash_code as _hash_code
+from api.otp import otp_required as _otp_required
+
+import time as _time
+from collections import defaultdict
+
 log = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# In-memory rate limiter (IMPROVEMENTS item 13 — /subscribe is an SMS-cost
+# attack surface; Render is single-process so a module-level dict is enough)
+# ---------------------------------------------------------------------------
+_phone_windows: dict = defaultdict(list)
+_ip_windows:    dict = defaultdict(list)
+_PHONE_MAX, _PHONE_TTL = 3, 600   # 3 attempts per phone per 10 min
+_IP_MAX,    _IP_TTL    = 15, 60   # 15 attempts per IP per 1 min
+
+
+def _rate_check(phone: str, ip: str) -> None:
+    """Raise HTTP 429 if phone or IP exceeds the subscribe rate limit."""
+    now = _time.monotonic()
+    wins = [t for t in _phone_windows[phone] if now - t < _PHONE_TTL]
+    _phone_windows[phone] = wins
+    if len(wins) >= _PHONE_MAX:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many subscription requests. Try again in {_PHONE_TTL // 60} minutes.",
+            headers={"Retry-After": str(_PHONE_TTL)},
+        )
+    _phone_windows[phone].append(now)
+    wins = [t for t in _ip_windows[ip] if now - t < _IP_TTL]
+    _ip_windows[ip] = wins
+    if len(wins) >= _IP_MAX:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many requests from this address. Please slow down.",
+            headers={"Retry-After": str(_IP_TTL)},
+        )
+    _ip_windows[ip].append(now)
+
 
 router = APIRouter(tags=["subscriptions"])
 
@@ -85,7 +145,7 @@ class SubscribeRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 @router.post("/subscribe")
-def subscribe(req: SubscribeRequest):
+def subscribe(req: SubscribeRequest, request: Request):
     """
     Register a resident for SMS flood alerts.
 
@@ -104,23 +164,72 @@ def subscribe(req: SubscribeRequest):
           "risk_class": "High",
           "area_name": "Kosofe"
         }
+    With ``REQUIRE_OTP=true`` this endpoint instead texts a 6-digit code
+    and returns ``{"status": "pending_confirmation"}`` — the subscription
+    is only written after POST /subscribe/confirm.
     """
-    # Look up the nearest grid cell to get risk class
+    _rate_check(req.phone, request.client.host or "")
+    if _otp_required():
+        code = f"{pysecrets.randbelow(10**6):06d}"
+        expires = (
+            datetime.now(timezone.utc) + timedelta(minutes=OTP_TTL_MINUTES)
+        ).isoformat()
+        try:
+            create_pending_subscription(
+                phone     = req.phone,
+                code_hash = _hash_code(code, req.phone),
+                payload   = {
+                    "lat":       req.lat,
+                    "lon":       req.lon,
+                    "name":      req.name,
+                    "area_name": req.area_name,
+                },
+                expires_at = expires,
+            )
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+        try:
+            from floodsight.notifications.sms import send_otp
+
+            send_otp(req.phone, code)
+        except Exception as exc:
+            log.error("OTP SMS failed for %s: %s", req.phone, exc)
+            raise HTTPException(
+                status_code=502, detail="Could not send confirmation code."
+            ) from exc
+
+        return {
+            "status":          "pending_confirmation",
+            "phone":           req.phone,
+            "expires_minutes": OTP_TTL_MINUTES,
+        }
+
+    return _complete_subscription(
+        phone=req.phone, lat=req.lat, lon=req.lon,
+        name=req.name, area_name=req.area_name,
+    )
+
+
+def _complete_subscription(
+    phone: str, lat: float, lon: float,
+    name: str | None, area_name: str | None,
+) -> dict:
+    """Nearest-cell lookup + Supabase upsert — shared by both flows."""
     try:
-        cell       = nearest_cell(req.lat, req.lon)
+        cell       = nearest_cell(lat, lon)
         risk_class = str(cell["risk_class"])
     except Exception as exc:
-        log.warning("nearest_cell failed for (%s, %s): %s", req.lat, req.lon, exc)
+        log.warning("nearest_cell failed for (%s, %s): %s", lat, lon, exc)
         risk_class = None
 
-    # Persist to Supabase
     try:
         row = add_subscriber(
-            phone      = req.phone,
-            lat        = req.lat,
-            lon        = req.lon,
-            name       = req.name,
-            area_name  = req.area_name,
+            phone      = phone,
+            lat        = lat,
+            lon        = lon,
+            name       = name,
+            area_name  = area_name,
             risk_class = risk_class,
             consent_at = datetime.now(timezone.utc).isoformat(),
         )
@@ -136,8 +245,73 @@ def subscribe(req: SubscribeRequest):
         "status":     "subscribed",
         "phone":      row["phone"],
         "risk_class": risk_class,
-        "area_name":  row.get("area_name") or req.area_name,
+        "area_name":  row.get("area_name") or area_name,
     }
+
+
+class ConfirmRequest(BaseModel):
+    phone: str
+    code:  str
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
+        return normalize_phone(v)
+
+    @field_validator("code")
+    @classmethod
+    def validate_code(cls, v: str) -> str:
+        v = v.strip()
+        if not (v.isdigit() and len(v) == 6):
+            raise ValueError("code must be 6 digits")
+        return v
+
+
+@router.post("/subscribe/confirm")
+def confirm_subscription(req: ConfirmRequest):
+    """
+    Complete an OTP-pending subscription (REQUIRE_OTP flow).
+
+    Errors: 404 no pending request | 410 code expired |
+    429 too many attempts | 401 wrong code.
+    """
+    try:
+        pending = get_pending_subscription(req.phone)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    if not pending:
+        raise HTTPException(status_code=404, detail="No pending subscription for this number.")
+
+    expires_at = str(pending.get("expires_at", ""))
+    try:
+        exp = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+    except ValueError:
+        exp = datetime.now(timezone.utc) - timedelta(seconds=1)
+    if datetime.now(timezone.utc) > exp:
+        delete_pending_subscription(req.phone)
+        raise HTTPException(status_code=410, detail="Code expired — subscribe again.")
+
+    attempts = int(pending.get("attempts", 0))
+    if attempts >= OTP_MAX_ATTEMPTS:
+        delete_pending_subscription(req.phone)
+        raise HTTPException(status_code=429, detail="Too many attempts — subscribe again.")
+
+    if not hmac.compare_digest(
+        _hash_code(req.code, req.phone), str(pending.get("code_hash", ""))
+    ):
+        bump_pending_attempts(req.phone, attempts + 1)
+        raise HTTPException(status_code=401, detail="Wrong code.")
+
+    payload = pending.get("payload") or {}
+    delete_pending_subscription(req.phone)
+    return _complete_subscription(
+        phone     = req.phone,
+        lat       = float(payload.get("lat")),
+        lon       = float(payload.get("lon")),
+        name      = payload.get("name"),
+        area_name = payload.get("area_name"),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -183,13 +357,13 @@ _SYNTHETIC_STATS = {
 
 _SYNTHETIC_HISTORY = {
     "dispatches": [
-        {"event_date": "2026-07-01", "alert_level": "Red",    "recipients": 298, "delivered": 271, "delivery_rate": 0.91},
-        {"event_date": "2026-06-28", "alert_level": "Orange", "recipients": 295, "delivered": 269, "delivery_rate": 0.91},
-        {"event_date": "2026-06-21", "alert_level": "Orange", "recipients": 280, "delivered": 257, "delivery_rate": 0.92},
-        {"event_date": "2026-06-14", "alert_level": "Red",    "recipients": 261, "delivered": 237, "delivery_rate": 0.91},
-        {"event_date": "2026-06-07", "alert_level": "Yellow", "recipients": 244, "delivered": 225, "delivery_rate": 0.92},
-        {"event_date": "2026-05-31", "alert_level": "Orange", "recipients": 218, "delivered": 199, "delivery_rate": 0.91},
-        {"event_date": "2026-05-24", "alert_level": "Yellow", "recipients": 193, "delivered": 178, "delivery_rate": 0.92},
+        {"event_date": "2026-07-01", "alert_level": "Warning",    "recipients": 298, "delivered": 271, "delivery_rate": 0.91},
+        {"event_date": "2026-06-28", "alert_level": "Watch", "recipients": 295, "delivered": 269, "delivery_rate": 0.91},
+        {"event_date": "2026-06-21", "alert_level": "Watch", "recipients": 280, "delivered": 257, "delivery_rate": 0.92},
+        {"event_date": "2026-06-14", "alert_level": "Warning",    "recipients": 261, "delivered": 237, "delivery_rate": 0.91},
+        {"event_date": "2026-06-07", "alert_level": "Watch", "recipients": 244, "delivered": 225, "delivery_rate": 0.92},
+        {"event_date": "2026-05-31", "alert_level": "Watch", "recipients": 218, "delivered": 199, "delivery_rate": 0.91},
+        {"event_date": "2026-05-24", "alert_level": "Watch", "recipients": 193, "delivered": 178, "delivery_rate": 0.92},
     ],
     "total_dispatches": 7,
     "data_source": "synthetic_demo",
@@ -242,7 +416,7 @@ def alert_history(limit: int = 20):
           "dispatches": [
             {
               "event_date": "2026-07-01",
-              "alert_level": "Red",
+              "alert_level": "Warning",
               "recipients": 298,
               "delivered": 271,
               "delivery_rate": 0.91

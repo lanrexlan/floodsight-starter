@@ -119,20 +119,31 @@ def get_grid_alerts(
     gdf, _ = get_grid()
     cell_rain = interpolate_to_cells(gdf, rainfall_grid, imerg_obs, imerg_source)
 
-    # 4. Compute per-cell alert levels
-    alert_levels = [
-        compute_alert_level(rc, r24, r72)
-        for rc, r24, r72 in zip(
-            gdf["risk_class"],
-            cell_rain["rain_24h_mm"],
-            cell_rain["rain_72h_mm"],
-        )
-    ]
+    # 4. Coastal/tidal signal — fetch early so it can upgrade coastal-LGA cells.
+    # NOTE: COASTAL_ADVISORY_M = 1.0 m MSL is a placeholder; calibrate against
+    # NiHSA tide gauge records + lekki_2021_07_12 before treating as operational.
+    from floodsight.forecast.marine import try_coastal_summary
+    coastal = try_coastal_summary()
+    _COASTAL_LGAS    = {"Eti-Osa", "Lagos Island", "Apapa", "Amuwo-Odofin", "Lagos Mainland"}
+    _COASTAL_UPGRADE = {"No Alert": "Watch", "Watch": "Warning", "Warning": "Warning"}
+    has_lga = "lga_name" in gdf.columns
+    _coastal_active  = bool(coastal and coastal.get("advisory") and has_lga)
 
-    # 5. Count levels + per-LGA breakdown
+    # 5. Compute per-cell alert levels (coastal-LGA cells promoted when advisory)
+    alert_levels = []
+    for i, (rc, r24, r72) in enumerate(zip(
+        gdf["risk_class"],
+        cell_rain["rain_24h_mm"],
+        cell_rain["rain_72h_mm"],
+    )):
+        level = compute_alert_level(rc, r24, r72)
+        if _coastal_active and str(gdf["lga_name"].iloc[i]) in _COASTAL_LGAS:
+            level = _COASTAL_UPGRADE.get(level, level)
+        alert_levels.append(level)
+
+    # 6. Count levels + per-LGA breakdown
     counts: dict[str, int] = {"Warning": 0, "Watch": 0, "No Alert": 0}
     lga_alerts: dict[str, int] = {}
-    has_lga = "lga_name" in gdf.columns
 
     for i, level in enumerate(alert_levels):
         counts[level] = counts.get(level, 0) + 1
@@ -151,11 +162,12 @@ def get_grid_alerts(
         else "No Alert"
     )
 
-    # 6. City-centre forecast for the status card (backward-compatible)
+    # 7. City-centre forecast for the status card (backward-compatible)
     cfc = get_centre_forecast(rainfall_grid)
 
     return {
         "alert_levels":   alert_levels,
+        "coastal":        coastal,
         "alert_counts":   counts,
         "highest_alert":  highest,
         "lga_alerts":     lga_alerts,
@@ -220,14 +232,23 @@ def get_alert_summary(
     gdf, _ = get_grid()
     cell_rain = interpolate_to_cells(gdf, rainfall_grid, imerg_obs, imerg_source)
 
-    # 2. Count alert levels using per-cell rainfall
+    # 2. Coastal signal — fetched early so it can upgrade coastal-LGA cells.
+    from floodsight.forecast.marine import try_coastal_summary
+    coastal = try_coastal_summary()
+    _COASTAL_LGAS    = {"Eti-Osa", "Lagos Island", "Apapa", "Amuwo-Odofin", "Lagos Mainland"}
+    _COASTAL_UPGRADE = {"No Alert": "Watch", "Watch": "Warning", "Warning": "Warning"}
+    _coastal_active  = bool(coastal and coastal.get("advisory") and "lga_name" in gdf.columns)
+
+    # 3. Count alert levels (coastal-LGA cells promoted when advisory)
     counts: dict = {"Warning": 0, "Watch": 0, "No Alert": 0}
-    for rc, r24, r72 in zip(
+    for i, (rc, r24, r72) in enumerate(zip(
         gdf["risk_class"],
         cell_rain["rain_24h_mm"],
         cell_rain["rain_72h_mm"],
-    ):
+    )):
         level = compute_alert_level(rc, r24, r72)
+        if _coastal_active and str(gdf["lga_name"].iloc[i]) in _COASTAL_LGAS:
+            level = _COASTAL_UPGRADE.get(level, level)
         counts[level] = counts.get(level, 0) + 1
 
     highest = (
@@ -242,6 +263,7 @@ def get_alert_summary(
         "total_cells":    len(gdf),
         "alert_counts":   counts,
         "highest_alert":  highest,
+        "coastal":        coastal,
         "observed_source": imerg_source or "GFS",
         "forecast": {
             "observed_24h_mm":  cfc.get("observed_24h_mm", 0.0),

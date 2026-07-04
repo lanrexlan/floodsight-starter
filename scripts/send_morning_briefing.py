@@ -18,7 +18,11 @@ Environment variables (set in your shell, .env file, or GitHub Secrets):
     AT_USERNAME      Africa's Talking username (use 'sandbox' for testing)
     AT_API_KEY       Africa's Talking API key
     AT_SENDER_ID     Registered short-code / sender name (optional)
-    AT_RECIPIENTS    Comma-separated E.164 numbers: +2348012345678,+2349012345678
+    AT_RECIPIENTS    Comma-separated E.164 numbers (FALLBACK ONLY — when
+                     Supabase is configured, the briefing goes to all active
+                     subscribers instead; see resolve_recipients())
+    SUPABASE_URL     Supabase project URL (optional — enables subscriber send)
+    SUPABASE_KEY     Supabase service-role key
     FLOODSIGHT_API   Base URL of the deployed API
                      (default: https://floodsight-starter.onrender.com)
 
@@ -121,6 +125,14 @@ def format_message(summary: dict) -> str:
 
         msg = "\n".join(lines)
 
+    # Coastal/tidal advisory (P2 item 8) — appended to either branch
+    coastal = summary.get("coastal") or {}
+    if coastal.get("advisory"):
+        msg += (
+            f"\nHIGH TIDE: sea level peaks {coastal['max_sea_level_m']}m. "
+            "Coastal areas: expect possible tidal flooding."
+        )
+
     # Warn if we're close to SMS limit so we can shorten if needed
     if len(msg) > 160:
         log.warning("Message is %d chars (>160). May use 2 SMS segments.", len(msg))
@@ -145,14 +157,30 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # Parse recipients
-    recipients_raw = os.environ.get("AT_RECIPIENTS", "")
-    recipients = [r.strip() for r in recipients_raw.split(",") if r.strip()]
+    # Resolve recipients: Supabase subscriber base first (P2 item 11 —
+    # the briefing previously went only to a hardcoded AT_RECIPIENTS list,
+    # bypassing every resident who subscribed via the dashboard).
+    recipients: list[str] = []
+    recipients_source = "AT_RECIPIENTS"
+    if os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_KEY"):
+        try:
+            from floodsight.db.supabase_client import get_active_subscribers
+
+            recipients = [s["phone"] for s in get_active_subscribers() if s.get("phone")]
+            recipients_source = f"supabase ({len(recipients)} active subscribers)"
+        except Exception as exc:
+            log.warning("Supabase subscriber fetch failed (%s) — falling back "
+                        "to AT_RECIPIENTS", exc)
+
+    if not recipients:
+        recipients_raw = os.environ.get("AT_RECIPIENTS", "")
+        recipients = [r.strip() for r in recipients_raw.split(",") if r.strip()]
+
+    log.info("Recipients source: %s", recipients_source)
 
     if not recipients and not args.dry_run:
         log.error(
-            "AT_RECIPIENTS is not set. "
-            "Set it to comma-separated E.164 numbers, e.g. +2348012345678"
+            "No recipients: Supabase returned none and AT_RECIPIENTS is not set."
         )
         sys.exit(1)
 

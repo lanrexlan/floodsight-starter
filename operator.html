@@ -241,9 +241,8 @@
       font-size: .72rem;
       font-weight: 700;
     }
-    .badge.Red    { background: #ffebee; color: var(--red); }
-    .badge.Orange { background: #fff3e0; color: var(--orange); }
-    .badge.Yellow { background: #fffde7; color: #6d4c00; }
+    .badge.Warning { background: #ffebee; color: var(--red); }
+    .badge.Watch   { background: #fff3e0; color: var(--orange); }
     .badge.Green  { background: var(--lgreen); color: var(--green); }
 
     .delivery-bar {
@@ -358,7 +357,7 @@ const PW_KEY   = 'fs_op_auth';
 const VALID_PW = 'floodsight2026';
 
 const COLOURS = ['#1565C0','#2E7D32','#E65100','#6A1B9A','#00838F','#AD1457'];
-const LEVEL_ORDER = { Red: 0, Orange: 1, Yellow: 2, Green: 3 };
+const LEVEL_ORDER = { Warning: 0, Watch: 1, Green: 3 };
 
 // ── Helpers ───────────────────────────────────────────────────────────
 function showApiError(elId, msg) {
@@ -530,7 +529,7 @@ function renderHistory(history) {
   const sparkLbl = sorted.map(r => r.event_date.slice(5));   // MM-DD
   const sparkDat = sorted.map(r => r.recipients);
   const levelCol = sorted.map(r => ({
-    Red: '#B71C1C', Orange: '#E65100', Yellow: '#F9A825', Green: '#2E7D32'
+    Warning: '#B71C1C', Watch: '#E65100', Green: '#2E7D32'
   }[r.alert_level] || '#1565C0'));
 
   if (sparkInst) sparkInst.destroy();
@@ -544,42 +543,3 @@ function renderHistory(history) {
         backgroundColor: levelCol,
         borderRadius: 4,
       }]
-    },
-    options: {
-      plugins: { legend: { display: false }, tooltip: {
-        callbacks: { title: ctx => sorted[ctx[0].dataIndex].event_date,
-                     label:  ctx => ` ${ctx.parsed.y} recipients` }
-      }},
-      scales: {
-        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-        y: { beginAtZero: true, ticks: { font: { size: 10 } } }
-      },
-      animation: { duration: 500 },
-    }
-  });
-
-  // ── Delivery mini-bars (per dispatch, compact)
-  const barsHtml = sorted.slice(-5).map(r => `
-    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem;font-size:.78rem">
-      <span style="width:42px;color:var(--grey)">${r.event_date.slice(5)}</span>
-      <div class="bar-bg" style="flex:1">
-        <div class="bar-fill" style="width:${(r.delivery_rate*100).toFixed(0)}%;background:${
-          r.delivery_rate >= 0.9 ? 'var(--green)' : r.delivery_rate >= 0.8 ? 'var(--yellow)' : 'var(--red)'
-        }"></div>
-      </div>
-      <span style="width:34px;text-align:right">${(r.delivery_rate*100).toFixed(0)}%</span>
-    </div>
-  `).join('');
-  document.getElementById('deliveryBars').innerHTML = barsHtml ||
-    '<span style="font-size:.8rem;color:var(--grey)">No dispatch data yet</span>';
-
-  // Now that history is available, refresh KPI delivery avg
-  const statsEl = document.getElementById('kpiRow').querySelector('.stat-card.red .val');
-  if (statsEl) {
-    const avg = rows.reduce((a, d) => a + d.delivery_rate, 0) / Math.max(rows.length, 1);
-    statsEl.textContent = (avg * 100).toFixed(1) + '%';
-  }
-}
-</script>
-</body>
-</html>
