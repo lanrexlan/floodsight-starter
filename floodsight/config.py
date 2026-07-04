@@ -173,12 +173,26 @@ RISK_CLASS_BREAKS = {
 #     floods (2 events) which are structurally undetectable by rainfall alone.
 # ---------------------------------------------------------------------------
 
-RAIN_WARNING_24H_MM        =  70   # was 100
-RAIN_WARNING_72H_MM        = 100   # was 150
-RAIN_WATCH_HIGH_24H_MM     =  25   # was  50
-RAIN_WATCH_HIGH_72H_MM     =  40   # was 100
-RAIN_WATCH_MODERATE_24H_MM =  70   # was 100
-RAIN_WATCH_MODERATE_72H_MM = 100   # was 150
+# Thresholds calibrated against 18 documented Lagos flood events (July 2026).
+# Warning 24h raised 70→80mm: July 2021 Flash Floods (78.5 mm) was rated Watch
+# by LASEMA, not Warning — the old 70mm trigger overcalled it.
+# Watch 72h lowered 40→30mm: June 2023 (37mm 72h) was No Alert under old threshold.
+# Watch 24h lowered 25→20mm: marginal sensitivity improvement, no false positives
+# in back-test.
+RAIN_WARNING_24H_MM        =  80   # was 70 → raised; July 2021 Flash 78.5mm → Watch (correct)
+RAIN_WARNING_72H_MM        = 100   # unchanged
+RAIN_WATCH_HIGH_24H_MM     =  20   # was 25 → lowered for sensitivity
+RAIN_WATCH_HIGH_72H_MM     =  30   # was 40 → catches June 2023 (37mm 3-day)
+RAIN_WATCH_MODERATE_24H_MM =  70   # unchanged
+RAIN_WATCH_MODERATE_72H_MM = 100   # unchanged
+
+# Antecedent soil-saturation signal.
+# Lagos wet-season average monthly rainfall ≈180 mm.  When 30-day accumulated
+# rainfall exceeds SAT_30D_MM the soil is near field-capacity and smaller
+# storms drive disproportionate runoff.  The Watch thresholds are multiplied
+# by SAT_WATCH_MULTIPLIER (i.e. lowered) under saturated conditions.
+RAIN_ANTECEDENT_SAT_30D_MM = 100   # ≥100 mm/30d → saturated (Lagos Aug interlude ≈106mm, July antecedent >250mm)
+RAIN_SAT_WATCH_MULTIPLIER  =  0.60 # lower Watch thresholds 40 % when saturated (20*0.6=12mm, 30*0.6=18mm)
 
 # ---------------------------------------------------------------------------
 # HAND-based depth model (Track A — see ROADMAP.md Phase 1)

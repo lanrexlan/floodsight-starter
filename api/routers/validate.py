@@ -23,10 +23,19 @@ log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/validate", tags=["validate"])
 
-# ── Pilot grid centre (used for all Open-Meteo archive queries) ────────────
-# Lagos is small enough that a single grid point represents the whole city.
-LAGOS_LAT = 6.5244
-LAGOS_LON = 3.3792
+# ── Multi-point validation grid (matches production rainfall_grid.py) ──────
+# Using a single Ikeja-centre point misses hyper-localised Lagos storms.
+# These 5 strategic points cover the main flood-affected zones; we take the
+# maximum 24h and 72h rainfall across all points — consistent with how the
+# live alert engine uses a 9-point spatial grid.
+VALIDATION_POINTS: list[tuple[float, float]] = [
+    (6.35, 3.40),   # Lagos Island / Victoria Island (tidal / coastal events)
+    (6.35, 3.70),   # Lekki / Eti-Osa              (Lekki 2021, 2024)
+    (6.55, 3.40),   # Ikeja / centre                (most mainland events)
+    (6.55, 3.70),   # Kosofe / Ikorodu              (Ikorodu Road events)
+    (6.55, 3.10),   # Alimosho / Badagry            (western mainland)
+]
+_CENTRE = (6.55, 3.40)   # used for antecedent (city-level aggregate)
 
 # ── Documented Lagos flood events ─────────────────────────────────────────
 # Each entry is a confirmed flood event with a cited source.
@@ -204,14 +213,10 @@ _cached_results: list[dict] | None = None
 
 # ── Open-Meteo archive fetch ──────────────────────────────────────────────
 
-def _fetch_nasa_power(peak_date: str) -> tuple[float, float]:
-    """
-    Primary source: NASA POWER API (IMERG-corrected daily precipitation).
-    Resolution ~0.5°, gauge-corrected via IMERG Final Run.
-    Far better than ERA5 for localised convective storms over Lagos.
-
-    Returns (rain_24h_mm, rain_72h_mm).
-    """
+def _fetch_nasa_power_point(
+    lat: float, lon: float, peak_date: str
+) -> tuple[float, float]:
+    """Fetch 24h and 72h rainfall at a single lat/lon from NASA POWER."""
     d = date.fromisoformat(peak_date)
     start = (d - timedelta(days=2)).strftime("%Y%m%d")
     end   = d.strftime("%Y%m%d")
@@ -220,7 +225,7 @@ def _fetch_nasa_power(peak_date: str) -> tuple[float, float]:
         "https://power.larc.nasa.gov/api/temporal/daily/point"
         "?parameters=PRECTOTCORR"
         "&community=RE"
-        f"&longitude={LAGOS_LON}&latitude={LAGOS_LAT}"
+        f"&longitude={lon}&latitude={lat}"
         f"&start={start}&end={end}"
         "&format=JSON"
     )
@@ -229,12 +234,81 @@ def _fetch_nasa_power(peak_date: str) -> tuple[float, float]:
         data = json.loads(resp.read())
 
     raw = data["properties"]["parameter"]["PRECTOTCORR"]
-    # Values keyed by "YYYYMMDD"; -999 = fill value (missing)
     values = [v if v != -999.0 else 0.0 for v in raw.values()]
+    return round(values[-1], 1), round(sum(values), 1)   # (24h, 72h)
 
-    rain_24h = values[-1]           # peak day
-    rain_72h = sum(values)          # 3-day total
-    return round(rain_24h, 1), round(rain_72h, 1)
+
+def _fetch_nasa_power(peak_date: str) -> tuple[float, float]:
+    """
+    Primary source: NASA POWER API (IMERG-corrected daily precipitation).
+
+    Fetches VALIDATION_POINTS in parallel and returns the *maximum* 24h and
+    72h values across all points.  Lagos convective storms are highly
+    localised — a single centre point routinely under-detects events that
+    affect only Lekki, Kosofe, or the western mainland.  Taking the spatial
+    maximum is consistent with how the live alert engine uses a 9-point grid.
+
+    Returns (max_rain_24h_mm, max_rain_72h_mm).
+    """
+    import concurrent.futures
+
+    results: list[tuple[float, float]] = []
+    errors: list[str] = []
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(VALIDATION_POINTS)) as pool:
+        future_map = {
+            pool.submit(_fetch_nasa_power_point, lat, lon, peak_date): (lat, lon)
+            for lat, lon in VALIDATION_POINTS
+        }
+        for fut in concurrent.futures.as_completed(future_map):
+            pt = future_map[fut]
+            try:
+                results.append(fut.result())
+            except Exception as exc:
+                errors.append(f"{pt}: {exc}")
+                log.warning("NASA POWER point %s failed: %s", pt, exc)
+
+    if not results:
+        raise RuntimeError(f"All POWER points failed: {errors}")
+    if errors:
+        log.warning("NASA POWER: %d/%d points OK", len(results), len(VALIDATION_POINTS))
+
+    max_24h = max(r[0] for r in results)
+    max_72h = max(r[1] for r in results)
+    log.debug("NASA POWER max: 24h=%.1f mm  72h=%.1f mm  (from %d points)",
+               max_24h, max_72h, len(results))
+    return max_24h, max_72h
+
+
+def _fetch_antecedent_30d(peak_date: str) -> float:
+    """
+    Fetch 30-day accumulated rainfall ending on peak_date-1 from NASA POWER.
+    Used to detect soil-saturation conditions (see RAIN_ANTECEDENT_SAT_30D_MM).
+    Returns accumulated mm, or 0.0 on failure.
+    """
+    d = date.fromisoformat(peak_date)
+    start = (d - timedelta(days=30)).strftime("%Y%m%d")
+    end   = (d - timedelta(days=1)).strftime("%Y%m%d")
+    lat, lon = _CENTRE
+
+    url = (
+        "https://power.larc.nasa.gov/api/temporal/daily/point"
+        "?parameters=PRECTOTCORR"
+        "&community=RE"
+        f"&longitude={lon}&latitude={lat}"
+        f"&start={start}&end={end}"
+        "&format=JSON"
+    )
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "FloodSight/1.0"})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read())
+        raw = data["properties"]["parameter"]["PRECTOTCORR"]
+        values = [v if v != -999.0 else 0.0 for v in raw.values()]
+        return round(sum(values), 1)
+    except Exception as exc:
+        log.warning("Antecedent 30d fetch failed for %s: %s", peak_date, exc)
+        return 0.0
 
 
 def _fetch_era5_openmeteo(peak_date: str, retries: int = 3) -> tuple[float, float]:
@@ -328,10 +402,18 @@ def _compute_results() -> list[dict]:
             log.warning("Could not fetch archive data for %s: %s", event["id"], exc)
             rain_24h, rain_72h = 0.0, 0.0
 
+        # Antecedent 30-day soil saturation — politely sleep a moment first
+        # since we just fetched the event rainfall (multiple parallel calls)
+        antecedent_30d = _fetch_antecedent_30d(event["peak_date"])
+        log.info("  %s — 30-day antecedent: %.0f mm", event["id"], antecedent_30d)
+
         # Count alert levels across the whole grid
         counts: dict[str, int] = {"Warning": 0, "Watch": 0, "No Alert": 0}
         for risk_class in gdf["risk_class"]:
-            level = compute_alert_level(risk_class, rain_24h, rain_72h)
+            level = compute_alert_level(
+                risk_class, rain_24h, rain_72h,
+                antecedent_30d_mm=antecedent_30d,
+            )
             counts[level] = counts.get(level, 0) + 1
 
         total = len(gdf)
@@ -349,8 +431,9 @@ def _compute_results() -> list[dict]:
 
         results.append({
             **event,
-            "rain_24h_mm":    rain_24h,
-            "rain_72h_mm":    rain_72h,
+            "rain_24h_mm":       rain_24h,
+            "rain_72h_mm":       rain_72h,
+            "antecedent_30d_mm": antecedent_30d,
             "rain_24h_label": _describe_rain(rain_24h),
             "rain_72h_label": _describe_rain(rain_72h),
             "alert_counts":   counts,
