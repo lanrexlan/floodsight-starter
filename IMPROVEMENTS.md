@@ -14,7 +14,7 @@ session vs. what remains.
 | 6 | P1 | Recalibration matches the wrong thing | **Fixed** |
 | 7 | P1 | Stale HANDOFF.md | **Fixed** |
 | 8–12 | P2 | Missed opportunities | **8 partial (per-cell wired; threshold + dam-release pending), 9–12 done** |
-| 13–17 | P3 | Smaller improvements | **13 done, 14 done, 16 done, 17 done; 15 deferred** |
+| 13–17 | P3 | Smaller improvements | **Done (15: scored_grid.gpkg regenerated with hazard_score; re-run validate_historical.py after deploy to confirm accuracy)** |
 
 ---
 
@@ -179,6 +179,13 @@ honest post-fix metrics and this document as the work queue.
 15. Susceptibility mixes hazard and exposure: population density inside
     `flood_score` makes dense dry areas look flood-prone. Keep a pure
     hazard score; use population only to prioritize alerts/exposure stats.
+
+    **Fixed July 2026:** `hazard_score` (elevation/slope/flow/water-dist/
+    landcover only) now drives `risk_class`. `flood_score` is retained as
+    a column for exposure statistics. `scored_grid.gpkg` regenerated with
+    `--quantile` breaks on `hazard_score` (Q25=0.578, Q50=0.640, Q75=0.701).
+    Re-run `python scripts/validate_historical.py` after deploy to confirm
+    accuracy is maintained with the new risk-class boundaries.
 16. Operator-dashboard synthetic fallbacks use "Red/Orange/Yellow" levels
     while the live system uses Watch/Warning — confusing in demos.
 17. Housekeeping: `data/processed/` has leftover `_test_write.gpkg`,

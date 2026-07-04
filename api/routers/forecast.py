@@ -123,7 +123,9 @@ def get_grid_alerts(
     # NOTE: COASTAL_ADVISORY_M = 1.0 m MSL is a placeholder; calibrate against
     # NiHSA tide gauge records + lekki_2021_07_12 before treating as operational.
     from floodsight.forecast.marine import try_coastal_summary
+    from floodsight.forecast.dam import try_dam_summary
     coastal = try_coastal_summary()
+    dam     = try_dam_summary()
     _COASTAL_LGAS    = {"Eti-Osa", "Lagos Island", "Apapa", "Amuwo-Odofin", "Lagos Mainland"}
     _COASTAL_UPGRADE = {"No Alert": "Watch", "Watch": "Warning", "Warning": "Warning"}
     has_lga = "lga_name" in gdf.columns
@@ -168,6 +170,7 @@ def get_grid_alerts(
     return {
         "alert_levels":   alert_levels,
         "coastal":        coastal,
+        "dam":            dam,
         "alert_counts":   counts,
         "highest_alert":  highest,
         "lga_alerts":     lga_alerts,
@@ -234,7 +237,9 @@ def get_alert_summary(
 
     # 2. Coastal signal — fetched early so it can upgrade coastal-LGA cells.
     from floodsight.forecast.marine import try_coastal_summary
+    from floodsight.forecast.dam import try_dam_summary
     coastal = try_coastal_summary()
+    dam     = try_dam_summary()
     _COASTAL_LGAS    = {"Eti-Osa", "Lagos Island", "Apapa", "Amuwo-Odofin", "Lagos Mainland"}
     _COASTAL_UPGRADE = {"No Alert": "Watch", "Watch": "Warning", "Warning": "Warning"}
     _coastal_active  = bool(coastal and coastal.get("advisory") and "lga_name" in gdf.columns)
@@ -264,6 +269,7 @@ def get_alert_summary(
         "alert_counts":   counts,
         "highest_alert":  highest,
         "coastal":        coastal,
+        "dam":            dam,
         "observed_source": imerg_source or "GFS",
         "forecast": {
             "observed_24h_mm":  cfc.get("observed_24h_mm", 0.0),

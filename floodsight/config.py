@@ -113,18 +113,44 @@ SUSCEPTIBILITY_WEIGHTS = {
     "risk_pop": 0.10,
 }
 
+# Pure physical flood HAZARD weights — population excluded (IMPROVEMENTS item 15).
+# Population density is an exposure modifier, not a flood driver. Including it
+# inflates risk_class for dense-but-dry areas, causing spurious Watch alerts at
+# just 25 mm rain in places that rarely flood. risk_class should derive from
+# hazard_score (terrain + hydrology only); population is used separately for
+# alert prioritisation and exposure statistics.
+#
+# Weights re-normalised from SUSCEPTIBILITY_WEIGHTS minus risk_pop:
+#   original sum without pop = 0.90 → divide each by 0.90 → sum = 1.0
+#
+# ⚠ After changing the scoring formula you MUST regenerate scored_grid.gpkg:
+#     python scripts/03_compute_susceptibility.py --quantile
+# The --quantile flag is required because fixed RISK_CLASS_BREAKS were
+# calibrated to the old formula's score distribution; without it the new
+# hazard_score distribution will be lopsided. Re-run
+#     python scripts/validate_historical.py
+# afterwards to confirm accuracy is maintained, then commit the new .gpkg.
+HAZARD_WEIGHTS = {
+    "risk_elev":      round(0.25 / 0.90, 4),   # 0.2778
+    "risk_slope":     round(0.15 / 0.90, 4),   # 0.1667
+    "risk_flow":      round(0.20 / 0.90, 4),   # 0.2222
+    "risk_waterdist": round(0.15 / 0.90, 4),   # 0.1667
+    "risk_landcover": round(0.15 / 0.90, 4),   # 0.1667
+    # risk_pop intentionally omitted — use population_density column
+    # directly for exposure_score or dispatch prioritisation.
+}
+
 RISK_CLASS_BREAKS = {
-    # Phase 13: recalibrated to the actual Lagos city-wide score distribution.
-    # Lagos's flat terrain + high impervious cover pushes all scores into a
-    # narrow band (0.31–0.91, Q25=0.526, median=0.580, Q75=0.639).  The
-    # original generic 0.25/0.50/0.75 breaks put 84% of cells into "High"
-    # with no Low cells at all — too noisy for operational alerting.
-    # These breaks are the Lagos AOI quartiles, giving ~25% per class:
-    #   Low < 0.53 | Moderate 0.53–0.58 | High 0.58–0.64 | Very High > 0.64
-    "Low":       (0.00, 0.53),
-    "Moderate":  (0.53, 0.58),
-    "High":      (0.58, 0.64),
-    "Very High": (0.64, 1.01),
+    # Updated for hazard_score (no population) — IMPROVEMENTS.md item 15.
+    # Quartiles of Lagos hazard_score distribution (24,933 cells, July 2026):
+    #   Q25=0.578 | Q50=0.640 | Q75=0.701  range 0.340–0.991
+    # Each band holds ~25% of cells (use --quantile flag when regenerating).
+    # Population was excluded because it inflated risk_class in dense-but-dry
+    # areas, causing false Watch alerts at just 25 mm rain.
+    "Low":       (0.00, 0.578),
+    "Moderate":  (0.578, 0.640),
+    "High":      (0.640, 0.701),
+    "Very High": (0.701, 1.01),
 }
 
 # ---------------------------------------------------------------------------

@@ -125,12 +125,20 @@ def format_message(summary: dict) -> str:
 
         msg = "\n".join(lines)
 
-    # Coastal/tidal advisory (P2 item 8) — appended to either branch
+    # Coastal/tidal advisory (P2 item 8)
     coastal = summary.get("coastal") or {}
     if coastal.get("advisory"):
         msg += (
             f"\nHIGH TIDE: sea level peaks {coastal['max_sea_level_m']}m. "
             "Coastal areas: expect possible tidal flooding."
+        )
+
+    # Ogun dam-release advisory (P2 item 8 — Open-Meteo Flood/GloFAS)
+    dam = summary.get("dam") or {}
+    if dam.get("advisory"):
+        msg += (
+            f"\nOGUN RIVER: discharge forecast {dam['max_discharge_m3s']:.0f}m3/s "
+            f"(peak {dam['peak_day']}). Low-lying areas near Ogun at risk."
         )
 
     # Warn if we're close to SMS limit so we can shorten if needed
