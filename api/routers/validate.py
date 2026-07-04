@@ -204,16 +204,49 @@ _cached_results: list[dict] | None = None
 
 # ── Open-Meteo archive fetch ──────────────────────────────────────────────
 
-def _fetch_rainfall_archive(peak_date: str, retries: int = 3) -> tuple[float, float]:
+def _fetch_nasa_power(peak_date: str) -> tuple[float, float]:
     """
-    Fetch daily precipitation for 3 days ending on peak_date.
-    Retries up to `retries` times with exponential back-off to handle
-    transient connection resets (common on Windows / rate-limited endpoints).
+    Primary source: NASA POWER API (IMERG-corrected daily precipitation).
+    Resolution ~0.5°, gauge-corrected via IMERG Final Run.
+    Far better than ERA5 for localised convective storms over Lagos.
 
     Returns (rain_24h_mm, rain_72h_mm).
     """
     d = date.fromisoformat(peak_date)
-    start = (d - timedelta(days=2)).isoformat()  # 3-day window
+    start = (d - timedelta(days=2)).strftime("%Y%m%d")
+    end   = d.strftime("%Y%m%d")
+
+    url = (
+        "https://power.larc.nasa.gov/api/temporal/daily/point"
+        "?parameters=PRECTOTCORR"
+        "&community=RE"
+        f"&longitude={LAGOS_LON}&latitude={LAGOS_LAT}"
+        f"&start={start}&end={end}"
+        "&format=JSON"
+    )
+    req = urllib.request.Request(url, headers={"User-Agent": "FloodSight/1.0"})
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        data = json.loads(resp.read())
+
+    raw = data["properties"]["parameter"]["PRECTOTCORR"]
+    # Values keyed by "YYYYMMDD"; -999 = fill value (missing)
+    values = [v if v != -999.0 else 0.0 for v in raw.values()]
+
+    rain_24h = values[-1]           # peak day
+    rain_72h = sum(values)          # 3-day total
+    return round(rain_24h, 1), round(rain_72h, 1)
+
+
+def _fetch_era5_openmeteo(peak_date: str, retries: int = 3) -> tuple[float, float]:
+    """
+    Fallback source: Open-Meteo ERA5 archive.
+    Lower resolution (~30 km); known to under-detect localised Lagos storms.
+    Used only when NASA POWER is unavailable.
+
+    Returns (rain_24h_mm, rain_72h_mm).
+    """
+    d = date.fromisoformat(peak_date)
+    start = (d - timedelta(days=2)).isoformat()
     end   = d.isoformat()
 
     url = (
@@ -233,25 +266,39 @@ def _fetch_rainfall_archive(peak_date: str, retries: int = 3) -> tuple[float, fl
             break
         except Exception as exc:
             last_exc = exc
-            wait = 2 ** attempt          # 1s, 2s, 4s
-            log.warning("Archive fetch attempt %d failed (%s) — retrying in %ds", attempt + 1, exc, wait)
+            wait = 2 ** attempt
+            log.warning("ERA5 fallback attempt %d failed (%s) — retrying in %ds", attempt + 1, exc, wait)
             time.sleep(wait)
     else:
         raise last_exc  # type: ignore[misc]
 
-    daily = data["daily"]
+    daily  = data["daily"]
     times  = daily["time"]
-    precip = daily["precipitation_sum"]
+    precip = [p if p is not None else 0.0 for p in daily["precipitation_sum"]]
+    peak_idx = times.index(peak_date) if peak_date in times else len(times) - 1
+    return round(precip[peak_idx], 1), round(sum(precip[:peak_idx + 1]), 1)
 
-    # Replace None values (missing data) with 0.0
-    precip = [p if p is not None else 0.0 for p in precip]
 
-    # 24h = peak day total; 72h = sum of all 3 days in window
-    peak_idx  = times.index(peak_date) if peak_date in times else len(times) - 1
-    rain_24h  = precip[peak_idx]
-    rain_72h  = sum(precip[:peak_idx + 1])  # all days up to and including peak
+def _fetch_rainfall_archive(peak_date: str, retries: int = 3) -> tuple[float, float]:
+    """
+    Fetch 24h and 72h rainfall ending on peak_date.
 
-    return round(rain_24h, 1), round(rain_72h, 1)
+    Strategy (in order):
+      1. NASA POWER API — IMERG-corrected, ~0.5° resolution, best for Lagos
+         convective storms. Covers 1981-present, no auth required.
+      2. Open-Meteo ERA5 — ~30 km global reanalysis, known to underestimate
+         localised convective events but always available as a fallback.
+
+    Returns (rain_24h_mm, rain_72h_mm).
+    """
+    try:
+        result = _fetch_nasa_power(peak_date)
+        log.debug("NASA POWER: %s → 24h=%.1f mm  72h=%.1f mm", peak_date, *result)
+        return result
+    except Exception as exc:
+        log.warning("NASA POWER failed for %s (%s) — falling back to ERA5", peak_date, exc)
+
+    return _fetch_era5_openmeteo(peak_date, retries=retries)
 
 
 def _describe_rain(mm: float) -> str:
@@ -371,10 +418,12 @@ def get_validation_events(refresh: bool = False):
             "dam_release_events": len(dam_events),
             "note": (
                 "Overall accuracy uses all 18 events (8 original + 10 added Phase 22). "
-                "Meaningful rain accuracy counts only events where ERA5 recorded >=10 mm on the peak day — "
-                "below that threshold, the global reanalysis model is known to underestimate localised "
-                "convective storms common in Lagos. Dam-release and antecedent-saturation events "
-                "(2019_10, 2022_10) are structurally undetectable by rainfall thresholds alone."
+                "Rainfall data sourced from NASA POWER API (IMERG-corrected, ~0.5° resolution) "
+                "with ERA5/Open-Meteo as fallback. "
+                "Meaningful rain accuracy counts only events where the satellite recorded >=10 mm on "
+                "the peak day — below that, even IMERG may miss hyper-localised Lagos convective storms. "
+                "Dam-release and antecedent-saturation events (2019_10, 2022_10) are structurally "
+                "undetectable by any rainfall-threshold system."
             ),
         },
     }
