@@ -982,4 +982,31 @@ async function _loadMlDepthLayer() {
     const meta = geojson.metadata || {};
     console.log(
       `ML depth layer loaded — ${(geojson.features || []).length} cells ` +
-      `(desi
+      `(design storm ${meta.design_rain_24h_mm || 150} mm/24h)`
+    );
+  } catch (err) {
+    console.warn("ML depth layer failed to load:", err);
+    if (btn) { btn.textContent = "ML depth (error)"; btn.disabled = true; }
+  } finally {
+    _mlDepthLoading = false;
+  }
+}
+
+// ── Toggle ML depth layer visibility ────────────────────────────────────────────
+function toggleMlDepthLayer() {
+  _mlDepthVisible = !_mlDepthVisible;
+  const btn = document.getElementById("ml-depth-toggle");
+
+  if (!_mlDepthLoaded) {
+    // Lazy-load on first toggle
+    _loadMlDepthLayer();
+    if (btn) btn.textContent = "Loading ML depth…";
+    return;
+  }
+
+  const vis = _mlDepthVisible ? "visible" : "none";
+  ["ml-depth-glow", "ml-depth-dots"].forEach(id => {
+    if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", vis);
+  });
+  if (btn) btn.textContent = _mlDepthVisible ? "Hide ML depth" : "Show ML depth";
+}
