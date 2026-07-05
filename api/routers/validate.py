@@ -18,6 +18,7 @@ import urllib.request
 from datetime import date, timedelta
 
 from fastapi import APIRouter, HTTPException
+from floodsight.config import ALERT_UPGRADE, COASTAL_UPGRADE_LGAS, OGUN_UPGRADE_LGAS
 
 log = logging.getLogger(__name__)
 
@@ -44,11 +45,13 @@ _DAM_LAT, _DAM_LON = 6.67, 3.43
 # Coastal: just offshore Lagos (ERA5-Ocean gives sea_level_height_msl here)
 _COAST_LAT, _COAST_LON = 6.30, 3.35
 
-# LGA tier-upgrade sets — mirror get_grid_alerts() in forecast.py
-_COASTAL_LGAS   = {"Eti-Osa", "Lagos Island", "Apapa", "Amuwo-Odofin", "Lagos Mainland"}
-_OGUN_LGAS      = {"Agege", "Ifako-Ijaiye", "Alimosho"}
-_COASTAL_UPGRADE = {"No Alert": "Watch", "Watch": "Warning", "Warning": "Warning"}
-_DAM_UPGRADE     = {"No Alert": "Watch", "Watch": "Warning", "Warning": "Warning"}
+# LGA tier-upgrade sets — imported from config (single source of truth)
+# Coastal: tidal surge / Niger-Benue backwater → upgrades shoreline LGAs
+# Ogun:    Oyan Dam discharge spike → upgrades Ogun floodplain LGAs
+_COASTAL_LGAS    = COASTAL_UPGRADE_LGAS
+_OGUN_LGAS       = OGUN_UPGRADE_LGAS
+_COASTAL_UPGRADE = ALERT_UPGRADE
+_DAM_UPGRADE     = ALERT_UPGRADE
 
 # ── Documented Lagos flood events ─────────────────────────────────────────
 # Each entry is a confirmed flood event with a cited source.
@@ -610,8 +613,18 @@ def get_validation_events(refresh: bool = False):
     meaningful = [r for r in _cached_results if r["rain_24h_mm"] >= 10]
     meaningful_correct = sum(1 for r in meaningful if r["correct"])
 
-    # Dam-release / antecedent-saturation events (unfixable by rainfall threshold)
-    dam_events = [r for r in _cached_results if r["id"] in ("2019_10", "2022_10")]
+    # Oyan Dam events: 2019_10 only.
+    # 2022_10 (October 2022) is a Niger/Benue coastal backwater event — NOT an
+    # Ogun dam event — so it is NOT listed here and IS covered by the coastal
+    # advisory upgrade for Lagos Island / shoreline LGAs.
+    oyan_dam_events = [r for r in _cached_results if r["id"] in ("2019_10",)]
+
+    # Coastal/backwater events expected to be caught by the marine advisory
+    coastal_events = [r for r in _cached_results if r["id"] in ("2021_07a", "2022_10")]
+
+    # Hyper-local convective cells: satellite resolution too coarse to detect.
+    # These are structural misses — no free reanalysis product can fix them.
+    hyper_local_events = [r for r in _cached_results if r["id"] in ("2016_07", "2019_07")]
 
     return {
         "events": _cached_results,
@@ -622,20 +635,25 @@ def get_validation_events(refresh: bool = False):
             "meaningful_rain_events":  len(meaningful),
             "meaningful_correct":      meaningful_correct,
             "meaningful_accuracy_pct": round(meaningful_correct / len(meaningful) * 100) if meaningful else 0,
-            "era5_misses": sum(
+            "low_rainfall_misses": sum(
                 1 for r in _cached_results
                 if not r["correct"] and r["rain_24h_mm"] < 10
-                and r["id"] not in ("2019_10", "2022_10")
             ),
-            "dam_release_events": len(dam_events),
+            "oyan_dam_events":    len(oyan_dam_events),
+            "coastal_events":     len(coastal_events),
+            "hyper_local_events": len(hyper_local_events),
             "note": (
                 "Overall accuracy uses all 18 events (8 original + 10 added Phase 22). "
-                "Rainfall data sourced from NASA POWER API (IMERG-corrected, ~0.5° resolution) "
+                "Rainfall data sourced from NASA POWER API (IMERG-corrected, ~0.5 degree resolution) "
                 "with ERA5/Open-Meteo as fallback. "
-                "Meaningful rain accuracy counts only events where the satellite recorded >=10 mm on "
-                "the peak day — below that, even IMERG may miss hyper-localised Lagos convective storms. "
-                "Dam-release and antecedent-saturation events (2019_10, 2022_10) are structurally "
-                "undetectable by any rainfall-threshold system."
+                "Meaningful rain accuracy counts only events where the satellite recorded >=10 mm "
+                "on the peak day. "
+                "Coastal events (2021_07a, 2022_10) are now covered by the marine advisory "
+                "upgrade when ERA5-Ocean sea level exceeds COASTAL_ADVISORY_M. "
+                "Oyan Dam events (2019_10) are covered by the GloFAS discharge advisory. "
+                "Hyper-local convective cells (2016_07, 2019_07) remain structural misses -- "
+                "the storm footprint is smaller than the free satellite grid (0.1 deg/~11 km) and "
+                "cannot be detected without a dense rain-gauge network."
             ),
         },
     }

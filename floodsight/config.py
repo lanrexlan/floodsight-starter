@@ -195,6 +195,49 @@ RAIN_ANTECEDENT_SAT_30D_MM = 100   # ≥100 mm/30d → saturated (Lagos Aug inte
 RAIN_SAT_WATCH_MULTIPLIER  =  0.60 # lower Watch thresholds 40 % when saturated (20*0.6=12mm, 30*0.6=18mm)
 
 # ---------------------------------------------------------------------------
+# Non-rainfall alert upgrade sets
+#
+# When a coastal or dam advisory is active, all grid cells inside the
+# corresponding LGA set are promoted one tier:
+#   No Alert → Watch,  Watch → Warning,  Warning stays Warning
+#
+# COASTAL_UPGRADE_LGAS: LGAs that flood when sea level is anomalously high
+#   (tidal surge, storm surge, Niger/Benue coastal backwater).
+#   Covers the VI / Lagos Island shoreline and the Lagos Mainland / Apapa
+#   creek system.  Badagry, Epe, and Ibeju-Lekki are NOT in the grid (see
+#   AOI_LGAS comment) so they are omitted even though they flood in surge
+#   events — addressing them requires extending the grid first.
+#
+# OGUN_UPGRADE_LGAS: LGAs on the Ogun river floodplain that flood when
+#   Oyan Dam releases.  The Ogun lower reach crosses Agege/Ifako-Ijaiye
+#   before spreading into Alimosho via Agbado Creek.  Ojo sits further
+#   downstream along the Badagry Creek corridor and is included because
+#   Oyan releases reach it during major events (>500 m³/s).
+# ---------------------------------------------------------------------------
+
+COASTAL_UPGRADE_LGAS: frozenset[str] = frozenset({
+    "Eti-Osa",
+    "Lagos Island",
+    "Apapa",
+    "Amuwo-Odofin",
+    "Lagos Mainland",
+})
+
+OGUN_UPGRADE_LGAS: frozenset[str] = frozenset({
+    "Agege",
+    "Ifako-Ijaiye",
+    "Alimosho",
+    "Ojo",           # Ogun/Badagry Creek corridor — large Oyan releases reach here
+})
+
+# One-tier upgrade map (shared by both coastal and dam signals)
+ALERT_UPGRADE: dict[str, str] = {
+    "No Alert": "Watch",
+    "Watch":    "Warning",
+    "Warning":  "Warning",
+}
+
+# ---------------------------------------------------------------------------
 # HAND-based depth model (Track A — see ROADMAP.md Phase 1)
 # ---------------------------------------------------------------------------
 
@@ -244,7 +287,7 @@ class Credentials:
 CREDENTIALS = Credentials()
 
 # earthaccess's strategy="environment" login specifically requires the
-# env vars to be named EARTHDATA_USERNAME / EARTHDATA_PASSWORD — not the
+# env vars to be named EARTHDATA_USERNAME / EARTHDATA_PASSWORD -- not the
 # NASA_EARTHDATA_* names used in .env, which exist only for clarity in
 # this project's own .env file. Mirror them across here so .env doesn't
 # need to duplicate values under two different names, and so earthaccess

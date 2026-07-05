@@ -15,6 +15,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Query
 
 from api.data_provider import get_grid, get_grid_geojson
+from floodsight.config import ALERT_UPGRADE, COASTAL_UPGRADE_LGAS, OGUN_UPGRADE_LGAS
 
 log = logging.getLogger(__name__)
 
@@ -126,15 +127,7 @@ def get_grid_alerts(
     from floodsight.forecast.dam import try_dam_summary
     coastal = try_coastal_summary()
     dam     = try_dam_summary()
-    _COASTAL_LGAS    = {"Eti-Osa", "Lagos Island", "Apapa", "Amuwo-Odofin", "Lagos Mainland"}
-    _COASTAL_UPGRADE = {"No Alert": "Watch", "Watch": "Warning", "Warning": "Warning"}
-    # Ogun river floodplain LGAs — promoted when dam discharge advisory is active.
-    # Agege/Ifako-Ijaiye sit astride the Ogun lower reaches; Alimosho (Agbado
-    # Creek) is the main inland overflow corridor.  Same one-tier upgrade logic
-    # as the coastal signal — Watch→Warning if already Watch, else Watch.
-    _OGUN_LGAS       = {"Agege", "Ifako-Ijaiye", "Alimosho"}
-    _DAM_UPGRADE     = {"No Alert": "Watch", "Watch": "Warning", "Warning": "Warning"}
-    has_lga = "lga_name" in gdf.columns
+    has_lga          = "lga_name" in gdf.columns
     _coastal_active  = bool(coastal and coastal.get("advisory") and has_lga)
     _dam_active      = bool(dam     and dam.get("advisory")     and has_lga)
 
@@ -147,10 +140,10 @@ def get_grid_alerts(
     )):
         level = compute_alert_level(rc, r24, r72)
         lga   = str(gdf["lga_name"].iloc[i]) if has_lga else ""
-        if _coastal_active and lga in _COASTAL_LGAS:
-            level = _COASTAL_UPGRADE.get(level, level)
-        if _dam_active and lga in _OGUN_LGAS:
-            level = _DAM_UPGRADE.get(level, level)
+        if _coastal_active and lga in COASTAL_UPGRADE_LGAS:
+            level = ALERT_UPGRADE.get(level, level)
+        if _dam_active and lga in OGUN_UPGRADE_LGAS:
+            level = ALERT_UPGRADE.get(level, level)
         alert_levels.append(level)
 
     # 6. Count levels + per-LGA breakdown
@@ -250,10 +243,6 @@ def get_alert_summary(
     from floodsight.forecast.dam import try_dam_summary
     coastal = try_coastal_summary()
     dam     = try_dam_summary()
-    _COASTAL_LGAS    = {"Eti-Osa", "Lagos Island", "Apapa", "Amuwo-Odofin", "Lagos Mainland"}
-    _COASTAL_UPGRADE = {"No Alert": "Watch", "Watch": "Warning", "Warning": "Warning"}
-    _OGUN_LGAS       = {"Agege", "Ifako-Ijaiye", "Alimosho"}
-    _DAM_UPGRADE     = {"No Alert": "Watch", "Watch": "Warning", "Warning": "Warning"}
     has_lga          = "lga_name" in gdf.columns
     _coastal_active  = bool(coastal and coastal.get("advisory") and has_lga)
     _dam_active      = bool(dam     and dam.get("advisory")     and has_lga)
@@ -267,10 +256,10 @@ def get_alert_summary(
     )):
         level = compute_alert_level(rc, r24, r72)
         lga   = str(gdf["lga_name"].iloc[i]) if has_lga else ""
-        if _coastal_active and lga in _COASTAL_LGAS:
-            level = _COASTAL_UPGRADE.get(level, level)
-        if _dam_active and lga in _OGUN_LGAS:
-            level = _DAM_UPGRADE.get(level, level)
+        if _coastal_active and lga in COASTAL_UPGRADE_LGAS:
+            level = ALERT_UPGRADE.get(level, level)
+        if _dam_active and lga in OGUN_UPGRADE_LGAS:
+            level = ALERT_UPGRADE.get(level, level)
         counts[level] = counts.get(level, 0) + 1
 
     highest = (

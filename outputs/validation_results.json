@@ -8,9 +8,9 @@
       "description": "Severe flooding across multiple mainland LGAs. NEMA reported thousands displaced.",
       "source": "NEMA Lagos State Report, 2011",
       "reported_severity": "Warning",
-      "rain_24h_mm": 0.0,
-      "rain_72h_mm": 0.0,
-      "antecedent_30d_mm": 0.0,
+      "rain_24h_mm": 47.0,
+      "rain_72h_mm": 60.3,
+      "antecedent_30d_mm": 246.0,
       "hist_dam": {
         "advisory": false,
         "max_discharge_m3s": 7.5,
@@ -20,17 +20,17 @@
       "hist_coastal": null,
       "dam_advisory": false,
       "coastal_advisory": false,
-      "rain_24h_label": "Barely any rain",
-      "rain_72h_label": "Barely any rain",
+      "rain_24h_label": "Heavy downpour",
+      "rain_72h_label": "Heavy downpour",
       "alert_counts": {
         "Warning": 0,
-        "Watch": 0,
-        "No Alert": 24933
+        "Watch": 12466,
+        "No Alert": 12467
       },
-      "predicted_alert": "No Alert",
-      "correct": false,
+      "predicted_alert": "Watch",
+      "correct": true,
       "warning_pct": 0.0,
-      "watch_pct": 0.0
+      "watch_pct": 50.0
     },
     {
       "id": "2012_07",
@@ -40,9 +40,9 @@
       "description": "Widespread flooding following sustained rainfall. Lagos State declared emergency in affected LGAs.",
       "source": "Lagos State Emergency Management Agency, 2012",
       "reported_severity": "Warning",
-      "rain_24h_mm": 0.0,
-      "rain_72h_mm": 0.0,
-      "antecedent_30d_mm": 0.0,
+      "rain_24h_mm": 12.7,
+      "rain_72h_mm": 53.1,
+      "antecedent_30d_mm": 327.0,
       "hist_dam": {
         "advisory": false,
         "max_discharge_m3s": 4.1,
@@ -52,17 +52,17 @@
       "hist_coastal": null,
       "dam_advisory": false,
       "coastal_advisory": false,
-      "rain_24h_label": "Barely any rain",
-      "rain_72h_label": "Barely any rain",
+      "rain_24h_label": "Light shower",
+      "rain_72h_label": "Heavy downpour",
       "alert_counts": {
         "Warning": 0,
-        "Watch": 0,
-        "No Alert": 24933
+        "Watch": 12466,
+        "No Alert": 12467
       },
-      "predicted_alert": "No Alert",
-      "correct": false,
+      "predicted_alert": "Watch",
+      "correct": true,
       "warning_pct": 0.0,
-      "watch_pct": 0.0
+      "watch_pct": 50.0
     },
     {
       "id": "2017_06",
@@ -72,9 +72,9 @@
       "description": "Intense rainfall caused flooding on major roads and markets. Several deaths recorded.",
       "source": "Punch Newspapers / LASEMA, June 2017",
       "reported_severity": "Warning",
-      "rain_24h_mm": 0.0,
-      "rain_72h_mm": 0.0,
-      "antecedent_30d_mm": 0.0,
+      "rain_24h_mm": 12.2,
+      "rain_72h_mm": 94.7,
+      "antecedent_30d_mm": 243.4,
       "hist_dam": {
         "advisory": false,
         "max_discharge_m3s": 2.7,
@@ -84,17 +84,17 @@
       "hist_coastal": null,
       "dam_advisory": false,
       "coastal_advisory": false,
-      "rain_24h_label": "Barely any rain",
-      "rain_72h_label": "Barely any rain",
+      "rain_24h_label": "Light shower",
+      "rain_72h_label": "Very heavy rain",
       "alert_counts": {
         "Warning": 0,
-        "Watch": 0,
-        "No Alert": 24933
+        "Watch": 12466,
+        "No Alert": 12467
       },
-      "predicted_alert": "No Alert",
-      "correct": false,
+      "predicted_alert": "Watch",
+      "correct": true,
       "warning_pct": 0.0,
-      "watch_pct": 0.0
+      "watch_pct": 50.0
     },
     {
       "id": "2019_07",
@@ -104,8 +104,8 @@
       "description": "Heavy overnight rain inundated low-lying communities and the Eko Bridge axis.",
       "source": "The Guardian Nigeria, July 2019",
       "reported_severity": "Warning",
-      "rain_24h_mm": 4.1,
-      "rain_72h_mm": 10.9,
+      "rain_24h_mm": 4.7,
+      "rain_72h_mm": 9.5,
       "antecedent_30d_mm": 282.1,
       "hist_dam": {
         "advisory": false,
@@ -579,7 +579,7 @@
   ],
   "summary": {
     "total_events": 18,
-    "correct": 11,
-    "accuracy_pct": 61
+    "correct": 14,
+    "accuracy_pct": 78
   }
 }

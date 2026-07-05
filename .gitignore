@@ -16,6 +16,8 @@ data/processed/**
 # rather than requiring a Render deploy to regenerate the whole
 # pipeline from scratch.
 !data/processed/scored_grid.gpkg
+# Exception: street-level risk layer — served by /risk/streets
+!data/processed/streets_risk.gpkg
 # Exception: real labeled training dataset — hard to regenerate (requires
 # HyP3 SAR processing + FwDET + manual event curation), small enough to
 # commit directly (~80KB).

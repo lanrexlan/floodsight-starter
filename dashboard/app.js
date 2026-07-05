@@ -16,6 +16,55 @@ const RISK_COLORS = {
   "Very High": "#C23B3B",
 };
 
+// ---------------------------------------------------------------------------
+// Client-side alert engine — mirrors floodsight/alerts/engine.py exactly.
+// Used to re-color the map in real time when the user drags the sliders
+// without a round-trip to the server.
+// ---------------------------------------------------------------------------
+const ALERT_THRESHOLDS = {
+  WARNING_24H:   80,   // RAIN_WARNING_24H_MM
+  WARNING_72H:  100,   // RAIN_WARNING_72H_MM
+  WATCH_HIGH_24H: 20,  // RAIN_WATCH_HIGH_24H_MM
+  WATCH_HIGH_72H: 30,  // RAIN_WATCH_HIGH_72H_MM
+  WATCH_MOD_24H:  70,  // RAIN_WATCH_MODERATE_24H_MM
+  WATCH_MOD_72H: 100,  // RAIN_WATCH_MODERATE_72H_MM
+};
+
+function computeAlertLevel(riskClass, rain24, rain72) {
+  const high = riskClass === "High" || riskClass === "Very High";
+  if (high && (rain24 >= ALERT_THRESHOLDS.WARNING_24H || rain72 >= ALERT_THRESHOLDS.WARNING_72H))
+    return "Warning";
+  if (high && (rain24 >= ALERT_THRESHOLDS.WATCH_HIGH_24H || rain72 >= ALERT_THRESHOLDS.WATCH_HIGH_72H))
+    return "Watch";
+  if (riskClass === "Moderate" && (rain24 >= ALERT_THRESHOLDS.WATCH_MOD_24H || rain72 >= ALERT_THRESHOLDS.WATCH_MOD_72H))
+    return "Watch";
+  return "No Alert";
+}
+
+function applySliderAlerts() {
+  if (!_cachedGeojson) return;
+  const rain24 = Number(document.getElementById("rain24").value);
+  const rain72 = Number(document.getElementById("rain72").value);
+  let warn = 0, watch = 0;
+  _cachedGeojson.features.forEach(feat => {
+    const level = computeAlertLevel(feat.properties.risk_class, rain24, rain72);
+    feat.properties.alert_level = level !== "No Alert" ? level : undefined;
+    if (level === "Warning") warn++;
+    else if (level === "Watch") watch++;
+  });
+  map.getSource("risk-grid")?.setData(_cachedGeojson);
+  updateCityAlert(warn, watch, {});
+}
+
+// ---------------------------------------------------------------------------
+// Auto-refresh — re-fetch /forecast/alerts every 30 min without reloading
+// the page or re-fetching the heavy /risk/grid geometry.
+// ---------------------------------------------------------------------------
+const REFRESH_INTERVAL_MS = 30 * 60 * 1000;
+let _nextRefreshAt  = null;
+let _countdownTimer = null;
+let _cachedGeojson  = null;   // geometry cached after first load
+
 // Alert colors override risk colors when forecasts fire
 const ALERT_COLORS = {
   "Warning": "#FF4040",
@@ -60,6 +109,12 @@ let queryMarker = null;
 
 map.on("load", () => {
   loadForecastGrid();   // live alert colours + auto-populates sliders
+
+  // Re-fetch alerts every 30 min without touching the heavy grid geometry
+  setInterval(refreshAlerts, REFRESH_INTERVAL_MS);
+
+  // Click the status bar to refresh immediately
+  document.getElementById("api-status").addEventListener("click", refreshAlerts);
 });
 
 // ---------------------------------------------------------------------------
@@ -98,6 +153,7 @@ async function loadForecastGrid() {
     // Attach forecast to geojson so updateForecastSliders can read it
     geojson.forecast = alertData.forecast;
 
+    _cachedGeojson = geojson;   // cache for lightweight alert refreshes
     applyGridLayers(geojson);
 
     if (geojson.forecast) {
@@ -109,7 +165,7 @@ async function loadForecastGrid() {
     updateCityAlert(counts.Warning || 0, counts.Watch || 0, lgaAlerts);
 
     showDataSourceBanner(geojson.data_source);
-    setApiStatus(true);
+    setApiStatus(true, alertData.forecast?.fetched_at);
     wireMapClick();
   } catch (err) {
     console.warn("Forecast grid unavailable, falling back to static risk grid:", err);
@@ -134,6 +190,45 @@ async function loadRiskGrid() {
   } catch (err) {
     console.error("Failed to load risk grid:", err);
     setApiStatus(false);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// refreshAlerts — lightweight re-fetch of /forecast/alerts only.
+// Re-colors the existing map geometry without re-downloading the 54 k-cell
+// grid GeoJSON.  Called on 30-min timer and on manual status-bar click.
+// ---------------------------------------------------------------------------
+async function refreshAlerts() {
+  const statusEl = document.getElementById("api-status");
+  statusEl.textContent = "Refreshing…";
+  try {
+    const alertRes = await fetch(`${API_BASE_URL}/forecast/alerts`);
+    if (!alertRes.ok) throw new Error(`HTTP ${alertRes.status}`);
+    const alertData = await alertRes.json();
+
+    // Update cached geojson alert properties and push to map
+    if (_cachedGeojson) {
+      const levels = alertData.alert_levels || [];
+      const fc     = alertData.forecast || {};
+      _cachedGeojson.features.forEach((feat, i) => {
+        const level = levels[i];
+        feat.properties.alert_level            = (level && level !== "No Alert") ? level : undefined;
+        feat.properties.forecast_rain_24h_mm   = fc.rain_24h_mm  ?? 0;
+        feat.properties.forecast_rain_72h_mm   = fc.rain_72h_mm  ?? 0;
+      });
+      map.getSource("risk-grid")?.setData(_cachedGeojson);
+    }
+
+    const counts    = alertData.alert_counts || {};
+    const lgaAlerts = alertData.lga_alerts   || {};
+    updateCityAlert(counts.Warning || 0, counts.Watch || 0, lgaAlerts);
+
+    if (alertData.forecast) updateForecastSliders(alertData.forecast);
+
+    setApiStatus(true, alertData.forecast?.fetched_at);
+  } catch (err) {
+    console.warn("Alert refresh failed:", err);
+    statusEl.textContent = "Refresh failed — click to retry";
   }
 }
 
@@ -450,10 +545,12 @@ const rain72Input = document.getElementById("rain72");
 rain24Input.addEventListener("input", () => {
   document.getElementById("rain24-val").textContent = `${rain24Input.value} mm`;
   markManual();
+  applySliderAlerts();   // re-color map in real time
 });
 rain72Input.addEventListener("input", () => {
   document.getElementById("rain72-val").textContent = `${rain72Input.value} mm`;
   markManual();
+  applySliderAlerts();   // re-color map in real time
 });
 
 function markManual() {
@@ -536,13 +633,35 @@ function showDataSourceBanner(source) {
   }
 }
 
-function setApiStatus(ok) {
+function setApiStatus(ok, fetchedAt) {
   const el = document.getElementById("api-status");
   el.classList.toggle("ok", ok);
   el.classList.toggle("err", !ok);
-  el.textContent = ok
-    ? `API connected · ${API_BASE_URL || window.location.host}`
-    : `Cannot reach API at ${API_BASE_URL}`;
+  el.title  = "Click to refresh now";
+  el.style.cursor = "pointer";
+
+  if (!ok) {
+    el.textContent = `Cannot reach API · click to retry`;
+    clearInterval(_countdownTimer);
+    return;
+  }
+
+  // Record when the next scheduled refresh will fire
+  _nextRefreshAt = Date.now() + REFRESH_INTERVAL_MS;
+
+  const updatedStr = fetchedAt
+    ? new Date(fetchedAt).toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Lagos" })
+    : new Date().toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Lagos" });
+
+  clearInterval(_countdownTimer);
+  _countdownTimer = setInterval(() => {
+    const remaining = Math.max(0, _nextRefreshAt - Date.now());
+    const m = Math.floor(remaining / 60000);
+    const s = Math.floor((remaining % 60000) / 1000);
+    el.textContent = remaining > 0
+      ? `Updated ${updatedStr} · Next in ${m}:${String(s).padStart(2, "0")} · Click to refresh`
+      : "Refreshing…";
+  }, 1000);
 }
 
 function setBeacon(level) {

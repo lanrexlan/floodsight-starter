@@ -739,7 +739,7 @@ footer {
       loading="lazy"
       allow="fullscreen"
     ></iframe>
-    <div class="map-overlay-badge">◎ Live · Updates every 30 min</div>
+    <div class="map-overlay-badge" id="live-badge">◎ Live · Updates every 30 min</div>
   </div>
 </section>
 
@@ -1291,16 +1291,48 @@ function renderTrackError() {
     '<span style="color:var(--muted);font-size:13px;">⚠ Validation data temporarily unavailable. The server may still be loading — please refresh in 60 seconds.</span>';
 }
 
+// ── Auto-refreshing live data ──────────────────────────────────────
+const LIVE_REFRESH_MS = 30 * 60 * 1000;  // 30 minutes, matching API cache
+let _liveNextRefreshAt  = null;
+let _liveCountdownTimer = null;
+
+function loadLiveConditions() {
+  fetch(`${API}/forecast/summary`)
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(data => {
+      renderStatus(data);
+      startLiveCountdown(data.forecast?.fetched_at);
+    })
+    .catch(renderError);
+}
+
+function startLiveCountdown(fetchedAt) {
+  const badge = document.getElementById('live-badge');
+  if (!badge) return;
+  _liveNextRefreshAt = Date.now() + LIVE_REFRESH_MS;
+  const updatedStr = fetchedAt
+    ? new Date(fetchedAt).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Lagos' })
+    : new Date().toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Lagos' });
+  clearInterval(_liveCountdownTimer);
+  _liveCountdownTimer = setInterval(() => {
+    const remaining = Math.max(0, _liveNextRefreshAt - Date.now());
+    const m = Math.floor(remaining / 60000);
+    const s = Math.floor((remaining % 60000) / 1000);
+    badge.textContent = remaining > 0
+      ? `◎ Live · Updated ${updatedStr} · Next in ${m}:${String(s).padStart(2, '0')}`
+      : '◎ Refreshing…';
+  }, 1000);
+}
+
+// Track record is static data — load once
 fetch(`${API}/validate/events`)
   .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
   .then(renderTrackRecord)
   .catch(renderTrackError);
 
-// ── Fetch ─────────────────────────────────────────────────────────
-fetch(`${API}/forecast/summary`)
-  .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-  .then(renderStatus)
-  .catch(renderError);
+// Live conditions — load now, then every 30 min
+loadLiveConditions();
+setInterval(loadLiveConditions, LIVE_REFRESH_MS);
 
 // ═══════════════════════════════════════════════════════════════════
 // Phase 16 — Subscription form
