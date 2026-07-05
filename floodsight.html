@@ -716,6 +716,7 @@ footer {
       </div>
       <div id="rain-72-note" style="font-size:12px;color:var(--muted);margin-top:12px;line-height:1.5;"></div>
       <div class="status-updated" id="status-updated"></div>
+      <div id="status-next-refresh" style="font-size:11px;color:var(--muted);margin-top:3px;"></div>
     </div>
   </div>
 </section>
@@ -1307,8 +1308,8 @@ function loadLiveConditions() {
 }
 
 function startLiveCountdown(fetchedAt) {
-  const badge = document.getElementById('live-badge');
-  if (!badge) return;
+  const badge  = document.getElementById('live-badge');
+  const nextEl = document.getElementById('status-next-refresh');
   _liveNextRefreshAt = Date.now() + LIVE_REFRESH_MS;
   const updatedStr = fetchedAt
     ? new Date(fetchedAt).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Lagos' })
@@ -1318,9 +1319,19 @@ function startLiveCountdown(fetchedAt) {
     const remaining = Math.max(0, _liveNextRefreshAt - Date.now());
     const m = Math.floor(remaining / 60000);
     const s = Math.floor((remaining % 60000) / 1000);
-    badge.textContent = remaining > 0
-      ? `◎ Live · Updated ${updatedStr} · Next in ${m}:${String(s).padStart(2, '0')}`
-      : '◎ Refreshing…';
+    const tick = remaining > 0
+      ? `${m}:${String(s).padStart(2, '0')}`
+      : null;
+    if (badge) {
+      badge.textContent = tick
+        ? `◎ Live · Updated ${updatedStr} · Next in ${tick}`
+        : '◎ Refreshing…';
+    }
+    if (nextEl) {
+      nextEl.textContent = tick
+        ? `◎ Auto-refreshes in ${tick}`
+        : '◎ Refreshing…';
+    }
   }, 1000);
 }
 

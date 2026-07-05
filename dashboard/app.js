@@ -48,7 +48,8 @@ function applySliderAlerts() {
   let warn = 0, watch = 0;
   _cachedGeojson.features.forEach(feat => {
     const level = computeAlertLevel(feat.properties.risk_class, rain24, rain72);
-    feat.properties.alert_level = level !== "No Alert" ? level : undefined;
+    if (level !== "No Alert") { feat.properties.alert_level = level; }
+    else { delete feat.properties.alert_level; }
     if (level === "Warning") warn++;
     else if (level === "Watch") watch++;
   });
@@ -183,6 +184,7 @@ async function loadRiskGrid() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const geojson = await res.json();
 
+    _cachedGeojson = geojson;   // cache so sliders work on fallback path too
     applyGridLayers(geojson);
     showDataSourceBanner(geojson.data_source);
     setApiStatus(true);
@@ -212,7 +214,8 @@ async function refreshAlerts() {
       const fc     = alertData.forecast || {};
       _cachedGeojson.features.forEach((feat, i) => {
         const level = levels[i];
-        feat.properties.alert_level            = (level && level !== "No Alert") ? level : undefined;
+        if (level && level !== "No Alert") { feat.properties.alert_level = level; }
+        else { delete feat.properties.alert_level; }
         feat.properties.forecast_rain_24h_mm   = fc.rain_24h_mm  ?? 0;
         feat.properties.forecast_rain_72h_mm   = fc.rain_72h_mm  ?? 0;
       });
@@ -223,7 +226,11 @@ async function refreshAlerts() {
     const lgaAlerts = alertData.lga_alerts   || {};
     updateCityAlert(counts.Warning || 0, counts.Watch || 0, lgaAlerts);
 
-    if (alertData.forecast) updateForecastSliders(alertData.forecast);
+    // Don't reset sliders if user has manually adjusted them
+    const _badge = document.getElementById("forecast-badge");
+    if (alertData.forecast && !(_badge?.dataset.manual)) {
+      updateForecastSliders(alertData.forecast);
+    }
 
     setApiStatus(true, alertData.forecast?.fetched_at);
   } catch (err) {
