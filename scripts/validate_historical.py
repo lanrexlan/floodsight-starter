@@ -146,9 +146,22 @@ def main() -> None:
         "--api", default=None,
         help="If provided, fetch results from the deployed API instead of running locally."
     )
+    parser.add_argument(
+        "--cached", action="store_true",
+        help="Load results from the last saved outputs/validation_results.json instead of re-fetching."
+    )
     args = parser.parse_args()
 
-    if args.api:
+    cache_path = Path(__file__).resolve().parent.parent / "outputs" / "validation_results.json"
+
+    if args.cached:
+        if not cache_path.exists():
+            log.error("No cached results found at %s — run without --cached first.", cache_path)
+            sys.exit(1)
+        with open(cache_path) as f:
+            data = json.load(f)
+        log.info("Loaded cached results from %s", cache_path)
+    elif args.api:
         try:
             data = fetch_from_api(args.api)
         except Exception as exc:
