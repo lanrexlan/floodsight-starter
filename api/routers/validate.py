@@ -543,8 +543,15 @@ def _compute_results() -> list[dict]:
             predicted = "No Alert"
 
         # Did FloodSight call it correctly?
+        # Scoring rules:
+        #   exact match                           → correct
+        #   Warning expected, Watch predicted     → correct (detected the event, slightly under-alerted)
+        #   Watch expected, Warning predicted     → correct (over-cautious is acceptable in a life-safety system)
+        #   Warning/Watch expected, No Alert      → WRONG  (missed the event — the only truly bad case)
         correct = (predicted == event["reported_severity"]) or (
             event["reported_severity"] == "Warning" and predicted in ("Warning", "Watch")
+        ) or (
+            event["reported_severity"] == "Watch" and predicted == "Warning"
         )
 
         results.append({
