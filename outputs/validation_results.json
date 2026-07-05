@@ -8,19 +8,29 @@
       "description": "Severe flooding across multiple mainland LGAs. NEMA reported thousands displaced.",
       "source": "NEMA Lagos State Report, 2011",
       "reported_severity": "Warning",
-      "rain_24h_mm": 58.0,
-      "rain_72h_mm": 75.2,
-      "rain_24h_label": "Heavy downpour",
-      "rain_72h_label": "Heavy downpour",
+      "rain_24h_mm": 0.0,
+      "rain_72h_mm": 0.0,
+      "antecedent_30d_mm": 0.0,
+      "hist_dam": {
+        "advisory": false,
+        "max_discharge_m3s": 7.5,
+        "peak_day": "2011-07-10",
+        "threshold_m3s": 300.0
+      },
+      "hist_coastal": null,
+      "dam_advisory": false,
+      "coastal_advisory": false,
+      "rain_24h_label": "Barely any rain",
+      "rain_72h_label": "Barely any rain",
       "alert_counts": {
         "Warning": 0,
-        "Watch": 27057,
-        "No Alert": 27058
+        "Watch": 0,
+        "No Alert": 24933
       },
-      "predicted_alert": "Watch",
-      "correct": true,
+      "predicted_alert": "No Alert",
+      "correct": false,
       "warning_pct": 0.0,
-      "watch_pct": 50.0
+      "watch_pct": 0.0
     },
     {
       "id": "2012_07",
@@ -30,19 +40,29 @@
       "description": "Widespread flooding following sustained rainfall. Lagos State declared emergency in affected LGAs.",
       "source": "Lagos State Emergency Management Agency, 2012",
       "reported_severity": "Warning",
-      "rain_24h_mm": 15.3,
-      "rain_72h_mm": 60.7,
-      "rain_24h_label": "Light shower",
-      "rain_72h_label": "Heavy downpour",
+      "rain_24h_mm": 0.0,
+      "rain_72h_mm": 0.0,
+      "antecedent_30d_mm": 0.0,
+      "hist_dam": {
+        "advisory": false,
+        "max_discharge_m3s": 4.1,
+        "peak_day": "2012-07-03",
+        "threshold_m3s": 300.0
+      },
+      "hist_coastal": null,
+      "dam_advisory": false,
+      "coastal_advisory": false,
+      "rain_24h_label": "Barely any rain",
+      "rain_72h_label": "Barely any rain",
       "alert_counts": {
         "Warning": 0,
-        "Watch": 27057,
-        "No Alert": 27058
+        "Watch": 0,
+        "No Alert": 24933
       },
-      "predicted_alert": "Watch",
-      "correct": true,
+      "predicted_alert": "No Alert",
+      "correct": false,
       "warning_pct": 0.0,
-      "watch_pct": 50.0
+      "watch_pct": 0.0
     },
     {
       "id": "2017_06",
@@ -52,19 +72,29 @@
       "description": "Intense rainfall caused flooding on major roads and markets. Several deaths recorded.",
       "source": "Punch Newspapers / LASEMA, June 2017",
       "reported_severity": "Warning",
-      "rain_24h_mm": 10.1,
-      "rain_72h_mm": 40.1,
-      "rain_24h_label": "Light shower",
-      "rain_72h_label": "Heavy downpour",
+      "rain_24h_mm": 0.0,
+      "rain_72h_mm": 0.0,
+      "antecedent_30d_mm": 0.0,
+      "hist_dam": {
+        "advisory": false,
+        "max_discharge_m3s": 2.7,
+        "peak_day": "2017-06-20",
+        "threshold_m3s": 300.0
+      },
+      "hist_coastal": null,
+      "dam_advisory": false,
+      "coastal_advisory": false,
+      "rain_24h_label": "Barely any rain",
+      "rain_72h_label": "Barely any rain",
       "alert_counts": {
         "Warning": 0,
-        "Watch": 27057,
-        "No Alert": 27058
+        "Watch": 0,
+        "No Alert": 24933
       },
-      "predicted_alert": "Watch",
-      "correct": true,
+      "predicted_alert": "No Alert",
+      "correct": false,
       "warning_pct": 0.0,
-      "watch_pct": 50.0
+      "watch_pct": 0.0
     },
     {
       "id": "2019_07",
@@ -74,14 +104,24 @@
       "description": "Heavy overnight rain inundated low-lying communities and the Eko Bridge axis.",
       "source": "The Guardian Nigeria, July 2019",
       "reported_severity": "Warning",
-      "rain_24h_mm": 3.8,
-      "rain_72h_mm": 8.8,
+      "rain_24h_mm": 4.1,
+      "rain_72h_mm": 10.9,
+      "antecedent_30d_mm": 282.1,
+      "hist_dam": {
+        "advisory": false,
+        "max_discharge_m3s": 2.1,
+        "peak_day": "2019-07-10",
+        "threshold_m3s": 300.0
+      },
+      "hist_coastal": null,
+      "dam_advisory": false,
+      "coastal_advisory": false,
       "rain_24h_label": "Barely any rain",
       "rain_72h_label": "Light shower",
       "alert_counts": {
         "Warning": 0,
         "Watch": 0,
-        "No Alert": 54115
+        "No Alert": 24933
       },
       "predicted_alert": "No Alert",
       "correct": false,
@@ -92,23 +132,33 @@
       "id": "2020_06",
       "name": "June 2020 Lagos Floods",
       "peak_date": "2020-06-18",
-      "areas": "Eti-Osa, Kosofe, Gbagada",
-      "description": "Flooding in coastal areas of Eti-Osa and Kosofe following a long wet spell.",
-      "source": "Vanguard Newspaper, June 2020",
+      "areas": "Eti-Osa, Kosofe, Gbagada, Orile-Agege, Ogudu",
+      "description": "Almost 90mm of rain fell 18-19 June. 20 families displaced at Orile-Agege; child swept away. House collapsed in Ogudu.",
+      "source": "FloodList / LASEMA, June 2020",
       "reported_severity": "Warning",
-      "rain_24h_mm": 110.5,
-      "rain_72h_mm": 120.6,
-      "rain_24h_label": "Very heavy rain",
+      "rain_24h_mm": 59.2,
+      "rain_72h_mm": 84.7,
+      "antecedent_30d_mm": 261.7,
+      "hist_dam": {
+        "advisory": false,
+        "max_discharge_m3s": 2.9,
+        "peak_day": "2020-06-19",
+        "threshold_m3s": 300.0
+      },
+      "hist_coastal": null,
+      "dam_advisory": false,
+      "coastal_advisory": false,
+      "rain_24h_label": "Heavy downpour",
       "rain_72h_label": "Very heavy rain",
       "alert_counts": {
-        "Warning": 27057,
-        "Watch": 13529,
-        "No Alert": 13529
+        "Warning": 0,
+        "Watch": 12466,
+        "No Alert": 12467
       },
-      "predicted_alert": "Warning",
+      "predicted_alert": "Watch",
       "correct": true,
-      "warning_pct": 50.0,
-      "watch_pct": 25.0
+      "warning_pct": 0.0,
+      "watch_pct": 50.0
     },
     {
       "id": "2022_07",
@@ -118,19 +168,29 @@
       "description": "Major flooding following days of heavy rain. Critical roads impassable for 48 hours.",
       "source": "NAN / Lagos State Govt. Sitrep, July 2022",
       "reported_severity": "Warning",
-      "rain_24h_mm": 1.5,
-      "rain_72h_mm": 28.5,
-      "rain_24h_label": "Barely any rain",
+      "rain_24h_mm": 5.8,
+      "rain_72h_mm": 21.9,
+      "antecedent_30d_mm": 334.3,
+      "hist_dam": {
+        "advisory": false,
+        "max_discharge_m3s": 3.3,
+        "peak_day": "2022-07-05",
+        "threshold_m3s": 300.0
+      },
+      "hist_coastal": null,
+      "dam_advisory": false,
+      "coastal_advisory": false,
+      "rain_24h_label": "Light shower",
       "rain_72h_label": "Steady rain",
       "alert_counts": {
         "Warning": 0,
-        "Watch": 0,
-        "No Alert": 54115
+        "Watch": 12466,
+        "No Alert": 12467
       },
-      "predicted_alert": "No Alert",
-      "correct": false,
+      "predicted_alert": "Watch",
+      "correct": true,
       "warning_pct": 0.0,
-      "watch_pct": 0.0
+      "watch_pct": 50.0
     },
     {
       "id": "2022_10",
@@ -140,14 +200,24 @@
       "description": "Flooding exacerbated by upstream dam releases on the Niger and Benue. Widespread coastal inundation.",
       "source": "Federal Ministry of Humanitarian Affairs, Oct 2022",
       "reported_severity": "Warning",
-      "rain_24h_mm": 5.3,
-      "rain_72h_mm": 14.3,
-      "rain_24h_label": "Light shower",
+      "rain_24h_mm": 3.8,
+      "rain_72h_mm": 10.9,
+      "antecedent_30d_mm": 266.9,
+      "hist_dam": {
+        "advisory": false,
+        "max_discharge_m3s": 1.4,
+        "peak_day": "2022-10-08",
+        "threshold_m3s": 300.0
+      },
+      "hist_coastal": null,
+      "dam_advisory": false,
+      "coastal_advisory": false,
+      "rain_24h_label": "Barely any rain",
       "rain_72h_label": "Light shower",
       "alert_counts": {
         "Warning": 0,
         "Watch": 0,
-        "No Alert": 54115
+        "No Alert": 24933
       },
       "predicted_alert": "No Alert",
       "correct": false,
@@ -162,25 +232,354 @@
       "description": "Flash flooding on the Ikorodu Road corridor following an intense storm.",
       "source": "Channels TV, June 2023",
       "reported_severity": "Watch",
-      "rain_24h_mm": 6.4,
-      "rain_72h_mm": 18.3,
+      "rain_24h_mm": 19.3,
+      "rain_72h_mm": 55.2,
+      "antecedent_30d_mm": 271.4,
+      "hist_dam": {
+        "advisory": false,
+        "max_discharge_m3s": 2.2,
+        "peak_day": "2023-06-15",
+        "threshold_m3s": 300.0
+      },
+      "hist_coastal": null,
+      "dam_advisory": false,
+      "coastal_advisory": false,
       "rain_24h_label": "Light shower",
+      "rain_72h_label": "Heavy downpour",
+      "alert_counts": {
+        "Warning": 0,
+        "Watch": 12466,
+        "No Alert": 12467
+      },
+      "predicted_alert": "Watch",
+      "correct": true,
+      "warning_pct": 0.0,
+      "watch_pct": 50.0
+    },
+    {
+      "id": "2015_07",
+      "name": "July 2015 Lagos Floods",
+      "peak_date": "2015-07-14",
+      "areas": "Mushin, Surulere, Lagos Island, Festac",
+      "description": "Widespread flooding after sustained July rains. LASEMA deployed to multiple hotspots.",
+      "source": "Vanguard Newspaper / LASEMA Sitrep, July 2015",
+      "reported_severity": "Warning",
+      "rain_24h_mm": 7.9,
+      "rain_72h_mm": 23.7,
+      "antecedent_30d_mm": 173.0,
+      "hist_dam": {
+        "advisory": false,
+        "max_discharge_m3s": 1.6,
+        "peak_day": "2015-07-16",
+        "threshold_m3s": 300.0
+      },
+      "hist_coastal": null,
+      "dam_advisory": false,
+      "coastal_advisory": false,
+      "rain_24h_label": "Light shower",
+      "rain_72h_label": "Steady rain",
+      "alert_counts": {
+        "Warning": 0,
+        "Watch": 12466,
+        "No Alert": 12467
+      },
+      "predicted_alert": "Watch",
+      "correct": true,
+      "warning_pct": 0.0,
+      "watch_pct": 50.0
+    },
+    {
+      "id": "2016_07",
+      "name": "July 2016 Lagos Floods",
+      "peak_date": "2016-07-19",
+      "areas": "Ajah, Lagos Island, Victoria Island, Lekki Phase II",
+      "description": "Severe flooding across coastal LGAs. Roads impassable for 24+ hours.",
+      "source": "Punch Newspapers / NEMA, July 2016",
+      "reported_severity": "Warning",
+      "rain_24h_mm": 2.6,
+      "rain_72h_mm": 6.3,
+      "antecedent_30d_mm": 91.9,
+      "hist_dam": {
+        "advisory": false,
+        "max_discharge_m3s": 2.2,
+        "peak_day": "2016-07-21",
+        "threshold_m3s": 300.0
+      },
+      "hist_coastal": null,
+      "dam_advisory": false,
+      "coastal_advisory": false,
+      "rain_24h_label": "Barely any rain",
       "rain_72h_label": "Light shower",
       "alert_counts": {
         "Warning": 0,
         "Watch": 0,
-        "No Alert": 54115
+        "No Alert": 24933
       },
       "predicted_alert": "No Alert",
       "correct": false,
       "warning_pct": 0.0,
       "watch_pct": 0.0
+    },
+    {
+      "id": "2018_06",
+      "name": "June 2018 Lagos Floods",
+      "peak_date": "2018-06-21",
+      "areas": "Ikeja, Agege, Alimosho, Surulere",
+      "description": "Heavy overnight storm triggered flash flooding on major arterial roads.",
+      "source": "The Guardian Nigeria / LASEMA, June 2018",
+      "reported_severity": "Warning",
+      "rain_24h_mm": 29.2,
+      "rain_72h_mm": 64.4,
+      "antecedent_30d_mm": 183.4,
+      "hist_dam": {
+        "advisory": false,
+        "max_discharge_m3s": 2.9,
+        "peak_day": "2018-06-23",
+        "threshold_m3s": 300.0
+      },
+      "hist_coastal": null,
+      "dam_advisory": false,
+      "coastal_advisory": false,
+      "rain_24h_label": "Steady rain",
+      "rain_72h_label": "Heavy downpour",
+      "alert_counts": {
+        "Warning": 0,
+        "Watch": 12466,
+        "No Alert": 12467
+      },
+      "predicted_alert": "Watch",
+      "correct": true,
+      "warning_pct": 0.0,
+      "watch_pct": 50.0
+    },
+    {
+      "id": "2019_10",
+      "name": "October 2019 Oyan Dam Flooding",
+      "peak_date": "2019-10-21",
+      "areas": "Badagry, Epe, coastal Lagos LGAs",
+      "description": "Flooding amplified by release of water from Oyan Dam (Abeokuta). Six deaths reported in Lagos.",
+      "source": "FloodList / NEMA Sitrep, October 2019",
+      "reported_severity": "Warning",
+      "rain_24h_mm": 0.3,
+      "rain_72h_mm": 40.4,
+      "antecedent_30d_mm": 480.8,
+      "hist_dam": {
+        "advisory": false,
+        "max_discharge_m3s": 11.9,
+        "peak_day": "2019-10-19",
+        "threshold_m3s": 300.0
+      },
+      "hist_coastal": null,
+      "dam_advisory": false,
+      "coastal_advisory": false,
+      "rain_24h_label": "Barely any rain",
+      "rain_72h_label": "Heavy downpour",
+      "alert_counts": {
+        "Warning": 0,
+        "Watch": 12466,
+        "No Alert": 12467
+      },
+      "predicted_alert": "Watch",
+      "correct": true,
+      "warning_pct": 0.0,
+      "watch_pct": 50.0
+    },
+    {
+      "id": "2021_07a",
+      "name": "July 2021 Lagos Tidal-Rain Surge",
+      "peak_date": "2021-07-10",
+      "areas": "Lagos Island, Victoria Island, Lekki, Ikoyi",
+      "description": "Major flooding from combination of heavy rain and high tides raising sea level 122cm above normal. Cars submerged, 4,000+ displaced.",
+      "source": "LASEMA / Interconnected Disaster Risks Report, 2021",
+      "reported_severity": "Warning",
+      "rain_24h_mm": 0.3,
+      "rain_72h_mm": 12.8,
+      "antecedent_30d_mm": 179.7,
+      "hist_dam": {
+        "advisory": false,
+        "max_discharge_m3s": 0.9,
+        "peak_day": "2021-07-09",
+        "threshold_m3s": 300.0
+      },
+      "hist_coastal": null,
+      "dam_advisory": false,
+      "coastal_advisory": false,
+      "rain_24h_label": "Barely any rain",
+      "rain_72h_label": "Light shower",
+      "alert_counts": {
+        "Warning": 0,
+        "Watch": 0,
+        "No Alert": 24933
+      },
+      "predicted_alert": "No Alert",
+      "correct": false,
+      "warning_pct": 0.0,
+      "watch_pct": 0.0
+    },
+    {
+      "id": "2021_07b",
+      "name": "July 2021 Lagos Flash Floods",
+      "peak_date": "2021-07-16",
+      "areas": "Lagos Mainland, Gbagada, Mushin, Oshodi",
+      "description": "Heavy rainfall caused flood depths up to 50 cm in residential areas. Significant vehicle damage reported.",
+      "source": "FloodList, July 2021",
+      "reported_severity": "Watch",
+      "rain_24h_mm": 124.4,
+      "rain_72h_mm": 157.8,
+      "antecedent_30d_mm": 191.0,
+      "hist_dam": {
+        "advisory": false,
+        "max_discharge_m3s": 12.2,
+        "peak_day": "2021-07-16",
+        "threshold_m3s": 300.0
+      },
+      "hist_coastal": null,
+      "dam_advisory": false,
+      "coastal_advisory": false,
+      "rain_24h_label": "Very heavy rain",
+      "rain_72h_label": "Extreme rainfall",
+      "alert_counts": {
+        "Warning": 12466,
+        "Watch": 6233,
+        "No Alert": 6234
+      },
+      "predicted_alert": "Warning",
+      "correct": true,
+      "warning_pct": 50.0,
+      "watch_pct": 25.0
+    },
+    {
+      "id": "2022_06",
+      "name": "June 2022 Lagos Pre-Peak Floods",
+      "peak_date": "2022-06-18",
+      "areas": "Lagos Mainland, Apapa, Mushin",
+      "description": "Roads and houses flooded after a downpour. Event preceded the larger July 2022 flooding by three weeks.",
+      "source": "FloodList / NAN, June 2022",
+      "reported_severity": "Watch",
+      "rain_24h_mm": 10.8,
+      "rain_72h_mm": 85.0,
+      "antecedent_30d_mm": 270.4,
+      "hist_dam": {
+        "advisory": false,
+        "max_discharge_m3s": 3.8,
+        "peak_day": "2022-06-16",
+        "threshold_m3s": 300.0
+      },
+      "hist_coastal": null,
+      "dam_advisory": false,
+      "coastal_advisory": false,
+      "rain_24h_label": "Light shower",
+      "rain_72h_label": "Very heavy rain",
+      "alert_counts": {
+        "Warning": 0,
+        "Watch": 12466,
+        "No Alert": 12467
+      },
+      "predicted_alert": "Watch",
+      "correct": true,
+      "warning_pct": 0.0,
+      "watch_pct": 50.0
+    },
+    {
+      "id": "2023_09",
+      "name": "September 2023 Lagos Floods",
+      "peak_date": "2023-09-14",
+      "areas": "Ikorodu, Kosofe, Gbagada, Ketu",
+      "description": "End-of-season heavy rains flooded Ikorodu Road and surrounding communities. LASEMA reported over N10bn cumulative losses for 2023.",
+      "source": "LASEMA Annual Report 2023 / Channels TV",
+      "reported_severity": "Watch",
+      "rain_24h_mm": 2.2,
+      "rain_72h_mm": 28.2,
+      "antecedent_30d_mm": 261.1,
+      "hist_dam": {
+        "advisory": false,
+        "max_discharge_m3s": 3.5,
+        "peak_day": "2023-09-16",
+        "threshold_m3s": 300.0
+      },
+      "hist_coastal": null,
+      "dam_advisory": false,
+      "coastal_advisory": false,
+      "rain_24h_label": "Barely any rain",
+      "rain_72h_label": "Steady rain",
+      "alert_counts": {
+        "Warning": 0,
+        "Watch": 12466,
+        "No Alert": 12467
+      },
+      "predicted_alert": "Watch",
+      "correct": true,
+      "warning_pct": 0.0,
+      "watch_pct": 50.0
+    },
+    {
+      "id": "2024_06",
+      "name": "June 2024 Lagos Floods",
+      "peak_date": "2024-06-28",
+      "areas": "Oshodi, Mushin, Surulere, Egbeda, Gbagada, Ilupeju",
+      "description": "Hours of heavy rainfall put major roads and residential communities under water. Multiple LGAs affected simultaneously.",
+      "source": "Punch Newspapers / LASEMA, June 2024",
+      "reported_severity": "Warning",
+      "rain_24h_mm": 10.6,
+      "rain_72h_mm": 65.5,
+      "antecedent_30d_mm": 250.8,
+      "hist_dam": {
+        "advisory": false,
+        "max_discharge_m3s": 2.4,
+        "peak_day": "2024-06-27",
+        "threshold_m3s": 300.0
+      },
+      "hist_coastal": null,
+      "dam_advisory": false,
+      "coastal_advisory": false,
+      "rain_24h_label": "Light shower",
+      "rain_72h_label": "Heavy downpour",
+      "alert_counts": {
+        "Warning": 0,
+        "Watch": 12466,
+        "No Alert": 12467
+      },
+      "predicted_alert": "Watch",
+      "correct": true,
+      "warning_pct": 0.0,
+      "watch_pct": 50.0
+    },
+    {
+      "id": "2024_07",
+      "name": "July 2024 Lekki Floods",
+      "peak_date": "2024-07-03",
+      "areas": "Lekki, Ibeju-Lekki, Ikoyi, Mushin, Ketu",
+      "description": "10-hour rainfall caused buildings to collapse and cars to be swept away in Lekki. Student carried away by floods in Ketu.",
+      "source": "Wikipedia / Punch / TheCable, July 2024",
+      "reported_severity": "Warning",
+      "rain_24h_mm": 33.9,
+      "rain_72h_mm": 84.4,
+      "antecedent_30d_mm": 306.6,
+      "hist_dam": {
+        "advisory": false,
+        "max_discharge_m3s": 3.0,
+        "peak_day": "2024-07-04",
+        "threshold_m3s": 300.0
+      },
+      "hist_coastal": null,
+      "dam_advisory": false,
+      "coastal_advisory": false,
+      "rain_24h_label": "Steady rain",
+      "rain_72h_label": "Very heavy rain",
+      "alert_counts": {
+        "Warning": 0,
+        "Watch": 12466,
+        "No Alert": 12467
+      },
+      "predicted_alert": "Watch",
+      "correct": true,
+      "warning_pct": 0.0,
+      "watch_pct": 50.0
     }
   ],
   "summary": {
-    "total_events": 8,
-    "correct": 4,
-    "accuracy_pct": 50,
-    "note": "FloodSight is considered 'correct' if it issued Warning or Watch for a documented Warning event, and Warning for a Warning event."
+    "total_events": 18,
+    "correct": 11,
+    "accuracy_pct": 61
   }
 }
