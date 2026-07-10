@@ -165,6 +165,18 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    # Idempotency guard: if this is a backup/retry run and the briefing was
+    # already sent today (logged in Supabase), skip to avoid double-sending.
+    if not args.dry_run and os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_KEY"):
+        try:
+            from floodsight.db.supabase_client import briefing_sent_today
+            if briefing_sent_today():
+                log.info("Briefing already sent today (Lagos time) — skipping. "
+                         "This backup run is not needed.")
+                return
+        except Exception as exc:
+            log.warning("Could not check briefing_log (%s) — proceeding anyway.", exc)
+
     # Resolve recipients: Supabase subscriber base first (P2 item 11 —
     # the briefing previously went only to a hardcoded AT_RECIPIENTS list,
     # bypassing every resident who subscribed via the dashboard).
@@ -229,6 +241,14 @@ def main() -> None:
     except (ValueError, RuntimeError) as exc:
         log.error("Send failed: %s", exc)
         sys.exit(1)
+
+    # Log the send so backup cron runs don't double-send
+    if os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_KEY"):
+        try:
+            from floodsight.db.supabase_client import log_briefing_sent
+            log_briefing_sent(len(recipients), dry_run=False)
+        except Exception as exc:
+            log.warning("Could not write to briefing_log (%s) — not fatal.", exc)
 
 
 if __name__ == "__main__":

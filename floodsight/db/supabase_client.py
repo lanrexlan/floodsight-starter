@@ -406,6 +406,47 @@ def get_dispatch_cells(event_date: str | None = None) -> list[dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
+# Morning briefing idempotency log
+# ---------------------------------------------------------------------------
+
+def briefing_sent_today() -> bool:
+    """
+    Return True if a (non-dry-run) morning briefing was already sent today
+    in Lagos time.  Used by the backup cron to avoid double-sending.
+    """
+    client = _get_client()
+    result = (
+        client.table("briefing_log")
+        .select("id", count="exact", head=True)
+        .eq("sent_date", today_lagos())
+        .eq("dry_run", False)
+        .execute()
+    )
+    return (result.count or 0) > 0
+
+
+def log_briefing_sent(recipient_count: int, dry_run: bool = False) -> None:
+    """
+    Record that the morning briefing was sent today.  The UNIQUE constraint
+    on sent_date means a second call is a safe no-op (conflict is ignored).
+    """
+    client = _get_client()
+    try:
+        client.table("briefing_log").insert({
+            "sent_date":       today_lagos(),
+            "recipient_count": recipient_count,
+            "dry_run":         dry_run,
+        }).execute()
+        log.info("Briefing logged: sent_date=%s recipients=%d dry_run=%s",
+                 today_lagos(), recipient_count, dry_run)
+    except Exception as exc:
+        if "unique" in str(exc).lower() or "duplicate" in str(exc).lower():
+            log.debug("Briefing already logged for %s — skipping", today_lagos())
+        else:
+            raise
+
+
+# ---------------------------------------------------------------------------
 # Operator analytics
 # ---------------------------------------------------------------------------
 

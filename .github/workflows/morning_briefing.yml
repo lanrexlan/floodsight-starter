@@ -1,9 +1,12 @@
 name: FloodSight Morning Briefing SMS
 
-# Runs every day at 05:00 UTC = 06:00 WAT (Lagos)
+# Primary run:  05:00 UTC = 06:00 WAT
+# Backup run:   06:00 UTC = 07:00 WAT — fires only when primary runner failed
+# The script checks briefing_log in Supabase and exits early if already sent.
 on:
   schedule:
     - cron: '0 5 * * *'
+    - cron: '0 6 * * *'
   workflow_dispatch:          # also allows manual trigger from GitHub Actions UI
     inputs:
       dry_run:
