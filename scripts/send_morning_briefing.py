@@ -37,6 +37,7 @@ import json
 import logging
 import os
 import sys
+import time
 import urllib.request
 from pathlib import Path
 
@@ -62,17 +63,34 @@ SOUTH_AREAS         = COASTAL_AREAS        # backward-compat alias
 # Fetch
 # ---------------------------------------------------------------------------
 
-def fetch_summary(api_base: str) -> dict:
+def fetch_summary(api_base: str, max_attempts: int = 3) -> dict:
+    """
+    Fetch /forecast/summary with retries and a generous timeout.
+
+    Render free tier can take 30–90 s to cold-start after an idle night,
+    which exceeds a single-attempt 60 s timeout.  We retry up to 3 times
+    with 20 s gaps so the server has time to wake up between attempts.
+    """
+    import requests as _requests
+
     url = f"{api_base.rstrip('/')}/forecast/summary"
-    log.info("Fetching %s", url)
-    req = urllib.request.Request(
-        url, headers={"User-Agent": "FloodSight-Briefing/1.0"}
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            return json.loads(resp.read())
-    except Exception as exc:
-        raise RuntimeError(f"Failed to fetch forecast summary: {exc}") from exc
+    headers = {"User-Agent": "FloodSight-Briefing/1.0"}
+
+    for attempt in range(1, max_attempts + 1):
+        try:
+            log.info("Fetching %s (attempt %d/%d)", url, attempt, max_attempts)
+            resp = _requests.get(url, headers=headers, timeout=90)
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as exc:
+            if attempt < max_attempts:
+                wait = 20 * attempt   # 20 s, then 40 s
+                log.warning("Attempt %d failed (%s) — retrying in %d s", attempt, exc, wait)
+                time.sleep(wait)
+            else:
+                raise RuntimeError(
+                    f"Failed to fetch forecast summary after {max_attempts} attempts: {exc}"
+                ) from exc
 
 
 # ---------------------------------------------------------------------------
