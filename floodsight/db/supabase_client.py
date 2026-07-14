@@ -543,3 +543,169 @@ def get_alert_history(limit: int = 20) -> dict[str, Any]:
         "total_dispatches": len(dispatches),
         "data_source":      "supabase",
     }
+
+
+# ===========================================================================
+# HEALTH INTELLIGENCE LAYER — DB HELPERS
+# Added for NEXA PoC implementation (Phase health layer).
+# All functions follow the same patterns as the subscriber functions above.
+# ===========================================================================
+
+
+def upsert_lga_health_risk(scores: list[dict]) -> list[dict]:
+    """
+    Insert LGA outbreak probability scores into lga_health_risk table.
+
+    Parameters
+    ----------
+    scores : list of dicts from floodsight.health.engine.score_lgas()
+
+    Returns
+    -------
+    List of inserted rows with their assigned DB IDs.
+    """
+    client = _get_client()
+    if not scores:
+        return []
+    resp = client.table("lga_health_risk").insert(scores).execute()
+    return resp.data or []
+
+
+def get_lga_health_risk_today() -> list[dict]:
+    """
+    Return today's LGA health risk rows, ordered by outbreak_probability desc.
+    Used by the health API endpoint and alert dispatch script.
+    """
+    from datetime import date
+
+    client = _get_client()
+    today  = date.today().isoformat()
+    resp = (
+        client.table("lga_health_risk")
+        .select("*")
+        .gte("computed_at", today)
+        .order("outbreak_probability", desc=True)
+        .execute()
+    )
+    return resp.data or []
+
+
+def get_chew_subscribers_for_lga(lga_name: str) -> list[dict]:
+    """
+    Return active CHEW subscriber rows for a given LGA.
+    Returns: list of dicts with keys id, phone, name, facility_name, role, ward.
+    """
+    client = _get_client()
+    resp = (
+        client.table("chew_subscribers")
+        .select("id,phone,name,facility_name,role,ward")
+        .eq("lga_name", lga_name)
+        .eq("active", True)
+        .execute()
+    )
+    return resp.data or []
+
+
+def log_health_alert(
+    chew_id: int,
+    risk_id: int | None,
+    lga_name: str,
+    phone: str,
+    message_text: str,
+    at_message_id: str | None,
+    at_status: str,
+    at_cost: str | None,
+    idempotency_key: str,
+) -> dict | None:
+    """
+    Record a sent health alert in the health_alerts table.
+
+    Returns None if the idempotency_key already exists (duplicate suppression).
+    This is the same pattern used by briefing_log — prevents double-sends when
+    the backup cron fires.
+    """
+    client = _get_client()
+    try:
+        resp = client.table("health_alerts").insert({
+            "chew_id":            chew_id,
+            "lga_health_risk_id": risk_id,
+            "lga_name":           lga_name,
+            "phone":              phone,
+            "message_text":       message_text,
+            "at_message_id":      at_message_id,
+            "at_status":          at_status,
+            "at_cost":            at_cost,
+            "idempotency_key":    idempotency_key,
+        }).execute()
+        return resp.data[0] if resp.data else None
+    except Exception as exc:
+        if "unique" in str(exc).lower() or "duplicate" in str(exc).lower():
+            log.info(
+                "Health alert already sent (idempotency key exists): %s",
+                idempotency_key,
+            )
+            return None
+        raise
+
+
+def alert_already_sent_today(idempotency_key: str) -> bool:
+    """
+    Check whether a health alert with this idempotency key was already sent.
+    Fast path — used before composing the message to skip DB write entirely.
+    """
+    client = _get_client()
+    resp = (
+        client.table("health_alerts")
+        .select("id")
+        .eq("idempotency_key", idempotency_key)
+        .limit(1)
+        .execute()
+    )
+    return bool(resp.data)
+
+
+def record_chew_response(
+    phone: str,
+    raw_message: str,
+    parsed_action: str,
+    cases_reported: int | None,
+    lga_name: str | None,
+) -> dict:
+    """
+    Store an incoming CHEW SMS reply from the AT inbound webhook.
+
+    Attempts to resolve chew_id from the phone number for cross-referencing.
+    """
+    client = _get_client()
+
+    # Try to resolve chew_id + lga_name from the phone number
+    chew_rows = (
+        client.table("chew_subscribers")
+        .select("id,lga_name")
+        .eq("phone", phone)
+        .limit(1)
+        .execute()
+    ).data or []
+
+    chew_id      = chew_rows[0]["id"]       if chew_rows else None
+    resolved_lga = chew_rows[0]["lga_name"] if chew_rows else lga_name
+
+    resp = client.table("chew_responses").insert({
+        "phone":          phone,
+        "chew_id":        chew_id,
+        "raw_message":    raw_message,
+        "parsed_action":  parsed_action,
+        "cases_reported": cases_reported,
+        "lga_name":       resolved_lga,
+    }).execute()
+    return resp.data[0] if resp.data else {}
+
+
+def log_mel_event(event: dict) -> dict:
+    """
+    Record a health-system MEL action into the mel_events table.
+    event dict must include: lga_name, event_type, event_date.
+    """
+    client = _get_client()
+    resp   = client.table("mel_events").insert(event).execute()
+    return resp.data[0] if resp.data else {}

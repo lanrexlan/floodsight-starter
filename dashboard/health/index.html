@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FloodSight — Health Intelligence Dashboard</title>
+  <style>
+    :root {
+      --navy:  #0a1f44;
+      --teal:  #00897b;
+      --amber: #f59e0b;
+      --red:   #dc2626;
+      --green: #16a34a;
+      --bg:    #f0f4f8;
+      --card:  #ffffff;
+      --text:  #1e293b;
+      --muted: #64748b;
+      --border: #e2e8f0;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg); color: var(--text); font-size: 14px;
+    }
+
+    /* Header */
+    header {
+      background: var(--navy); color: #fff;
+      padding: 0.9rem 1.5rem;
+      display: flex; align-items: center; gap: 0.75rem;
+    }
+    header svg { flex-shrink: 0; }
+    header h1 { font-size: 1.1rem; font-weight: 600; }
+    header .tagline { font-size: 0.78rem; opacity: 0.6; margin-left: auto; white-space: nowrap; }
+    .nav-link {
+      color: rgba(255,255,255,0.7); font-size: 0.78rem; text-decoration: none;
+      padding: 0.3rem 0.7rem; border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 4px; margin-left: 0.5rem;
+    }
+    .nav-link:hover { background: rgba(255,255,255,0.1); color: #fff; }
+
+    /* Explanation banner */
+    .banner {
+      background: var(--teal); color: #fff;
+      padding: 0.55rem 1.5rem; font-size: 0.8rem; line-height: 1.4;
+    }
+
+    /* Main layout */
+    main { padding: 1.25rem 1.5rem; max-width: 1280px; margin: 0 auto; }
+
+    /* Toolbar */
+    .toolbar {
+      display: flex; align-items: center; gap: 0.75rem;
+      margin-bottom: 1.1rem; flex-wrap: wrap;
+    }
+    .toolbar h2 { font-size: 0.85rem; color: var(--muted); font-weight: 500; flex: 1; }
+    #last-updated { font-size: 0.78rem; color: var(--muted); }
+    .btn {
+      background: var(--teal); color: #fff; border: none;
+      padding: 0.45rem 1rem; border-radius: 6px; cursor: pointer;
+      font-size: 0.8rem; font-weight: 500; letter-spacing: .01em;
+    }
+    .btn:hover { opacity: 0.88; }
+    .btn-outline {
+      background: transparent; color: var(--navy);
+      border: 1px solid var(--border);
+    }
+    .btn-outline:hover { background: var(--bg); }
+
+    /* KPI cards */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 0.9rem; margin-bottom: 1.25rem;
+    }
+    .kpi-card {
+      background: var(--card); border-radius: 8px; padding: 1rem 1.1rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.07); border: 1px solid var(--border);
+    }
+    .kpi-card .label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+    .kpi-card .value { font-size: 2rem; font-weight: 700; color: var(--navy); margin: 0.25rem 0 0.1rem; line-height: 1; }
+    .kpi-card .sub   { font-size: 0.72rem; color: var(--muted); }
+
+    /* Sections */
+    .section {
+      background: var(--card); border-radius: 8px; padding: 1.1rem 1.2rem;
+      margin-bottom: 1.1rem; box-shadow: 0 1px 3px rgba(0,0,0,.07);
+      border: 1px solid var(--border);
+    }
+    .section h2 {
+      font-size: 0.875rem; font-weight: 600; color: var(--navy);
+      margin-bottom: 0.85rem; display: flex; align-items: center; gap: 0.5rem;
+    }
+    .section h2 .badge {
+      font-size: 0.7rem; font-weight: 500; padding: 0.15rem 0.5rem;
+      border-radius: 999px; background: #e0f2f1; color: var(--teal);
+    }
+
+    /* Two-column grid */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem; }
+    @media (max-width: 720px) { .two-col { grid-template-columns: 1fr; } }
+
+    /* Risk table */
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      text-align: left; padding: 0.45rem 0.7rem;
+      color: var(--muted); font-size: 0.7rem; text-transform: uppercase;
+      letter-spacing: .04em; border-bottom: 2px solid var(--border);
+      font-weight: 600;
+    }
+    tbody tr:hover { background: #f8fafc; }
+    tbody td { padding: 0.6rem 0.7rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tbody tr:last-child td { border-bottom: none; }
+
+    /* Tier badges */
+    .badge-tier {
+      display: inline-block; padding: 0.2rem 0.65rem;
+      border-radius: 999px; font-size: 0.72rem; font-weight: 600;
+    }
+    .tier-Low      { background: #dcfce7; color: #166534; }
+    .tier-Moderate { background: #fef9c3; color: #854d0e; }
+    .tier-High     { background: #ffedd5; color: #9a3412; }
+    .tier-Critical { background: #fee2e2; color: #991b1b; }
+
+    /* Probability bar */
+    .prob-wrap { display: flex; align-items: center; gap: 0.5rem; min-width: 110px; }
+    .prob-pct  { font-size: 0.8rem; font-weight: 600; width: 2.4rem; text-align: right; }
+    .prob-bar  { flex: 1; height: 6px; border-radius: 3px; background: var(--border); }
+    .prob-fill { height: 100%; border-radius: 3px; background: var(--teal); }
+    .prob-fill.high     { background: #f97316; }
+    .prob-fill.critical { background: var(--red); }
+
+    /* Alert status dot */
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+    .dot-sent    { background: var(--green); }
+    .dot-pending { background: var(--border); }
+
+    /* Activity feed */
+    .activity-list { display: flex; flex-direction: column; gap: 0.6rem; }
+    .activity-item {
+      display: flex; gap: 0.75rem; align-items: flex-start;
+      padding: 0.55rem 0.7rem; border-radius: 6px; background: #f8fafc;
+      border: 1px solid var(--border);
+    }
+    .activity-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+    .activity-body { flex: 1; }
+    .activity-title { font-size: 0.82rem; font-weight: 500; }
+    .activity-meta  { font-size: 0.72rem; color: var(--muted); margin-top: 0.1rem; }
+
+    /* Pilot/control arm pill */
+    .arm-pill {
+      font-size: 0.68rem; padding: 0.1rem 0.45rem; border-radius: 999px;
+      font-weight: 600; vertical-align: middle;
+    }
+    .arm-treatment { background: #e0f2f1; color: #00695c; }
+    .arm-control   { background: #f1f5f9; color: #475569; }
+
+    /* Empty / loading */
+    .state-msg { color: var(--muted); font-size: 0.85rem; padding: 1rem 0; text-align: center; }
+    .spinner {
+      width: 20px; height: 20px; border: 2px solid var(--border);
+      border-top-color: var(--teal); border-radius: 50%;
+      animation: spin .8s linear infinite; margin: 1rem auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Canvas chart */
+    canvas { max-height: 220px; }
+    .chart-legend { display: flex; gap: 1rem; font-size: 0.75rem; margin-top: 0.5rem; flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 0.3rem; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+    /* Footer */
+    footer {
+      text-align: center; font-size: 0.72rem; color: var(--muted);
+      padding: 1.5rem; border-top: 1px solid var(--border); margin-top: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="15" cy="15" r="15" fill="#00897b" opacity=".25"/>
+    <path d="M7 20c2-5 4-7 8-7s6 2 8 7" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="15" cy="11" r="3.5" fill="#fff"/>
+    <circle cx="15" cy="11" r="1.5" fill="#00897b"/>
+  </svg>
+  <div>
+    <h1>FloodSight Health Intelligence</h1>
+  </div>
+  <a href="/dashboard/" class="nav-link">Flood Map</a>
+  <span class="tagline">NEXA PoC · Lagos Pilot</span>
+</header>
+
+<div class="banner">
+  Mosquito outbreak risk is computed 7–14 days after flood inundation, based on Anopheles gambiae larval
+  development at Lagos temperatures (26–32 °C). Treatment LGAs receive CHEW SMS alerts; control LGAs receive
+  standard flood alerts only. Data powers the NEXA PoC difference-in-differences evaluation.
+</div>
+
+<main>
+  <div class="toolbar">
+    <h2>Last computed: <span id="last-updated">—</span></h2>
+    <button class="btn btn-outline" onclick="loadAll()">Refresh</button>
+    <button class="btn" onclick="window.open('/docs#/health','_blank')">API Docs</button>
+  </div>
+
+  <!-- KPI Row -->
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="label">Alerts Sent</div>
+      <div class="value" id="kpi-alerts">—</div>
+      <div class="sub">to CHEWs this season</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">CHEW Response Rate</div>
+      <div class="value" id="kpi-confirm">—%</div>
+      <div class="sub">confirmed action taken</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">MEL Events Logged</div>
+      <div class="value" id="kpi-mel">—</div>
+      <div class="sub">health actions recorded</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Nets Distributed</div>
+      <div class="value" id="kpi-nets">—</div>
+      <div class="sub">bed nets pre-positioned</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">RDT Kits</div>
+      <div class="value" id="kpi-rdt">—</div>
+      <div class="sub">rapid tests pre-positioned</div>
+    </div>
+  </div>
+
+  <!-- Risk Table -->
+  <div class="section">
+    <h2>
+      Current Outbreak Probability by LGA
+      <span class="badge" id="risk-badge">loading…</span>
+    </h2>
+    <div id="risk-table-container"><div class="spinner"></div></div>
+  </div>
+
+  <!-- Two-column: chart + activity -->
+  <div class="two-col">
+
+    <!-- DHIS2 Cases Chart -->
+    <div class="section">
+      <h2>Malaria Cases — Treatment vs. Control (DHIS2)</h2>
+      <canvas id="cases-chart"></canvas>
+      <div class="chart-legend">
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#00897b"></div>
+          Treatment LGAs (alerted)
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#94a3b8;border:1px dashed #64748b"></div>
+          Control LGAs (standard)
+        </div>
+      </div>
+      <p style="font-size:.72rem;color:var(--muted);margin-top:.6rem">
+        Treatment: Alimosho, Ajeromi-Ifelodun, Kosofe, Oshodi-Isolo, Ikorodu<br>
+        Control: Agege, Mushin, Surulere, Lagos Mainland, Ikeja
+      </p>
+    </div>
+
+    <!-- CHEW Activity Feed -->
+    <div class="section">
+      <h2>Recent CHEW Responses</h2>
+      <div id="chew-activity"><div class="spinner"></div></div>
+    </div>
+
+  </div>
+
+  <!-- MEL Events -->
+  <div class="section">
+    <h2>MEL Action Log <span class="badge" id="mel-badge">loading…</span></h2>
+    <div id="mel-table-container"><div class="spinner"></div></div>
+  </div>
+
+</main>
+
+<footer>
+  FloodSight Health Intelligence · NEXA PoC Lagos Pilot ·
+  <a href="https://grandchallenges.ca" target="_blank" style="color:var(--teal)">Grand Challenges Canada</a> ·
+  <a href="/dashboard/" style="color:var(--teal)">Flood Map</a>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="health_app.js"></script>
+</body>
+</html>

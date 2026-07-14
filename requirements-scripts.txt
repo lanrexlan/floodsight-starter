@@ -3,3 +3,4 @@
 africastalking
 requests
 supabase
+python-dotenv   # floodsight/config.py loads .env at import time

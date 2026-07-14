@@ -28,7 +28,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from api.routers import alerts, depth, dispatch, forecast, incoming, risk, subscribe, validate, verify
+from api.routers import alerts, depth, dispatch, forecast, health, incoming, risk, subscribe, validate, verify
 
 log = logging.getLogger(__name__)
 
@@ -83,6 +83,7 @@ app.include_router(validate.router)
 app.include_router(subscribe.router)
 app.include_router(dispatch.router)
 app.include_router(incoming.router)
+app.include_router(health.router)
 
 
 @app.get("/")
@@ -103,6 +104,8 @@ def root():
             "/at/incoming", "/subscribe/confirm",
             "/forecast/rainfall", "/forecast/alerts", "/forecast/summary",
             "/validate/events",
+            "/health/risk", "/health/risk/{lga_name}",
+            "/health/chew-response", "/health/mel/summary",
         ],
     }
 
@@ -112,9 +115,19 @@ def health():
     return {"status": "ok"}
 
 
-# Mounted at /dashboard (not /) so it can't shadow the API status route
-# above or any /risk, /depth, /alerts route — StaticFiles with html=True
-# automatically serves dashboard/index.html for /dashboard/ itself.
+# Health dashboard must be mounted BEFORE /dashboard so FastAPI's prefix
+# matching doesn't swallow /dashboard/health/* with the broader mount first.
+HEALTH_DASHBOARD_DIR = Path(__file__).resolve().parent.parent / "dashboard" / "health"
+if HEALTH_DASHBOARD_DIR.exists():
+    app.mount(
+        "/dashboard/health",
+        StaticFiles(directory=HEALTH_DASHBOARD_DIR, html=True),
+        name="health-dashboard",
+    )
+
+# Main flood dashboard — mounted at /dashboard (not /) so it can't shadow
+# the API routes above. StaticFiles with html=True serves index.html for
+# /dashboard/ itself.
 DASHBOARD_DIR = Path(__file__).resolve().parent.parent / "dashboard"
 if DASHBOARD_DIR.exists():
     app.mount("/dashboard", StaticFiles(directory=DASHBOARD_DIR, html=True), name="dashboard")

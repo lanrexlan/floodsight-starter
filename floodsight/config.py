@@ -238,6 +238,52 @@ ALERT_UPGRADE: dict[str, str] = {
 }
 
 # ---------------------------------------------------------------------------
+# Health Intelligence Layer — geographic centre and MEL design
+#
+# PILOT_LAT / PILOT_LON: single representative point for Open-Meteo
+# temperature lookups (Ikeja / city geographic centre).  Moved here from
+# api/routers/forecast.py so both the API and health engine share one value.
+#
+# HEALTH_PILOT_LGAS: 5 treatment LGAs receiving CHEW health alerts.
+# Selected for highest flood susceptibility AND highest DHIS2 malaria burden.
+#
+# HEALTH_CONTROL_LGAS: 5 matched control LGAs receiving standard flood
+# alerts only. Used for difference-in-differences outcome analysis at
+# Month 18 of the NEXA PoC.
+#
+# ANOPHELES_DEV_DAYS: Larval development days by temperature (°C).
+# Source: Bayoh & Lindsay (2003) Malaria Journal — measured at 16–40 °C.
+# Only the 26–32 °C range is used here (Lagos operational range).
+# ---------------------------------------------------------------------------
+
+PILOT_LAT: float = 6.520   # Ikeja / city geographic centre
+PILOT_LON: float = 3.370
+
+HEALTH_MIN_INUNDATION_KM2: float = 0.5   # minimum stagnant-water area to score
+
+HEALTH_PILOT_LGAS: frozenset[str] = frozenset({
+    "Alimosho",
+    "Ajeromi-Ifelodun",
+    "Kosofe",
+    "Oshodi-Isolo",
+    "Ikorodu",
+})
+
+HEALTH_CONTROL_LGAS: frozenset[str] = frozenset({
+    "Agege",
+    "Mushin",
+    "Surulere",
+    "Lagos Mainland",
+    "Ikeja",
+})
+
+# Anopheles gambiae larval development days at Lagos temperatures (26–32 °C)
+# Source: Bayoh & Lindsay (2003) Malaria Journal
+ANOPHELES_DEV_DAYS: dict[int, int] = {
+    26: 14, 27: 13, 28: 12, 29: 11, 30: 10, 31: 9, 32: 8
+}
+
+# ---------------------------------------------------------------------------
 # HAND-based depth model (Track A — see ROADMAP.md Phase 1)
 # ---------------------------------------------------------------------------
 

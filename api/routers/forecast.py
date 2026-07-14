@@ -15,15 +15,12 @@ import logging
 from fastapi import APIRouter, HTTPException, Query
 
 from api.data_provider import get_grid, get_grid_geojson
-from floodsight.config import ALERT_UPGRADE, COASTAL_UPGRADE_LGAS, OGUN_UPGRADE_LGAS
+from floodsight.config import ALERT_UPGRADE, COASTAL_UPGRADE_LGAS, OGUN_UPGRADE_LGAS, PILOT_LAT, PILOT_LON
 
 log = logging.getLogger(__name__)
 
-# Phase 13: default to Lagos city centre (covers all 15 LGAs).
-# GFS grid cells are 0.25° (~28 km) so one point lookup is representative
-# for the entire city; the same forecast is applied to every grid cell.
-PILOT_LAT = 6.520   # approximately Ikeja / city geographic centre
-PILOT_LON = 3.370
+# PILOT_LAT / PILOT_LON moved to floodsight/config.py (Phase health layer).
+# Imported above — single source of truth for the city geographic centre.
 
 router = APIRouter(prefix="/forecast", tags=["forecast"])
 

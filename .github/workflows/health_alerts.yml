@@ -1,0 +1,54 @@
+name: FloodSight Health Alerts
+
+on:
+  schedule:
+    # Primary run — 07:30 WAT = 06:30 UTC
+    # 30 min before the resident flood briefing (07:00 WAT / 06:00 UTC)
+    - cron: "30 6 * * *"
+    # Backup run — 07:45 WAT = 06:45 UTC
+    # Fires if the primary run is skipped due to Render cold-start delay.
+    # Idempotency keys in Supabase prevent double-sending.
+    - cron: "45 6 * * *"
+
+  workflow_dispatch:
+    # Allow manual trigger from GitHub Actions UI for testing
+    inputs:
+      dry_run:
+        description: "Dry run (score but do not send SMS or write to DB)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+jobs:
+  send-health-alerts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements-scripts.txt
+
+      - name: Run health alert dispatch
+        env:
+          SUPABASE_URL:             ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY:             ${{ secrets.SUPABASE_KEY }}
+          AFRICASTALKING_USERNAME:  ${{ secrets.AFRICASTALKING_USERNAME }}
+          AFRICASTALKING_API_KEY:   ${{ secrets.AFRICASTALKING_API_KEY }}
+          RENDER_EXTERNAL_URL:      ${{ secrets.RENDER_EXTERNAL_URL }}
+        run: |
+          DRY_RUN_FLAG=""
+          if [[ "${{ github.event.inputs.dry_run }}" == "true" ]]; then
+            DRY_RUN_FLAG="--dry-run"
+          fi
+          python scripts/send_health_alerts.py $DRY_RUN_FLAG
