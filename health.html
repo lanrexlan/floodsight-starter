@@ -457,8 +457,8 @@
       <li><a href="#how-it-works">How it works</a></li>
       <li><a href="#trial">MEL Trial</a></li>
       <li><a href="#evidence">Evidence</a></li>
-      <li><a href="floodsight.html">Flood Map</a></li>
-      <li><a href="/dashboard/health/" class="nav-cta">Live Dashboard</a></li>
+      <li><a href="https://floodsight-starter.onrender.com/dashboard/" target="_blank" rel="noopener">Flood Map</a></li>
+      <li><a href="https://floodsight-starter.onrender.com/dashboard/health/" class="nav-cta" target="_blank" rel="noopener">Live Dashboard</a></li>
     </ul>
   </div>
 </nav>
@@ -474,7 +474,7 @@
       before the first case spike — so nets and rapid tests are pre-positioned, not reactive.
     </p>
     <div class="hero-actions">
-      <a href="/dashboard/health/" class="btn btn-primary">Live Dashboard</a>
+      <a href="https://floodsight-starter.onrender.com/dashboard/health/" class="btn btn-primary" target="_blank" rel="noopener">Live Dashboard</a>
       <a href="#how-it-works" class="btn btn-ghost">How it works</a>
     </div>
   </div>
@@ -492,7 +492,7 @@
     </ul>
     <div class="risk-card-footer">
       Scored daily after morning flood run &nbsp;·&nbsp;
-      <a href="/dashboard/health/">Full dashboard →</a>
+      <a href="https://floodsight-starter.onrender.com/dashboard/health/" target="_blank" rel="noopener">Full dashboard →</a>
     </div>
   </div>
 </div>
@@ -706,9 +706,9 @@
       MEL events log in real time. All data feeds the Month 18 difference-in-differences evaluation.
     </p>
     <div class="cta-actions">
-      <a href="/dashboard/health/" class="btn btn-primary">Open Health Dashboard</a>
-      <a href="/dashboard/" class="btn btn-ghost">Flood Map</a>
-      <a href="/docs#/health" class="btn btn-ghost">API Docs</a>
+      <a href="https://floodsight-starter.onrender.com/dashboard/health/" class="btn btn-primary" target="_blank" rel="noopener">Open Health Dashboard</a>
+      <a href="https://floodsight-starter.onrender.com/dashboard/" class="btn btn-ghost" target="_blank" rel="noopener">Flood Map</a>
+      <a href="https://floodsight-starter.onrender.com/docs#/health" class="btn btn-ghost" target="_blank" rel="noopener">API Docs</a>
     </div>
   </div>
 </section>
@@ -722,10 +722,10 @@
     </div>
   </div>
   <div class="footer-links">
-    <a href="floodsight.html">Flood Map</a>
-    <a href="/dashboard/health/">Dashboard</a>
-    <a href="/docs">API</a>
-    <a href="/dashboard/">Live Alerts</a>
+    <a href="https://www.rankineinnovationlab.com/floodsight.html">Flood Map</a>
+    <a href="https://floodsight-starter.onrender.com/dashboard/health/" target="_blank" rel="noopener">Dashboard</a>
+    <a href="https://floodsight-starter.onrender.com/docs" target="_blank" rel="noopener">API</a>
+    <a href="https://floodsight-starter.onrender.com/dashboard/" target="_blank" rel="noopener">Live Alerts</a>
   </div>
   <div class="footer-grant">
     <strong>NEXA PoC Grant</strong><br>
@@ -738,10 +738,11 @@
 <script>
 'use strict';
 
-// Auto-detect Render vs local
+// health.html lives on Rankine's website; API lives on Render
+const RENDER_URL = 'https://floodsight-starter.onrender.com';
 const API_BASE = (location.hostname === 'localhost' || location.protocol === 'file:')
   ? 'http://localhost:8000'
-  : '';
+  : RENDER_URL;
 
 // ── Risk card ───────────────────────────────────────────────────────
 async function loadRiskCard() {
@@ -778,7 +779,7 @@ async function loadRiskCard() {
   } catch (e) {
     list.innerHTML = `<li class="risk-lga-item" style="color:var(--muted);font-size:12px;">
       Risk scores update after the morning flood run (07:30 WAT).
-      <a href="/dashboard/health/" style="color:var(--health);text-decoration:none;"> View dashboard →</a>
+      <a href="https://floodsight-starter.onrender.com/dashboard/health/" target="_blank" rel="noopener" style="color:var(--health);text-decoration:none;"> View dashboard →</a>
     </li>`;
   }
 }
