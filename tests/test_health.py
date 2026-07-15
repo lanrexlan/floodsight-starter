@@ -71,10 +71,20 @@ class TestOutbreakProbability:
         p = _outbreak_probability(5.0, 0.80, 30.0)
         assert p >= 0.55, f"Expected >= 0.55, got {p}"
 
-    def test_low_inundation_gives_low_prob(self):
-        from floodsight.health.engine import _outbreak_probability
-        p = _outbreak_probability(0.3, 0.50, 28.0)
-        assert p <= 0.40, f"Expected <= 0.40, got {p}"
+    def test_small_flood_ranks_below_large_flood(self):
+        # The engine is an UNCALIBRATED rule-based prior: we test the property
+        # it actually claims - monotonic RANKING (a small flood must score
+        # below a large one, same susceptibility/temperature) - not an
+        # absolute tier, which would imply a calibration we explicitly disclaim.
+        from floodsight.health.engine import _risk_prior
+        small = _risk_prior(0.3, 0.60, 28.0)
+        large = _risk_prior(5.0, 0.60, 28.0)
+        assert small < large, f"small={small} should rank below large={large}"
+
+    def test_score_carries_uncalibrated_provenance(self):
+        from floodsight.health.engine import RISK_MODEL_CALIBRATION, RISK_MODEL_TYPE
+        assert RISK_MODEL_TYPE == "rule_based_prior"
+        assert "uncalibrated" in RISK_MODEL_CALIBRATION
 
     def test_probability_always_in_unit_interval(self):
         from floodsight.health.engine import _outbreak_probability
@@ -397,7 +407,7 @@ class TestMelValidation:
     def test_valid_event_types_do_not_raise_on_type_check(self):
         """Check all valid event types pass the validation gate (mock DB)."""
         from floodsight.health.mel import VALID_EVENT_TYPES, record_mel_event
-        with patch("floodsight.health.mel.log_mel_event", return_value={"id": 1}):
+        with patch("floodsight.db.supabase_client.log_mel_event", return_value={"id": 1}):
             for et in VALID_EVENT_TYPES:
                 result = record_mel_event(
                     lga_name="Kosofe",
@@ -407,3 +417,28 @@ class TestMelValidation:
                     unit="units",
                 )
                 assert result is not None
+
+
+    def test_operational_and_entomology_event_types_present(self):
+        # The rework adds operational + entomology verification events used by
+        # the PRIMARY PoC outcomes (alert-to-action, Anopheles confirmation).
+        from floodsight.health.mel import VALID_EVENT_TYPES
+        for et in ("ALERT_ACKNOWLEDGED", "LARVAL_SURVEY_CONDUCTED",
+                   "ANOPHELES_CONFIRMED", "CULEX_ONLY", "LARVAL_SOURCE_MANAGEMENT"):
+            assert et in VALID_EVENT_TYPES, f"{et} missing from VALID_EVENT_TYPES"
+
+
+class TestOperationalKpis:
+    def test_kpis_are_none_safe_when_empty(self):
+        # Before enrolment there is no data; get_operational_kpis must return
+        # a well-formed dict (0 / None), never raise, so the dashboard renders.
+        from unittest.mock import MagicMock, patch as _patch
+        from floodsight.health import mel as mel_mod
+
+        empty = MagicMock()
+        empty.table.return_value.select.return_value.execute.return_value.data = []
+        with _patch("floodsight.db.supabase_client._get_client", return_value=empty):
+            k = mel_mod.get_operational_kpis()
+        assert k["alerts_sent"] == 0
+        assert k["O1_acknowledgement_rate"] is None
+        assert "O4_anopheles_confirmation_rate" in k

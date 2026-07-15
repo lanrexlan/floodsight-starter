@@ -46,3 +46,6 @@ data/logs/
 # Intermediate/temporary files — never commit
 *-journal
 *.tmp
+
+# Microsoft Office lock files (created while a doc is open — never commit)
+~$*

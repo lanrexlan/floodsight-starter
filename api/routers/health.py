@@ -328,3 +328,30 @@ def get_mel_summary():
     except Exception as exc:
         log.error("GET /health/mel/summary error: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ---------------------------------------------------------------------------
+# /health/mel/operational  —  the PRIMARY PoC outcome indicators
+# ---------------------------------------------------------------------------
+
+@router.get("/mel/operational")
+def get_operational_outcomes():
+    """
+    Return the PoC's PRIMARY (operational / intermediary) outcome indicators:
+    alert acknowledgement rate, alert-to-action time, anticipatory-action
+    rate, and entomological (Anopheles vs Culex) confirmation rate.
+
+    These are the metrics the NEXA proof of concept is judged on. DHIS2
+    case-counts are an exploratory secondary signal only (see /health/mel/summary
+    and floodsight/health/mel.py for the rationale).
+
+    Returns 0 / None-valued fields (not an error) before enrolment, so the
+    dashboard renders from day one.
+    """
+    from floodsight.health.mel import get_operational_kpis
+
+    try:
+        return get_operational_kpis()
+    except Exception as exc:
+        log.error("GET /health/mel/operational error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc

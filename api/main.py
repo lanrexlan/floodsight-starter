@@ -101,6 +101,7 @@ def root():
             "/depth/predict", "/depth/ml-grid", "/depth/ml-grid/summary",
             "/alerts/current",
             "/verify", "/verify/summary",
+            "/health/risk", "/health/chew-response", "/health/mel/summary", "/health/mel/operational",
             "/at/incoming", "/subscribe/confirm",
             "/forecast/rainfall", "/forecast/alerts", "/forecast/summary",
             "/validate/events",
