@@ -41,11 +41,12 @@ jobs:
 
       - name: Run health alert dispatch
         env:
-          SUPABASE_URL:             ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY:             ${{ secrets.SUPABASE_KEY }}
-          AFRICASTALKING_USERNAME:  ${{ secrets.AFRICASTALKING_USERNAME }}
-          AFRICASTALKING_API_KEY:   ${{ secrets.AFRICASTALKING_API_KEY }}
-          RENDER_EXTERNAL_URL:      ${{ secrets.RENDER_EXTERNAL_URL }}
+          SUPABASE_URL:   ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY:   ${{ secrets.SUPABASE_KEY }}
+          AT_USERNAME:    ${{ secrets.AT_USERNAME }}
+          AT_API_KEY:     ${{ secrets.AT_API_KEY }}
+          AT_SENDER_ID:   ${{ secrets.AT_SENDER_ID }}
+          FLOODSIGHT_API: ${{ secrets.FLOODSIGHT_API }}
         run: |
           DRY_RUN_FLAG=""
           if [[ "${{ github.event.inputs.dry_run }}" == "true" ]]; then

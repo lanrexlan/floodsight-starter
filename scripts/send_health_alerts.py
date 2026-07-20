@@ -16,12 +16,12 @@ Usage (manual / testing):
 
 Environment variables required:
     SUPABASE_URL, SUPABASE_KEY           — Supabase service-role credentials
-    AFRICASTALKING_USERNAME              — Africa's Talking username
-    AFRICASTALKING_API_KEY               — Africa's Talking API key
+    AT_USERNAME                          — Africa's Talking username
+    AT_API_KEY                           — Africa's Talking API key
 
 Optional:
-    RENDER_EXTERNAL_URL                  — used to fetch /forecast/alerts
-                                           (set automatically by Render)
+    FLOODSIGHT_API                       — base URL of the deployed API
+                                           (default: https://floodsight-starter.onrender.com)
 """
 
 from __future__ import annotations
@@ -29,7 +29,12 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from pathlib import Path
 from datetime import date
+
+# Make the floodsight package importable when the script is run directly
+# (Python adds scripts/ to sys.path, not the project root).
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 logging.basicConfig(
     level=logging.INFO,
@@ -51,7 +56,7 @@ def main(dry_run: bool = False) -> int:
     import os
     import requests
 
-    base_url = os.getenv("RENDER_EXTERNAL_URL", "https://floodsight.onrender.com").rstrip("/")
+    base_url = os.getenv("FLOODSIGHT_API", "https://floodsight-starter.onrender.com").rstrip("/")
     log.info("Fetching alert grid from %s/forecast/alerts", base_url)
 
     try:

@@ -109,7 +109,7 @@ def dispatch_health_alerts(
         get_chew_subscribers_for_lga,
         log_health_alert,
     )
-    from floodsight.notifications.sms import send_sms
+    from floodsight.notifications.africastalking import send_sms as _at_send
 
     summary = {
         "sent":                  0,
@@ -161,10 +161,12 @@ def dispatch_health_alerts(
                 continue
 
             try:
-                result     = send_sms(phone, message)
-                at_msg_id  = result.get("messageId")
-                at_status  = result.get("status", "Unknown")
-                at_cost    = result.get("cost")
+                result     = _at_send(message=message, recipients=[phone])
+                # AT SDK response: {"SMSMessageData": {"Recipients": [{...}]}}
+                recipient  = (result.get("SMSMessageData", {}).get("Recipients") or [{}])[0]
+                at_msg_id  = recipient.get("messageId")
+                at_status  = recipient.get("status", "Unknown")
+                at_cost    = recipient.get("cost")
 
                 log_health_alert(
                     chew_id=chew["id"],
