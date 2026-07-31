@@ -68,21 +68,62 @@ def main(dry_run: bool = False) -> int:
         return 1
 
     alert_levels: list[str] = alert_data.get("alert_levels", [])
-    lga_alerts: dict[str, str] = alert_data.get("lga_alerts", {})   # lga_name → highest level
     highest = alert_data.get("highest_alert", "No Alert")
 
-    log.info(
-        "Alert grid fetched: %d cells, highest=%s, pilot LGAs with alerts: %s",
-        len(alert_levels),
-        highest,
-        {k: v for k, v in lga_alerts.items() if k in PILOT_LGAS},
-    )
+    log.info("Alert grid fetched: %d cells, highest=%s", len(alert_levels), highest)
 
     # ------------------------------------------------------------------
-    # 2. Check if any pilot LGA is at Watch or Warning
+    # 2. Fetch the grid GeoJSON to get lga_name + hazard_score per cell
     # ------------------------------------------------------------------
+    try:
+        grid_resp = requests.get(f"{base_url}/risk/grid", timeout=60)
+        grid_resp.raise_for_status()
+        grid_geojson = grid_resp.json()
+    except Exception as exc:
+        log.error("Failed to fetch risk grid: %s", exc)
+        return 1
+
+    # ------------------------------------------------------------------
+    # 3. Derive the highest alert level per pilot LGA
+    #
+    # This used to read alert_data["lga_alerts"], but that field maps
+    # lga_name -> COUNT OF ALERTING CELLS (an int, e.g. {"Kosofe": 980}),
+    # not lga_name -> alert level. The old comparison
+    #     level in ("Watch", "Warning")
+    # therefore compared an int against strings, never matched, and the
+    # script exited at "No pilot LGAs at Watch/Warning today" on every run
+    # — which is why no CHEW SMS was ever sent. lga_alerts is also
+    # truncated to the top 6 LGAs, so pilot LGAs could be dropped entirely.
+    #
+    # Deriving the level from alert_levels + the grid features is exact and
+    # covers all 15 LGAs.
+    # ------------------------------------------------------------------
+    _RANK = {"No Alert": 0, "Watch": 1, "Warning": 2}
+    features = grid_geojson.get("features", [])
+
+    if len(features) != len(alert_levels):
+        log.warning(
+            "Grid/alert length mismatch: %d features vs %d alert levels — "
+            "comparing the overlapping prefix only",
+            len(features), len(alert_levels),
+        )
+
+    lga_highest: dict[str, str] = {}
+    for i in range(min(len(features), len(alert_levels))):
+        lga   = str(features[i].get("properties", {}).get("lga_name", "")).strip()
+        level = alert_levels[i]
+        if not lga or lga == "nan":
+            continue
+        if _RANK.get(level, 0) > _RANK.get(lga_highest.get(lga, "No Alert"), 0):
+            lga_highest[lga] = level
+
+    log.info(
+        "Pilot LGA alert levels: %s",
+        {k: v for k, v in lga_highest.items() if k in PILOT_LGAS},
+    )
+
     active_pilot_lgas = {
-        lga: level for lga, level in lga_alerts.items()
+        lga: level for lga, level in lga_highest.items()
         if lga in PILOT_LGAS and level in ("Watch", "Warning")
     }
 
@@ -93,17 +134,6 @@ def main(dry_run: bool = False) -> int:
         return 0
 
     log.info("Active pilot LGAs: %s", active_pilot_lgas)
-
-    # ------------------------------------------------------------------
-    # 3. Fetch the grid GeoJSON to get lga_name + hazard_score per cell
-    # ------------------------------------------------------------------
-    try:
-        grid_resp = requests.get(f"{base_url}/risk/grid", timeout=60)
-        grid_resp.raise_for_status()
-        grid_geojson = grid_resp.json()
-    except Exception as exc:
-        log.error("Failed to fetch risk grid: %s", exc)
-        return 1
 
     # ------------------------------------------------------------------
     # 4. Score outbreak probability for each LGA

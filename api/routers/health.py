@@ -128,22 +128,31 @@ def _compute_and_store() -> dict:
 
     geojson, _ = get_grid_geojson()
 
-    # Fetch live alert levels (parallel list to geojson features)
+    # Compute live alert levels IN-PROCESS by calling the same function that
+    # backs GET /forecast/alerts.
+    #
+    # This previously issued an HTTP request to os.getenv("RENDER_EXTERNAL_URL").
+    # That secret is not set on this deployment, so render_url was always ""
+    # and every request silently fell through to _compute_alert_levels_inline().
+    # That fallback reads rain_24h_mm / rain_72h_mm off the static grid, which
+    # does not carry rainfall columns, so it scored every cell with 0 mm ->
+    # "No Alert" for all 24,933 cells -> score_lgas() found zero inundated
+    # cells -> the health layer rendered empty even while the main FloodSight
+    # map showed Watch/Warning. Calling the function directly removes the
+    # env-var dependency, the self-HTTP round trip, and the cold-start race.
     try:
-        import requests as req_lib
-        import os
-        # Try to fetch from own /forecast/alerts — works in Render deployment.
-        # In local dev, falls back to recomputing inline.
-        render_url = os.getenv("RENDER_EXTERNAL_URL", "").strip()
-        if render_url:
-            resp = req_lib.get(f"{render_url}/forecast/alerts", timeout=20)
-            resp.raise_for_status()
-            alert_data  = resp.json()
-            alert_levels = alert_data.get("alert_levels", [])
-        else:
-            alert_levels = _compute_alert_levels_inline(geojson)
+        from api.routers.forecast import get_grid_alerts
+
+        alert_data   = get_grid_alerts()
+        alert_levels = alert_data.get("alert_levels", [])
+        if not alert_levels:
+            raise ValueError("forecast returned no alert_levels")
     except Exception as exc:
-        log.warning("Could not fetch /forecast/alerts (%s) — computing inline", exc)
+        log.warning(
+            "In-process forecast alert computation failed (%s) — "
+            "falling back to inline estimate (rainfall-blind, low accuracy)",
+            exc,
+        )
         alert_levels = _compute_alert_levels_inline(geojson)
 
     event_id = date.today().isoformat()

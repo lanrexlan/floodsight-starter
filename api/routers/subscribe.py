@@ -241,11 +241,52 @@ def _complete_subscription(
         log.error("Supabase insert failed: %s", exc)
         raise HTTPException(status_code=500, detail="Could not save subscription.") from exc
 
+    # ------------------------------------------------------------------
+    # Welcome SMS.
+    #
+    # Previously the subscriber row was written and the endpoint returned
+    # without sending anything, so residents who signed up on floodsight.html
+    # saw a success message but never received an SMS — they had no way to
+    # tell whether the number had registered correctly, and no delivery
+    # confirmation until the next Watch/Warning dispatch (potentially weeks).
+    #
+    # Deliberately non-blocking: a failed welcome SMS must not roll back or
+    # 500 a subscription that is already committed to Supabase. We log and
+    # report delivery status in the response instead.
+    # ------------------------------------------------------------------
+    welcome_sent = False
+    try:
+        from floodsight.notifications.africastalking import send_sms as _at_send
+
+        area = (row.get("area_name") or area_name or "your area").strip()
+
+        # Compose to fit ONE GSM-7 segment (<=160 chars) so every welcome
+        # message bills as a single SMS. The opt-out suffix is required on
+        # every message (NDPR) and is never truncated — the area name is
+        # dropped first if a pathological name would overflow the budget.
+        suffix = " Reply STOP to opt out"
+        head   = f"FloodSight: {phone} is registered for flood alerts"
+        tail   = ". We will text you when a Watch or Warning is issued."
+
+        body = f"{head} in {area}{tail}"
+        if len(body) + len(suffix) > 160:
+            body = f"{head}{tail}"
+        if len(body) + len(suffix) > 160:
+            body = body[: 160 - len(suffix)].rsplit(" ", 1)[0]
+        body += suffix
+
+        _at_send(message=body, recipients=[phone])
+        welcome_sent = True
+        log.info("Welcome SMS sent to %s (%s)", phone, area)
+    except Exception as exc:
+        log.error("Welcome SMS failed for %s: %s", phone, exc)
+
     return {
-        "status":     "subscribed",
-        "phone":      row["phone"],
-        "risk_class": risk_class,
-        "area_name":  row.get("area_name") or area_name,
+        "status":       "subscribed",
+        "phone":        row["phone"],
+        "risk_class":   risk_class,
+        "area_name":    row.get("area_name") or area_name,
+        "welcome_sent": welcome_sent,
     }
 
 
