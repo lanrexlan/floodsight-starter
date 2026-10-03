@@ -1,0 +1,56 @@
+name: Tests
+
+# Runs the test suite on every push and pull request.
+#
+# Until this workflow existed the repository had 112 passing tests that
+# nothing ever executed — no CI job referenced pytest. Three production
+# defects shipped as a direct result:
+#   * health_alerts.yml used AT secret names the sender never reads
+#   * scripts/send_health_alerts.py compared an int cell-count against
+#     the strings "Watch"/"Warning", so CHEW alerts never dispatched
+#   * POST /subscribe saved the subscriber and sent no SMS at all
+# Each is the kind of regression a green suite catches in seconds.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-scripts.txt
+          pip install pytest
+
+      - name: Run test suite
+        # No secrets are provided: the suite must stay hermetic. If a test
+        # starts requiring live Supabase or Africa's Talking credentials it
+        # will fail here, which is the intended signal — unit tests should
+        # mock those boundaries rather than reach the network.
+        run: pytest tests/ -q --maxfail=5
+
+      - name: Verify first-party packages are importable
+        # Guards the conftest.py sys.path bootstrap. This is the exact
+        # failure mode that disabled the CHEW health alerts in production,
+        # so it is asserted explicitly rather than left implicit.
+        run: |
+          python -c "import floodsight, api; print('floodsight + api import OK')"
+          python -c "import floodsight.health.chew_alerts; print('chew_alerts import OK')"
+          python -c "import floodsight.notifications.africastalking; print('AT sender import OK')"
