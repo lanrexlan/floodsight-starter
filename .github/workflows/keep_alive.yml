@@ -1,32 +1,73 @@
 name: Keep API Alive
 
-# Pings the Render API every 14 minutes to prevent the free-tier instance
-# from spinning down. Render free tier sleeps after 15 minutes of inactivity,
-# causing 30–60 s cold-start 502s on the dashboard.
-# This workflow keeps the process warm 24/7 at zero cost.
+# Wakes the Render instance shortly BEFORE each scheduled job, instead of
+# pinging around the clock.
+#
+# Why this changed
+# ----------------
+# The previous schedule was '*/14 * * * *' — every 14 minutes, 24/7. That is
+# ~103 runs/day. GitHub bills each job rounded up to a whole minute, so this
+# single workflow consumed roughly 3,090 minutes/month against the 2,000-minute
+# free allowance for a private repository. The quota ran out around day 17 of
+# every month, and once exhausted GitHub refuses to start ANY workflow — which
+# is why the morning briefing and health alerts silently stopped too.
+#
+# It also cost the Render allowance. Pinging every 14 minutes keeps the free
+# instance awake ~744 hours/month against a 750 instance-hour cap, leaving no
+# headroom for any other service on the account.
+#
+# One workflow, both budgets. The cold starts it was preventing cost 30-60 s;
+# the outage it caused cost days of missed alerts.
+#
+# New approach: wake the instance only in the ~20 minutes before a job needs
+# it. That is 6 runs/day (~180 min/month) instead of 103.
 
 on:
   schedule:
-    - cron: '*/14 * * * *'   # every 14 minutes, all day
-  workflow_dispatch:           # allow manual trigger to test
+    # Morning briefing fires at 05:00 and 06:00 UTC -> warm at 04:45 and 05:45
+    - cron: '45 4 * * *'
+    - cron: '45 5 * * *'
+    # Health alerts fire at 06:30 and 06:45 UTC -> warm at 06:15
+    - cron: '15 6 * * *'
+    # Light daytime coverage so the public dashboard is not always cold
+    - cron: '0 9,13,17 * * *'
+
+  workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 3
 
     steps:
       - name: Ping API
         run: |
-          echo "Pinging FloodSight API..."
-          # /health is a no-op endpoint — /forecast/summary (used previously)
-          # recomputed alert levels over ~25k grid cells every 14 minutes.
+          BASE="https://floodsight-starter.onrender.com"
+          echo "Pinging $BASE ..."
+
+          # Retry: a cold start can take 30-60 s on the free tier, so a single
+          # attempt is not evidence the service is down.
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            --max-time 60 \
-            https://floodsight-starter.onrender.com/health)
+                        --max-time 90 --retry 3 --retry-delay 15 \
+                        --retry-all-errors \
+                        "$BASE/" || echo "000")
+
           echo "HTTP status: $STATUS"
-          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 500 ]; then
-            echo "API is alive."
-          else
-            echo "WARNING: API returned $STATUS — may still be waking up."
-          fi
+
+          # The old version exited 0 on every outcome, including a total
+          # connection failure. That meant a dead API still showed a green
+          # tick, so an outage could run for days without any signal.
+          # Now a genuine failure fails the job and GitHub emails you.
+          case "$STATUS" in
+            2*|3*|4*)
+              echo "API is reachable (HTTP $STATUS)."
+              ;;
+            000)
+              echo "::error::No response from $BASE — service is down, suspended, or DNS is failing."
+              exit 1
+              ;;
+            *)
+              echo "::error::API returned HTTP $STATUS — server-side failure."
+              exit 1
+              ;;
+          esac
