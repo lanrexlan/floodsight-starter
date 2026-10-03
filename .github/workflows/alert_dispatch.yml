@@ -1,0 +1,136 @@
+name: FloodSight Alert Dispatch
+
+# Sends Watch/Warning SMS to affected subscribers.
+#
+# Why this workflow exists
+# ------------------------
+# POST /alerts/dispatch documents itself as "meant to be called by an
+# automated cron job every hour" — but no such job existed. The only
+# scheduled sends were the morning briefing (05:00/06:00 UTC) and the CHEW
+# health cron (06:30 UTC). A Warning that developed at 14:00 WAT therefore
+# reached residents at roughly 06:00 the following morning: a ~16 hour delay
+# on a system whose entire value proposition is flood lead time.
+#
+# Cadence: every 3 hours. Frequent enough that worst-case notification lag is
+# ~3 h rather than ~16 h, infrequent enough to stay well inside the Africa's
+# Talking budget. Raise to hourly during peak rainy season (Jun–Sep) if the
+# SMS budget allows.
+#
+# Safety: /alerts/dispatch is idempotent per subscriber per alert level —
+# each subscriber receives at most one Watch and one Warning SMS per event
+# window, enforced server-side. Re-running this workflow does not re-notify
+# anyone, so overlapping or retried runs are harmless.
+
+on:
+  schedule:
+    # 00:00, 03:00, 06:00, 09:00, 12:00, 15:00, 18:00, 21:00 UTC
+    # (01:00 .. 22:00 WAT)
+    - cron: "0 */3 * * *"
+
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (compute alert levels, do not send SMS)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+# Never let two dispatch runs overlap. Without this a slow run (Render cold
+# start) could still be in flight when the next 3-hourly run starts.
+concurrency:
+  group: floodsight-alert-dispatch
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Wake the API (Render free tier cold start)
+        # The free tier spins down after inactivity; a cold start can take
+        # 30-60 s. Waking it first means the dispatch call itself does not
+        # burn its timeout waiting for the container to boot.
+        run: |
+          BASE="${{ secrets.FLOODSIGHT_API }}"
+          if [ -z "$BASE" ]; then
+            echo "::error::FLOODSIGHT_API secret is not set."
+            exit 1
+          fi
+          echo "Waking $BASE ..."
+          curl -sS --max-time 90 --retry 3 --retry-delay 10 \
+               -o /dev/null -w "wake status=%{http_code}\n" \
+               "$BASE/" || echo "Wake request failed (continuing anyway)"
+
+      - name: Dispatch alerts
+        env:
+          FLOODSIGHT_API:  ${{ secrets.FLOODSIGHT_API }}
+          DISPATCH_SECRET: ${{ secrets.DISPATCH_SECRET }}
+          DRY_RUN:         ${{ github.event.inputs.dry_run }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${DISPATCH_SECRET:-}" ]; then
+            echo "::error::DISPATCH_SECRET secret is not set — /alerts/dispatch requires it."
+            exit 1
+          fi
+
+          BASE="${FLOODSIGHT_API%/}"
+
+          if [ "${DRY_RUN:-false}" = "true" ]; then
+            echo "DRY RUN — reading current alert state only, no SMS will be sent."
+            curl -sS --max-time 120 "$BASE/forecast/alerts" \
+              | python3 -c "import sys,json; d=json.load(sys.stdin); print('highest_alert:', d.get('highest_alert')); print('alert_counts:', d.get('alert_counts'))"
+            exit 0
+          fi
+
+          echo "Calling POST $BASE/alerts/dispatch ..."
+          HTTP=$(curl -sS --max-time 240 \
+                      -X POST "$BASE/alerts/dispatch" \
+                      -H "Authorization: Bearer ${DISPATCH_SECRET}" \
+                      -H "Content-Type: application/json" \
+                      -w "\n%{http_code}" \
+                      -o /tmp/dispatch.json) || {
+            echo "::error::curl failed calling /alerts/dispatch"
+            exit 1
+          }
+
+          echo "HTTP $HTTP"
+          cat /tmp/dispatch.json
+
+          if [ "$HTTP" != "200" ]; then
+            echo "::error::Dispatch returned HTTP $HTTP"
+            exit 1
+          fi
+
+      - name: Summarise result
+        if: success() && github.event.inputs.dry_run != 'true'
+        run: |
+          python3 - <<'PY'
+          import json, os
+          try:
+              with open("/tmp/dispatch.json") as fh:
+                  d = json.load(fh)
+          except Exception as exc:
+              print(f"Could not parse dispatch response: {exc}")
+              raise SystemExit(0)
+
+          sent    = d.get("sent", 0)
+          highest = d.get("highest_alert", "unknown")
+          total   = d.get("subscribers", 0)
+
+          print(f"highest_alert = {highest}")
+          print(f"subscribers   = {total}")
+          print(f"sms_sent      = {sent}")
+
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a") as fh:
+                  fh.write(f"### FloodSight dispatch\n\n")
+                  fh.write(f"- Highest alert: **{highest}**\n")
+                  fh.write(f"- Subscribers: {total}\n")
+                  fh.write(f"- SMS sent: **{sent}**\n")
+          PY
