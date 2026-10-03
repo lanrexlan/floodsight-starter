@@ -230,18 +230,44 @@ def already_alerted(subscriber_id: str, alert_level: str, event_date: str) -> bo
     return (result.count or 0) > 0
 
 
-def log_alert_sent(subscriber_id: str, alert_level: str, event_date: str) -> None:
+def log_alert_sent(
+    subscriber_id: str,
+    alert_level: str,
+    event_date: str,
+    at_message_id: str | None = None,
+    at_status: str | None = None,
+    at_cost: str | None = None,
+) -> None:
     """
     Record that an alert was sent.  The UNIQUE INDEX prevents duplicates so
     if the dispatch job runs twice in the same hour this is a no-op.
+
+    at_message_id / at_status / at_cost carry the Africa's Talking submission
+    result. at_message_id is the correlation key that lets a later delivery
+    report (POST /at/delivery) mark this row delivered or failed; without it
+    the row can only ever say "handed to the gateway", never "reached the
+    handset". The parameters are optional so older callers keep working and
+    so a send that returns no recipient record still logs.
+
+    Requires migration scripts/sql/06_delivery_reports.sql for the columns.
     """
     client = _get_client()
+    row: dict[str, Any] = {
+        "subscriber_id": subscriber_id,
+        "alert_level":   alert_level,
+        "event_date":    event_date,
+    }
+    # Only include delivery columns when populated, so this still works
+    # against a database where 06_delivery_reports.sql has not been run yet.
+    if at_message_id:
+        row["at_message_id"] = at_message_id
+    if at_status:
+        row["at_status"] = at_status
+    if at_cost:
+        row["at_cost"] = at_cost
+
     try:
-        client.table("alert_log").insert({
-            "subscriber_id": subscriber_id,
-            "alert_level":   alert_level,
-            "event_date":    event_date,
-        }).execute()
+        client.table("alert_log").insert(row).execute()
     except Exception as exc:
         # Unique constraint violation = already logged — not an error
         if "unique" in str(exc).lower() or "duplicate" in str(exc).lower():
@@ -249,6 +275,62 @@ def log_alert_sent(subscriber_id: str, alert_level: str, event_date: str) -> Non
                       subscriber_id, alert_level, event_date)
         else:
             raise
+
+
+def record_delivery_report(
+    at_message_id: str,
+    status: str,
+    failure_reason: str | None = None,
+) -> str:
+    """
+    Apply an Africa's Talking delivery report to the matching alert row.
+
+    AT sends a callback per message once the network reports a final state.
+    ``status`` is one of Success | Failed | Rejected | Sent | Submitted |
+    Buffered. Only the terminal states are meaningful for delivery accounting;
+    the transient ones are recorded but do not set ``delivered_at``.
+
+    The messageId may belong to either a resident alert (``alert_log``) or a
+    CHEW health alert (``health_alert_log``), so both are tried. Returns which
+    table matched: "alert_log" | "health_alert_log" | "not_found".
+
+    Not finding a row is normal and not an error — it happens for the welcome
+    SMS and the OTP SMS, neither of which is logged as an alert.
+    """
+    client = _get_client()
+
+    patch: dict[str, Any] = {"at_status": status}
+    if status == "Success":
+        patch["delivered_at"] = datetime.now(timezone.utc).isoformat()
+    if failure_reason:
+        patch["failure_reason"] = failure_reason
+
+    for table in ("alert_log", "health_alert_log"):
+        try:
+            resp = (
+                client.table(table)
+                .update(patch)
+                .eq("at_message_id", at_message_id)
+                .execute()
+            )
+            if getattr(resp, "data", None):
+                log.info(
+                    "Delivery report applied: %s %s -> %s",
+                    table, at_message_id, status,
+                )
+                return table
+        except Exception as exc:
+            # A missing column means migration 06 has not been run. Log it
+            # loudly but keep trying the other table rather than 500-ing the
+            # webhook — AT retries failed callbacks and we do not want a
+            # retry storm over a schema gap.
+            log.error(
+                "Delivery report update failed on %s for %s: %s",
+                table, at_message_id, exc,
+            )
+
+    log.debug("No alert row matched messageId %s (welcome/OTP SMS?)", at_message_id)
+    return "not_found"
 
 
 def get_recent_alert_levels(event_dates: list[str]) -> list[dict[str, Any]]:

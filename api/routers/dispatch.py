@@ -214,12 +214,20 @@ def dispatch_alerts(request: Request):
 
         # Send SMS
         try:
-            send_sms(
+            # Capture the AT recipient record so the messageId can be stored:
+            # it is the only key that lets an inbound delivery report be
+            # matched back to this alert_log row.
+            at_recipient = send_sms(
                 to_number   = sub["phone"],
                 alert_level = level,
                 area_name   = area,
+            ) or {}
+            log_alert_sent(
+                sub_id, level, event_date,
+                at_message_id = at_recipient.get("messageId"),
+                at_status     = at_recipient.get("status"),
+                at_cost       = at_recipient.get("cost"),
             )
-            log_alert_sent(sub_id, level, event_date)
             dispatched += 1
             subscriber_detail.append({
                 "area":    area,
