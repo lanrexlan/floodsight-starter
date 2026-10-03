@@ -47,6 +47,17 @@ async def lifespan(app: FastAPI):
     check passes immediately and requests are accepted while the cache is
     still warming.  Subsequent requests block on the cached copy (< 1 ms).
     """
+    # Report missing configuration before anything else. Several subsystems
+    # fail closed when an env var is unset (notably AT_WEBHOOK_TOKEN, which
+    # makes every inbound-SMS callback return 503), and a closed failure with
+    # no signal looks exactly like a quiet day. Logging at startup means the
+    # operator sees it in Render's log view without going looking.
+    try:
+        from api.diagnostics import log_config_report
+        log_config_report()
+    except Exception as exc:
+        log.warning("Config diagnostics failed (non-fatal): %s", exc)
+
     def _warm():
         try:
             from api.data_provider import get_grid_geojson
@@ -86,6 +97,22 @@ app.include_router(incoming.router)
 app.include_router(health.router)
 
 
+@app.get("/diagnostics")
+def diagnostics():
+    """
+    Configuration health check for the operator dashboard.
+
+    Reports which required environment variables are unset and, for each, the
+    user-facing capability that is consequently switched off. Returns only
+    whether a name is set — never a secret value — so it is safe to expose
+    alongside the other public status routes.
+
+    ``status`` is ``"degraded"`` when any required variable is missing.
+    """
+    from api.diagnostics import config_report
+    return config_report()
+
+
 @app.get("/")
 def root():
     return {
@@ -102,7 +129,8 @@ def root():
             "/alerts/current",
             "/verify", "/verify/summary",
             "/health/risk", "/health/chew-response", "/health/mel/summary", "/health/mel/operational",
-            "/at/incoming", "/subscribe/confirm",
+            "/at/incoming", "/at/delivery", "/subscribe/confirm",
+            "/diagnostics",
             "/forecast/rainfall", "/forecast/alerts", "/forecast/summary",
             "/validate/events",
             "/health/risk", "/health/risk/{lga_name}",
