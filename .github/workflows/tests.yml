@@ -49,7 +49,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip 'setuptools>=83.0.0' wheel
           pip install -r requirements-deploy.txt
           pip install rasterio==1.3.10 pytest httpx pip-audit 'psycopg[binary]'
 
@@ -65,6 +65,20 @@ jobs:
 
       - name: Verify production container builds
         run: docker build -t floodsight-test .
+
+      - name: Verify container serves packaged assets with depth disabled
+        run: |
+          docker run -d --name floodsight-smoke -p 8000:8000 \
+            -e ENABLE_EXPERIMENTAL_DEPTH=false floodsight-test
+          trap 'docker logs floodsight-smoke; docker rm -f floodsight-smoke' EXIT
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://localhost:8000/health; then break; fi
+            sleep 2
+          done
+          curl --fail --silent http://localhost:8000/product-status \
+            | python -c "import json,sys; assert json.load(sys.stdin)['experimental_depth_enabled'] is False"
+          curl --fail --silent 'http://localhost:8000/risk/point?lat=6.52&lon=3.37' \
+            | python -c "import json,sys; d=json.load(sys.stdin); assert d['cell_id'] and d['risk_class']"
 
       - name: Verify first-party packages are importable
         # Guards the conftest.py sys.path bootstrap. This is the exact

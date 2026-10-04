@@ -69,9 +69,8 @@ def _log_prediction(req: DepthPredictionRequest, predicted_depth_m: float) -> No
 
 @router.post("/predict", response_model=DepthPredictionResponse)
 def predict_depth(req: DepthPredictionRequest):
-    from api.runtime import production
-    import os
-    if production() and os.getenv("ENABLE_EXPERIMENTAL_DEPTH", "false").lower() != "true":
+    from api.runtime import experimental_depth_enabled
+    if not experimental_depth_enabled():
         raise HTTPException(503, "Experimental depth predictions are disabled for this pilot.")
     if not ML_MODEL_PATH.exists():
         raise HTTPException(
@@ -206,9 +205,8 @@ def ml_grid(
     - **High**    1.00 – 2.00 m
     - **Extreme** > 2.00 m
     """
-    from api.runtime import production
-    import os
-    if production() and os.getenv("ENABLE_EXPERIMENTAL_DEPTH", "false").lower() != "true":
+    from api.runtime import experimental_depth_enabled
+    if not experimental_depth_enabled():
         raise HTTPException(503, "Experimental design-storm depth layer is disabled for this pilot.")
     if not ML_GRID_GEOJSON.exists():
         raise HTTPException(

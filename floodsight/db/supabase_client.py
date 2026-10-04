@@ -320,8 +320,8 @@ def record_delivery_report(
     the transient ones are recorded but do not set ``delivered_at``.
 
     The messageId may belong to either a resident alert (``alert_log``) or a
-    CHEW health alert (``health_alert_log``), so both are tried. Returns which
-    table matched: "alert_log" | "health_alert_log" | "not_found".
+    CHEW health alert (``health_alerts``), so both are tried. Returns which
+    table matched: "alert_log" | "health_alerts" | "not_found".
 
     Not finding a row is normal and not an error — it happens for the welcome
     SMS and the OTP SMS, neither of which is logged as an alert.
@@ -334,7 +334,8 @@ def record_delivery_report(
     if failure_reason:
         patch["failure_reason"] = failure_reason
 
-    for table in ("alert_log", "health_alert_log"):
+    errors = []
+    for table in ("alert_log", "health_alerts"):
         try:
             resp = (
                 client.table(table)
@@ -349,15 +350,17 @@ def record_delivery_report(
                 )
                 return table
         except Exception as exc:
-            # A missing column means migration 06 has not been run. Log it
-            # loudly but keep trying the other table rather than 500-ing the
-            # webhook — AT retries failed callbacks and we do not want a
-            # retry storm over a schema gap.
+            # Try the other audience, but never acknowledge a storage failure
+            # as a successfully recorded delivery. The webhook returns 503
+            # so the provider can retry after connectivity/schema is repaired.
+            errors.append(table)
             log.error(
                 "Delivery report update failed on %s for %s: %s",
                 table, at_message_id, exc,
             )
 
+    if errors:
+        raise RuntimeError("Delivery report storage unavailable; please retry later.")
     log.debug("No alert row matched messageId %s (welcome/OTP SMS?)", at_message_id)
     return "not_found"
 

@@ -188,6 +188,11 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    # The morning cron used to bypass the resident dispatch approval entirely.
+    if not args.dry_run and os.getenv("BRIEFING_DISPATCH_ENABLED", "false").lower() != "true":
+        log.error("Morning SMS awaits pilot approval and BRIEFING_DISPATCH_ENABLED=true.")
+        sys.exit(1)
+
     # Idempotency guard: if this is a backup/retry run and the briefing was
     # already sent today (logged in Supabase), skip to avoid double-sending.
     if not args.dry_run and os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_KEY"):

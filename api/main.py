@@ -122,11 +122,11 @@ def readiness():
 def product_status():
     from floodsight.config import AOI_BBOX, GRID_RESOLUTION_M, RISK_CLASS_BREAKS
     from floodsight import config
-    from api.runtime import production
+    from api.runtime import experimental_depth_enabled
     return {"stage": "controlled_pilot", "coverage_bbox": AOI_BBOX,
             "grid_resolution_m": GRID_RESOLUTION_M, "risk_breaks": RISK_CLASS_BREAKS,
             "depth_model": "experimental", "official_emergency_service": False,
-            "experimental_depth_enabled": not production() or os.getenv("ENABLE_EXPERIMENTAL_DEPTH", "false").lower() == "true",
+            "experimental_depth_enabled": experimental_depth_enabled(),
             "alert_thresholds": {"WARNING_24H": config.RAIN_WARNING_24H_MM,
                 "WARNING_72H": config.RAIN_WARNING_72H_MM,
                 "WATCH_HIGH_24H": config.RAIN_WATCH_HIGH_24H_MM,

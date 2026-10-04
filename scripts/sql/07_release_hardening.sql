@@ -3,8 +3,32 @@
 ALTER TABLE prediction_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE verifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE dispatch_cells ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON prediction_log, verifications, dispatch_cells FROM anon, authenticated;
+ALTER TABLE briefing_log ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON prediction_log, verifications, dispatch_cells, briefing_log,
+    subscribers, pending_subscriptions, alert_log,
+    chew_subscribers, health_alerts, chew_responses, mel_events FROM PUBLIC, anon, authenticated;
+GRANT ALL ON prediction_log, verifications, dispatch_cells, briefing_log,
+    subscribers, pending_subscriptions, alert_log,
+    chew_subscribers, health_alerts, chew_responses, mel_events TO service_role;
 ALTER VIEW alert_delivery_stats SET (security_invoker = true);
+REVOKE ALL ON alert_delivery_stats FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON alert_delivery_stats TO service_role;
+
+-- Harden the pre-release privileged function without running it or changing
+-- subscribers. Absence of a flood warning is not withdrawal of consent.
+ALTER FUNCTION deactivate_stale_subscribers() SET search_path = public;
+REVOKE EXECUTE ON FUNCTION deactivate_stale_subscribers() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION deactivate_stale_subscribers() TO service_role;
+
+-- Also repair policies on databases where health migration 001 already ran.
+DROP POLICY IF EXISTS "service only chew_subscribers" ON chew_subscribers;
+DROP POLICY IF EXISTS "service only health_alerts" ON health_alerts;
+DROP POLICY IF EXISTS "service only chew_responses" ON chew_responses;
+DROP POLICY IF EXISTS "service only mel_events" ON mel_events;
+CREATE POLICY "service only chew_subscribers" ON chew_subscribers TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "service only health_alerts" ON health_alerts TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "service only chew_responses" ON chew_responses TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "service only mel_events" ON mel_events TO service_role USING (true) WITH CHECK (true);
 
 -- Shared, atomic limits survive restarts and serialize concurrent requests.
 CREATE TABLE IF NOT EXISTS subscription_attempts (

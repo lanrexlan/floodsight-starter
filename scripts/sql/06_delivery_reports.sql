@@ -1,7 +1,7 @@
 -- =============================================================================
 -- FloodSight — Africa's Talking delivery reports for resident alerts.
 --
--- Run ONCE in the Supabase SQL Editor, after 03_logs.sql.
+-- Run after scripts/sql/01..05 and supabase/migrations/001..002.
 --
 -- Why
 -- ---
@@ -51,15 +51,15 @@ CREATE INDEX IF NOT EXISTS alert_log_at_status_idx
 
 
 -- 2. Same treatment for CHEW health alerts ----------------------------------
--- health_alert_log already stores at_message_id / at_status / at_cost from
+-- health_alerts already stores at_message_id / at_status / at_cost from
 -- migration 001, but had nowhere to record the delivery outcome.
 
-ALTER TABLE health_alert_log
+ALTER TABLE health_alerts
     ADD COLUMN IF NOT EXISTS delivered_at   TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS failure_reason TEXT;
 
-CREATE UNIQUE INDEX IF NOT EXISTS health_alert_log_at_message_id_idx
-    ON health_alert_log (at_message_id)
+CREATE UNIQUE INDEX IF NOT EXISTS health_alerts_at_message_id_idx
+    ON health_alerts (at_message_id)
     WHERE at_message_id IS NOT NULL;
 
 
@@ -77,7 +77,7 @@ SELECT
     COUNT(*) FILTER (WHERE delivered_at IS NOT NULL)           AS delivered,
     COUNT(*) FILTER (WHERE at_status IN ('Failed', 'Rejected')) AS failed,
     COUNT(*) FILTER (WHERE delivered_at IS NULL
-                       AND at_status NOT IN ('Failed', 'Rejected')) AS pending,
+                       AND COALESCE(at_status, '') NOT IN ('Failed', 'Rejected')) AS pending,
     ROUND(
         COUNT(*) FILTER (WHERE delivered_at IS NOT NULL)::numeric
         / NULLIF(COUNT(*) FILTER (
