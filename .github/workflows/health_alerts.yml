@@ -47,6 +47,8 @@ jobs:
           AT_API_KEY:     ${{ secrets.AT_API_KEY }}
           AT_SENDER_ID:   ${{ secrets.AT_SENDER_ID }}
           FLOODSIGHT_API: ${{ secrets.FLOODSIGHT_API }}
+          FLOODSIGHT_ENV: production
+          HEALTH_DISPATCH_ENABLED: ${{ secrets.HEALTH_DISPATCH_ENABLED }}
         run: |
           DRY_RUN_FLAG=""
           if [[ "${{ github.event.inputs.dry_run }}" == "true" ]]; then

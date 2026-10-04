@@ -54,8 +54,8 @@ def compose_message(
     if risk_tier == "Low":
         raise ValueError("Low-tier LGAs do not receive CHEW alerts")
 
-    w_start = datetime.fromisoformat(outbreak_window_start).strftime("%-d %b")
-    w_end   = datetime.fromisoformat(outbreak_window_end).strftime("%-d %b")
+    w_start = datetime.fromisoformat(outbreak_window_start).strftime("%d %b").lstrip("0")
+    w_end   = datetime.fromisoformat(outbreak_window_end).strftime("%d %b").lstrip("0")
     action  = _TIER_ACTIONS.get(risk_tier, "Monitor closely for fever cases.")
 
     msg = (
@@ -104,6 +104,9 @@ def dispatch_health_alerts(
         sent, skipped_already_sent, skipped_low_risk,
         skipped_not_pilot, failed
     """
+    import os
+    if os.getenv("FLOODSIGHT_ENV") == "production" and os.getenv("HEALTH_DISPATCH_ENABLED", "false").lower() != "true":
+        raise RuntimeError("Health SMS dispatch requires approval of the research pilot and HEALTH_DISPATCH_ENABLED=true.")
     from floodsight.db.supabase_client import (
         alert_already_sent_today,
         get_chew_subscribers_for_lga,

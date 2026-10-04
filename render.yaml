@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: floodsight
+    runtime: docker
+    plan: standard
+    healthCheckPath: /ready
+    autoDeployTrigger: "off"
+    envVars:
+      - key: FLOODSIGHT_ENV
+        value: production
+      - key: REQUIRE_OTP
+        value: "true"
+      - key: ALERT_DISPATCH_ENABLED
+        value: "false"
+      - key: ENABLE_EXPERIMENTAL_DEPTH
+        value: "false"
+      - key: HEALTH_DISPATCH_ENABLED
+        value: "false"
+      - key: CORS_ORIGINS
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: AT_USERNAME
+        sync: false
+      - key: AT_API_KEY
+        sync: false
+      - key: AT_SENDER_ID
+        sync: false
+      - key: AT_WEBHOOK_TOKEN
+        generateValue: true
+      - key: DISPATCH_SECRET
+        generateValue: true
+      - key: DATA_PROVIDER_LICENSES_CONFIRMED
+        sync: false
+      - key: OPENMETEO_API_KEY
+        sync: false

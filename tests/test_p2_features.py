@@ -137,13 +137,17 @@ def test_briefing_includes_coastal_line():
         "highest_alert": "No Alert",
         "alert_counts": {"Warning": 0, "Watch": 0, "No Alert": 100},
         "forecast": {"rain_24h_mm": 4.0, "rain_72h_mm": 9.0},
-        "coastal": {"advisory": True, "max_sea_level_m": 1.15},
+        "coastal": {"advisory": True, "high_tide": True, "max_sea_level_m": 1.25},
     }
     msg = mod.format_message(summary)
-    assert "HIGH TIDE" in msg
+    assert "COASTAL SURGE" in msg
+
+    # High tide alone (a spring tide) must NOT produce a flooding line
+    summary["coastal"] = {"advisory": False, "high_tide": True, "max_sea_level_m": 1.08}
+    assert "COASTAL SURGE" not in mod.format_message(summary)
 
     summary["coastal"] = None
-    assert "HIGH TIDE" not in mod.format_message(summary)
+    assert "COASTAL SURGE" not in mod.format_message(summary)
 
 
 if __name__ == "__main__":

@@ -92,10 +92,11 @@ def get_dam_summary(force: bool = False) -> dict:
     if _cache is not None and not force and now - _cache[0] < _CACHE_TTL_S:
         return _cache[1]
 
+    from floodsight.forecast.provider import endpoint, credential_query
     url = (
-        "https://flood-api.open-meteo.com/v1/flood"
-        f"?latitude={OGUN_LAT}&longitude={OGUN_LON}"
-        "&daily=river_discharge&forecast_days=16&past_days=1"
+        endpoint("flood", "flood")
+        + f"?latitude={OGUN_LAT}&longitude={OGUN_LON}"
+        "&daily=river_discharge&forecast_days=16&past_days=1" + credential_query()
     )
     req = urllib.request.Request(url, headers={"User-Agent": "FloodSight/1.0"})
     try:

@@ -78,8 +78,8 @@ def _build_message(alert_level: str, area_name: str | None) -> str:
         head   = f"FloodSight ALERT: Flood Warning for {area}."
         detail = " Avoid low roads. Move to higher ground if needed."
     elif alert_level == "All Clear":
-        head   = f"FloodSight: All clear for {area}."
-        detail = " Flood alert has ended. Stay careful near drains and canals."
+        head   = f"FloodSight: All clear threshold status for {area}."
+        detail = " Flooding can still occur. Avoid flooded roads."
     else:  # Watch
         head   = f"FloodSight: Flood Watch for {area}."
         detail = " Heavy rain expected - avoid flood-prone streets."
@@ -130,7 +130,9 @@ def send_otp(to_number: str, code: str) -> None:
     log.info("OTP sent to %s", to_number)
 
 
-def send_sms(to_number: str, alert_level: str, area_name: str | None = None) -> None:
+def send_sms(
+    to_number: str, alert_level: str, area_name: str | None = None
+) -> dict:
     """
     Send a flood alert SMS via Africa's Talking.
 
@@ -139,6 +141,23 @@ def send_sms(to_number: str, alert_level: str, area_name: str | None = None) -> 
     to_number   : E.164 recipient number, e.g. +2348012345678
     alert_level : "Watch", "Warning", or "All Clear"
     area_name   : human-readable location name (optional but recommended)
+
+    Returns
+    -------
+    dict
+        The recipient record from the Africa's Talking response::
+
+            {"statusCode": 101, "number": "+234...", "status": "Success",
+             "cost": "NGN 2.2000", "messageId": "ATXid_..."}
+
+        Returns ``{}`` if AT returns no recipient entry.
+
+        This previously returned None, which meant the ``messageId`` was
+        discarded at the call site. Without it there is no correlation key to
+        match an inbound Africa's Talking delivery report back to the
+        alert_log row, so delivery could never be confirmed — the dashboard
+        could only ever report "submitted to gateway" as though it were
+        "received by resident".
 
     Raises
     ------
@@ -149,9 +168,16 @@ def send_sms(to_number: str, alert_level: str, area_name: str | None = None) -> 
     body = _build_message(alert_level, area_name)
     log.debug("SMS -> %s | %s | %d chars", to_number, alert_level, len(body))
 
-    _at_send(message=body, recipients=[to_number])
+    result = _at_send(message=body, recipients=[to_number])
+
+    # AT response shape: {"SMSMessageData": {"Recipients": [{...}]}}
+    recipient = (
+        (result or {}).get("SMSMessageData", {}).get("Recipients") or [{}]
+    )[0]
 
     log.info(
-        "SMS sent via AT to=%s level=%s area=%s",
+        "SMS sent via AT to=%s level=%s area=%s status=%s id=%s",
         to_number, alert_level, area_name,
+        recipient.get("status"), recipient.get("messageId"),
     )
+    return recipient

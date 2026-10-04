@@ -41,6 +41,7 @@ _cached_source: str | None = None
 # removes the per-request serialisation spike entirely.
 _cached_grid_geojson: tuple[dict, str] | None = None
 _grid_lock = threading.Lock()  # guards get_grid_geojson() cache population
+_grid_load_lock = threading.RLock()
 
 
 def _build_synthetic_demo_grid(n_cells_per_side: int = 35) -> gpd.GeoDataFrame:
@@ -99,6 +100,20 @@ def _tag_lga_names(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 
     boundaries_path = RAW_DIR / "boundaries" / "NGA_ADM2.geojson"
     if not boundaries_path.exists():
+        # Deployments package a small verified cell-to-LGA index, not the full
+        # raw boundary download. Coastal/river upgrades require these names.
+        index_path = PROCESSED_DIR / "lga_index.json"
+        if index_path.exists() and SCORED_GRID_PATH.exists():
+            import hashlib
+            payload = json.loads(index_path.read_text(encoding="utf-8"))
+            digest = hashlib.sha256(SCORED_GRID_PATH.read_bytes()).hexdigest()
+            if payload.get("source_sha256") != digest:
+                raise RuntimeError("LGA index does not match scored grid; rebuild from boundaries.")
+            if set(payload["cells"]) != set(gdf["cell_id"].astype(str)):
+                raise RuntimeError("LGA index is incomplete; rebuild from boundaries.")
+            gdf = gdf.copy()
+            gdf["lga_name"] = gdf["cell_id"].astype(str).map(payload["cells"])
+            return gdf
         log.info("Boundary file not found — LGA names not tagged (run scripts/01 first)")
         return gdf
     try:
@@ -133,16 +148,44 @@ def _tag_lga_names(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 
 
 def get_grid(force_reload: bool = False) -> tuple[gpd.GeoDataFrame, str]:
-    global _cached_grid, _cached_source
+    with _grid_load_lock:
+        return _load_grid(force_reload)
+
+
+def _ensure_unique_cell_ids(grid: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """Disambiguate boundary-split records without changing their row order."""
+    grid = grid.copy()
+    ids = grid['cell_id'].astype(str).reset_index(drop=True)
+    duplicates = ids.duplicated(keep=False)
+    if duplicates.any():
+        ids = ids.where(~duplicates, ids + '@row=' + ids.index.astype(str))
+        log.warning('Disambiguated %d boundary-split cell identifiers', duplicates.sum())
+    if ids.duplicated().any():
+        raise RuntimeError('Grid cell identifiers are not unique')
+    grid['cell_id'] = ids.to_numpy()
+    return grid
+
+
+def _load_grid(force_reload: bool = False) -> tuple[gpd.GeoDataFrame, str]:
+    global _cached_grid, _cached_source, _cached_grid_geojson
     if _cached_grid is not None and not force_reload:
         return _cached_grid, _cached_source
 
+    if force_reload:
+        _cached_grid_geojson = None
+
     if SCORED_GRID_PATH.exists():
         log.info("Loading real processed grid from %s", SCORED_GRID_PATH)
-        _cached_grid = gpd.read_file(SCORED_GRID_PATH)
+        _cached_grid = _ensure_unique_cell_ids(gpd.read_file(SCORED_GRID_PATH))
         _cached_grid = _tag_lga_names(_cached_grid)
+        from api.runtime import production
+        if production() and ("lga_name" not in _cached_grid or not _cached_grid["lga_name"].notna().any()):
+            raise RuntimeError("Production requires verified pilot LGA coverage.")
         _cached_source = "processed_pipeline"
     else:
+        from api.runtime import production
+        if production():
+            raise RuntimeError("Processed grid is required in production; demo fallback disabled.")
         log.warning(
             "No processed grid found at %s — serving a SYNTHETIC demo grid. "
             "Run scripts/02-04 to generate real data.",
@@ -179,7 +222,11 @@ def get_grid_geojson() -> tuple[dict, str]:
             "Serialising %d-cell grid to GeoJSON (one-time; cached for all future requests) …",
             len(gdf),
         )
-        gdf_wgs84 = gdf.to_crs(WGS84)
+        # Only map properties: do not send every terrain/ML column to phones.
+        keep = [c for c in ("cell_id", "risk_class", "flood_score", "hazard_score", "elevation_m", "lga_name", "geometry") if c in gdf.columns]
+        gdf_wgs84 = gdf[keep].to_crs(WGS84)
+        from shapely import set_precision
+        gdf_wgs84.geometry = set_precision(gdf_wgs84.geometry, 0.00001)
         geojson = json.loads(gdf_wgs84.to_json())
         geojson["data_source"] = source
         _cached_grid_geojson = (geojson, source)
@@ -215,6 +262,10 @@ def get_streets_geojson() -> tuple[dict | None, str]:
     log.info("Loading streets risk from %s …", STREETS_RISK_PATH)
     gdf = gpd.read_file(STREETS_RISK_PATH)
     # Script always saves in WGS84 — no reprojection needed here
+    keep = [c for c in ("name", "highway", "risk_class", "flood_score", "geometry") if c in gdf.columns]
+    gdf = gdf[keep].to_crs(WGS84)
+    from shapely import set_precision
+    gdf.geometry = set_precision(gdf.geometry, 0.00001)
     geojson = json.loads(gdf.to_json())
     geojson["data_source"] = "osm_risk_tagged"
     _cached_streets_geojson = (geojson, "osm_risk_tagged")
@@ -271,8 +322,16 @@ def get_swmm_flooding_geojson() -> dict | None:
 
 
 def nearest_cell(lat: float, lon: float) -> pd.Series:
+    from api.coordinates import validate_location
+    from fastapi import HTTPException
+    validate_location(lat, lon)
     grid, _ = get_grid()
     point = gpd.GeoSeries([gpd.points_from_xy([lon], [lat])[0]], crs=WGS84).to_crs(grid.crs)[0]
-    idx = grid.geometry.distance(point).idxmin()
-    return grid.loc[idx]
-
+    # STRtree nearest lookup avoids a scan of every polygon on every click.
+    indices, distances = grid.sindex.nearest(point, return_all=False, return_distance=True)
+    if not len(distances) or distances[0] > 300:
+        raise HTTPException(422, "Location is outside the mapped pilot cells.")
+    cell = grid.iloc[int(indices[1][0])]
+    if "lga_name" in grid and pd.isna(cell["lga_name"]):
+        raise HTTPException(422, "Location is outside the mapped pilot LGAs.")
+    return cell

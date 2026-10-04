@@ -1,0 +1,72 @@
+{
+  "verification": "offline_only_packaged_data",
+  "api_checks": [
+    {
+      "path": "/risk/grid",
+      "status": 200,
+      "seconds": 0.128,
+      "transfer_bytes": 1353747
+    },
+    {
+      "path": "/risk/grid",
+      "status": 200,
+      "seconds": 0.091,
+      "transfer_bytes": 1353747
+    },
+    {
+      "path": "/risk/streets?bbox=3.35,6.51,3.38,6.54",
+      "status": 200,
+      "seconds": 0.582,
+      "transfer_bytes": 323658
+    },
+    {
+      "path": "/risk/point?lat=6.52&lon=3.37",
+      "status": 200,
+      "seconds": 1.683,
+      "transfer_bytes": 196
+    },
+    {
+      "path": "/risk/point?lat=6.52&lon=3.37",
+      "status": 200,
+      "seconds": 0.022,
+      "transfer_bytes": 196
+    },
+    {
+      "path": "/risk/point?lat=51.5&lon=-0.1",
+      "status": 422,
+      "seconds": 0.009,
+      "transfer_bytes": 67
+    },
+    {
+      "path": "/risk/point?lat=999&lon=999",
+      "status": 422,
+      "seconds": 0.01,
+      "transfer_bytes": 65
+    },
+    {
+      "path": "/forecast/rainfall?lat=51.5&lon=-0.1",
+      "status": 422,
+      "seconds": 0.034,
+      "transfer_bytes": 67
+    },
+    {
+      "path": "/floodsight.html",
+      "status": 200,
+      "seconds": 0.179,
+      "transfer_bytes": 15423
+    },
+    {
+      "path": "/privacy.html",
+      "status": 200,
+      "seconds": 0.02,
+      "transfer_bytes": 4163
+    },
+    {
+      "path": "/product-status",
+      "status": 200,
+      "seconds": 0.02,
+      "transfer_bytes": 519
+    }
+  ],
+  "landing_script_syntax": "passed"
+}

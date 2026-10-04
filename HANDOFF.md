@@ -1,5 +1,7 @@
 # FloodSight — Cowork Handoff Note
 
+> Current release status (4 October 2026): read `RELEASE_STATUS.md` and `DEPLOYMENT.md` first. They supersede earlier readiness, deployment, model accuracy, and launch assumptions below. Historical phase notes remain for provenance. Public dispatch and experimental depth are disabled by default in production.
+
 Please read `README.md`, `ROADMAP.md`, and **`IMPROVEMENTS.md`** (the
 July 2026 prioritized review — it is the current work queue) before doing
 anything else.

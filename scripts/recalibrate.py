@@ -133,7 +133,8 @@ def retrain() -> None:
         print(f"ERROR: training dataset not found at {TRAIN_CSV}")
         raise SystemExit(1)
 
-    df = pd.read_csv(TRAIN_CSV)
+    from floodsight.ml.provenance import normalize_dataset
+    df = normalize_dataset(pd.read_csv(TRAIN_CSV))
     print(f"Training dataset: {len(df)} rows across {df['event_name'].nunique()} event(s)")
     if "label_source" in df.columns:
         print(df["label_source"].value_counts().to_string())

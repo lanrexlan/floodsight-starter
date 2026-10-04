@@ -18,7 +18,8 @@ import secrets as pysecrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
+from api.schemas import LocatedInput
 
 from api.auth import require_dispatch_secret
 from api.data_provider import nearest_cell
@@ -70,7 +71,20 @@ _IP_MAX,    _IP_TTL    = 15, 60   # 15 attempts per IP per 1 min
 
 def _rate_check(phone: str, ip: str) -> None:
     """Raise HTTP 429 if phone or IP exceeds the subscribe rate limit."""
+    from api.runtime import production
+    if production():
+        from floodsight.db.supabase_client import consume_subscription_attempt
+        try:
+            allowed = consume_subscription_attempt(phone, ip)
+        except Exception as exc:
+            raise HTTPException(503, "Subscription service is temporarily unavailable.") from exc
+        if not allowed:
+            raise HTTPException(429, "Too many subscription attempts.", headers={"Retry-After": "600"})
+        return
     now = _time.monotonic()
+    for windows in (_phone_windows, _ip_windows):
+        if len(windows) > 10000:
+            windows.clear()
     wins = [t for t in _phone_windows[phone] if now - t < _PHONE_TTL]
     _phone_windows[phone] = wins
     if len(wins) >= _PHONE_MAX:
@@ -98,12 +112,10 @@ router = APIRouter(tags=["subscriptions"])
 # Request / response schemas
 # ---------------------------------------------------------------------------
 
-class SubscribeRequest(BaseModel):
-    phone:     str
-    lat:       float
-    lon:       float
-    name:      str | None = None
-    area_name: str | None = None
+class SubscribeRequest(LocatedInput):
+    phone:     str = Field(max_length=32)
+    name:      str | None = Field(default=None, max_length=120)
+    area_name: str | None = Field(default=None, max_length=200)
     consent:   bool = False  # NDPR: explicit consent required
 
     @field_validator("phone")
@@ -168,7 +180,9 @@ def subscribe(req: SubscribeRequest, request: Request):
     and returns ``{"status": "pending_confirmation"}`` — the subscription
     is only written after POST /subscribe/confirm.
     """
-    _rate_check(req.phone, request.client.host or "")
+    _rate_check(req.phone, request.client.host if request.client else "unknown")
+    # Check actual cell coverage before storing a pending record or sending SMS.
+    signup_cell = nearest_cell(req.lat, req.lon)
     if _otp_required():
         code = f"{pysecrets.randbelow(10**6):06d}"
         expires = (
@@ -183,6 +197,7 @@ def subscribe(req: SubscribeRequest, request: Request):
                     "lon":       req.lon,
                     "name":      req.name,
                     "area_name": req.area_name,
+                    "risk_class": str(signup_cell["risk_class"]),
                 },
                 expires_at = expires,
             )
@@ -213,18 +228,20 @@ def subscribe(req: SubscribeRequest, request: Request):
 
 def _complete_subscription(
     phone: str, lat: float, lon: float,
-    name: str | None, area_name: str | None,
+    name: str | None, area_name: str | None, confirmed_row: dict | None = None,
 ) -> dict:
     """Nearest-cell lookup + Supabase upsert — shared by both flows."""
     try:
         cell       = nearest_cell(lat, lon)
         risk_class = str(cell["risk_class"])
     except Exception as exc:
+        if isinstance(exc, HTTPException):
+            raise
         log.warning("nearest_cell failed for (%s, %s): %s", lat, lon, exc)
         risk_class = None
 
     try:
-        row = add_subscriber(
+        row = confirmed_row or add_subscriber(
             phone      = phone,
             lat        = lat,
             lon        = lon,
@@ -241,11 +258,52 @@ def _complete_subscription(
         log.error("Supabase insert failed: %s", exc)
         raise HTTPException(status_code=500, detail="Could not save subscription.") from exc
 
+    # ------------------------------------------------------------------
+    # Welcome SMS.
+    #
+    # Previously the subscriber row was written and the endpoint returned
+    # without sending anything, so residents who signed up on floodsight.html
+    # saw a success message but never received an SMS — they had no way to
+    # tell whether the number had registered correctly, and no delivery
+    # confirmation until the next Watch/Warning dispatch (potentially weeks).
+    #
+    # Deliberately non-blocking: a failed welcome SMS must not roll back or
+    # 500 a subscription that is already committed to Supabase. We log and
+    # report delivery status in the response instead.
+    # ------------------------------------------------------------------
+    welcome_sent = False
+    try:
+        from floodsight.notifications.africastalking import send_sms as _at_send
+
+        area = (row.get("area_name") or area_name or "your area").strip()
+
+        # Compose to fit ONE GSM-7 segment (<=160 chars) so every welcome
+        # message bills as a single SMS. The opt-out suffix is required on
+        # every message (NDPR) and is never truncated — the area name is
+        # dropped first if a pathological name would overflow the budget.
+        suffix = " Reply STOP to opt out"
+        head   = f"FloodSight: {phone} is registered for flood alerts"
+        tail   = ". We will text you when a Watch or Warning is issued."
+
+        body = f"{head} in {area}{tail}"
+        if len(body) + len(suffix) > 160:
+            body = f"{head}{tail}"
+        if len(body) + len(suffix) > 160:
+            body = body[: 160 - len(suffix)].rsplit(" ", 1)[0]
+        body += suffix
+
+        _at_send(message=body, recipients=[phone])
+        welcome_sent = True
+        log.info("Welcome SMS sent to %s (%s)", phone, area)
+    except Exception as exc:
+        log.error("Welcome SMS failed for %s: %s", phone, exc)
+
     return {
-        "status":     "subscribed",
-        "phone":      row["phone"],
-        "risk_class": risk_class,
-        "area_name":  row.get("area_name") or area_name,
+        "status":       "subscribed",
+        "phone":        row["phone"],
+        "risk_class":   risk_class,
+        "area_name":    row.get("area_name") or area_name,
+        "welcome_sent": welcome_sent,
     }
 
 
@@ -268,13 +326,29 @@ class ConfirmRequest(BaseModel):
 
 
 @router.post("/subscribe/confirm")
-def confirm_subscription(req: ConfirmRequest):
+def confirm_subscription(req: ConfirmRequest, request: Request):
     """
     Complete an OTP-pending subscription (REQUIRE_OTP flow).
 
     Errors: 404 no pending request | 410 code expired |
     429 too many attempts | 401 wrong code.
     """
+    _rate_check(req.phone, request.client.host if request.client else "unknown")
+    from api.runtime import production
+    if production():
+        from floodsight.db.supabase_client import consume_pending_subscription
+        try:
+            result = consume_pending_subscription(req.phone, _hash_code(req.code, req.phone))
+        except Exception as exc:
+            raise HTTPException(503, "Could not verify confirmation code; retry later.") from exc
+        status = result.get("status")
+        if status != "confirmed":
+            code, detail = {"expired": (410,"Code expired; subscribe again."),
+                            "limited": (429,"Too many attempts; subscribe again."),
+                            "wrong": (401,"Wrong code.")}.get(status, (404,"No pending subscription."))
+            raise HTTPException(code, detail)
+        row = result["subscriber"]
+        return _complete_subscription(req.phone, row["lat"], row["lon"], row.get("name"), row.get("area_name"), confirmed_row=row)
     try:
         pending = get_pending_subscription(req.phone)
     except RuntimeError as exc:
@@ -312,6 +386,21 @@ def confirm_subscription(req: ConfirmRequest):
         name      = payload.get("name"),
         area_name = payload.get("area_name"),
     )
+
+
+@router.delete("/subscribe/{phone}/erase")
+def erase_subscription(phone: str, request: Request):
+    require_dispatch_secret(request)
+    try:
+        phone = normalize_phone(phone)
+    except ValueError as exc:
+        raise HTTPException(422, "Invalid phone number.") from exc
+    from floodsight.db.supabase_client import erase_subscriber
+    try:
+        erase_subscriber(phone)
+    except Exception as exc:
+        raise HTTPException(503, "Erasure could not be completed; retry later.") from exc
+    return {"status": "erased"}
 
 
 # ---------------------------------------------------------------------------
@@ -395,10 +484,14 @@ def subscriber_stats():
     try:
         return get_subscriber_stats()
     except RuntimeError:
+        from api.runtime import require_durable_storage
+        require_durable_storage()
         log.warning("Supabase not configured; returning synthetic subscriber stats")
         return _SYNTHETIC_STATS
     except Exception as exc:
         log.error("get_subscriber_stats failed: %s", exc)
+        from api.runtime import require_durable_storage
+        require_durable_storage()
         return _SYNTHETIC_STATS
 
 
@@ -435,9 +528,13 @@ def alert_history(limit: int = 20):
         return get_alert_history(limit=limit)
     except RuntimeError:
         log.warning("Supabase not configured; returning synthetic alert history")
+        from api.runtime import require_durable_storage
+        require_durable_storage()
         return _SYNTHETIC_HISTORY
     except Exception as exc:
         log.error("get_alert_history failed: %s", exc)
+        from api.runtime import require_durable_storage
+        require_durable_storage()
         return _SYNTHETIC_HISTORY
 
 

@@ -70,7 +70,7 @@ def send_sms(
 
     try:
         response = sms.send(message, recipients, sender_id=sender_id)
-        log.info("AT SMS sent. Response: %s", response)
+        log.info("AT SMS gateway accepted a batch for %d recipients", len(recipients))
         return response
     except Exception as exc:
         raise RuntimeError(f"Africa's Talking API error: {exc}") from exc

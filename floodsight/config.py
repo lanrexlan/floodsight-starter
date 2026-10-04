@@ -322,12 +322,21 @@ class Credentials:
         default_factory=lambda: os.getenv("NASA_EARTHDATA_PASSWORD")
     )
     cds_api_key: str | None = field(default_factory=lambda: os.getenv("CDS_API_KEY"))
-    africastalking_username: str | None = field(
-        default_factory=lambda: os.getenv("AFRICASTALKING_USERNAME")
-    )
-    africastalking_api_key: str | None = field(
-        default_factory=lambda: os.getenv("AFRICASTALKING_API_KEY")
-    )
+
+    # NOTE: Africa's Talking credentials are deliberately NOT declared here.
+    #
+    # This block previously exposed africastalking_username / africastalking_api_key
+    # reading AFRICASTALKING_USERNAME / AFRICASTALKING_API_KEY. Nothing ever
+    # consumed them: floodsight/notifications/africastalking.py — the only module
+    # that talks to the SMS gateway — reads AT_USERNAME / AT_API_KEY / AT_SENDER_ID
+    # directly from the environment.
+    #
+    # The duplicate names were an active trap rather than dead weight. They are
+    # what made health_alerts.yml plausible-looking while being wrong: the
+    # workflow exported AFRICASTALKING_USERNAME / AFRICASTALKING_API_KEY, the
+    # sender read AT_USERNAME / AT_API_KEY, and every CHEW alert failed
+    # authentication. Keeping the fields would invite the same substitution
+    # again, so the single source of truth is the AT_* environment variables.
 
 
 CREDENTIALS = Credentials()

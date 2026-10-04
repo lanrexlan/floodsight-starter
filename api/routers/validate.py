@@ -17,8 +17,9 @@ import time
 import urllib.request
 from datetime import date, timedelta
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from floodsight.config import ALERT_UPGRADE, COASTAL_UPGRADE_LGAS, OGUN_UPGRADE_LGAS
+from floodsight.forecast.marine import coastal_upgrade
 
 log = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ _COAST_LAT, _COAST_LON = 6.30, 3.35
 # Ogun:    Oyan Dam discharge spike → upgrades Ogun floodplain LGAs
 _COASTAL_LGAS    = COASTAL_UPGRADE_LGAS
 _OGUN_LGAS       = OGUN_UPGRADE_LGAS
-_COASTAL_UPGRADE = ALERT_UPGRADE
+# Coastal upgrades go through floodsight.forecast.marine.coastal_upgrade (two tiers).
 _DAM_UPGRADE     = ALERT_UPGRADE
 
 # ── Documented Lagos flood events ─────────────────────────────────────────
@@ -434,12 +435,21 @@ def _fetch_historical_dam(peak_date: str, window_days: int = 5) -> dict | None:
 
 def _fetch_historical_coastal(peak_date: str, window_days: int = 3) -> dict | None:
     """
-    Fetch ERA5-Ocean hourly sea_level_height_msl at the Lagos coast for
-    [peak-1d, peak+window_days].  ERA5-Ocean covers 1940–present.
-    Uses the same Open-Meteo Marine API as the live coastal signal.
-    Returns None on fetch failure (non-fatal).
+    Fetch hourly sea_level_height_msl at the Lagos coast for
+    [peak-1d, peak+window_days], from the SAME model the live coastal signal
+    uses, so historical and live thresholds mean the same thing.
+
+    This previously requested ``&models=era5_ocean`` on the stated basis that
+    ERA5-Ocean "covers 1940-present".  On the Open-Meteo marine API that
+    model returns no sea_level_height_msl at all (every hour null, verified
+    for 2021 and 2024), so this function returned None for every event and the
+    coastal component of historical validation never ran.
+
+    The default model has data from early 2023 only.  Events before that
+    return None here — the honest answer is "no coastal record", not a guess.
+    Returns None on fetch failure or missing data (non-fatal).
     """
-    from floodsight.forecast.marine import COASTAL_ADVISORY_M
+    from floodsight.forecast.marine import COASTAL_HIGH_TIDE_M, COASTAL_SURGE_M
     d = date.fromisoformat(peak_date)
     start = (d - timedelta(days=1)).isoformat()
     end   = (d + timedelta(days=window_days)).isoformat()
@@ -447,7 +457,6 @@ def _fetch_historical_coastal(peak_date: str, window_days: int = 3) -> dict | No
         "https://marine-api.open-meteo.com/v1/marine"
         f"?latitude={_COAST_LAT}&longitude={_COAST_LON}"
         "&hourly=sea_level_height_msl"
-        "&models=era5_ocean"
         f"&start_date={start}&end_date={end}"
     )
     try:
@@ -460,12 +469,14 @@ def _fetch_historical_coastal(peak_date: str, window_days: int = 3) -> dict | No
             return None
         max_h = max(heights)
         result = {
-            "advisory":       bool(max_h >= COASTAL_ADVISORY_M),
-            "max_sea_level_m": round(float(max_h), 3),
-            "threshold_m":    COASTAL_ADVISORY_M,
+            "advisory":              bool(max_h >= COASTAL_SURGE_M),
+            "high_tide":             bool(max_h >= COASTAL_HIGH_TIDE_M),
+            "max_sea_level_m":       round(float(max_h), 3),
+            "threshold_m":           COASTAL_SURGE_M,
+            "high_tide_threshold_m": COASTAL_HIGH_TIDE_M,
         }
-        log.debug("Hist coastal %s: max=%.3f m (threshold=%.1f)",
-                  peak_date, max_h, COASTAL_ADVISORY_M)
+        log.debug("Hist coastal %s: max=%.3f m (surge>=%.2f, high tide>=%.2f)",
+                  peak_date, max_h, COASTAL_SURGE_M, COASTAL_HIGH_TIDE_M)
         return result
     except Exception as exc:
         log.warning("Historical coastal fetch failed for %s: %s", peak_date, exc)
@@ -508,7 +519,8 @@ def _compute_results() -> list[dict]:
         hist_dam     = _fetch_historical_dam(event["peak_date"])
         hist_coastal = _fetch_historical_coastal(event["peak_date"])
 
-        coastal_active = bool(hist_coastal and hist_coastal.get("advisory"))
+        coastal_active = bool(hist_coastal and (hist_coastal.get("advisory")
+                                                or hist_coastal.get("high_tide")))
         dam_active     = bool(hist_dam     and hist_dam.get("advisory"))
         has_lga        = "lga_name" in gdf.columns
 
@@ -532,7 +544,7 @@ def _compute_results() -> list[dict]:
             if has_lga and lga_list:
                 lga = str(lga_list[i])
                 if coastal_active and lga in _COASTAL_LGAS:
-                    level = _COASTAL_UPGRADE.get(level, level)
+                    level = coastal_upgrade(level, hist_coastal)
                 if dam_active and lga in _OGUN_LGAS:
                     level = _DAM_UPGRADE.get(level, level)
             counts[level] = counts.get(level, 0) + 1
@@ -551,11 +563,8 @@ def _compute_results() -> list[dict]:
         #   Warning expected, Watch predicted     → correct (detected the event, slightly under-alerted)
         #   Watch expected, Warning predicted     → correct (over-cautious is acceptable in a life-safety system)
         #   Warning/Watch expected, No Alert      → WRONG  (missed the event — the only truly bad case)
-        correct = (predicted == event["reported_severity"]) or (
-            event["reported_severity"] == "Warning" and predicted in ("Warning", "Watch")
-        ) or (
-            event["reported_severity"] == "Watch" and predicted == "Warning"
-        )
+        correct = predicted == event["reported_severity"]
+        detected = predicted in ("Watch", "Warning")
 
         results.append({
             **event,
@@ -571,6 +580,7 @@ def _compute_results() -> list[dict]:
             "alert_counts":   counts,
             "predicted_alert": predicted,
             "correct":         correct,
+            "detected":        detected,
             "warning_pct":    round(counts["Warning"] / total * 100, 1),
             "watch_pct":      round(counts["Watch"]   / total * 100, 1),
         })
@@ -581,7 +591,7 @@ def _compute_results() -> list[dict]:
 # ── Endpoint ──────────────────────────────────────────────────────────────
 
 @router.get("/events")
-def get_validation_events(refresh: bool = False):
+def get_validation_events(request: Request, refresh: bool = False):
     """
     Returns back-test results for each documented Lagos flood event.
 
@@ -598,6 +608,9 @@ def get_validation_events(refresh: bool = False):
     Dam-release events (2019_10, 2022_10) are included but noted as
     structurally hard for a rainfall-threshold model to detect.
     """
+    if refresh:
+        from api.auth import require_dispatch_secret
+        require_dispatch_secret(request)
     global _cached_results
     if _cached_results is None or refresh:
         try:
@@ -629,6 +642,8 @@ def get_validation_events(refresh: bool = False):
     return {
         "events": _cached_results,
         "summary": {
+            "metric_definition": "Exact historical severity agreement; not prospective forecast accuracy.",
+            "limitations": "Selected known flood events only. No non-flood control days or measured operational lead times; precision and false-alarm rate cannot be inferred.",
             "total_events":            total,
             "correct":                 correct,
             "accuracy_pct":            round(correct / total * 100) if total else 0,
@@ -648,8 +663,11 @@ def get_validation_events(refresh: bool = False):
                 "with ERA5/Open-Meteo as fallback. "
                 "Meaningful rain accuracy counts only events where the satellite recorded >=10 mm "
                 "on the peak day. "
-                "Coastal events (2021_07a, 2022_10) are now covered by the marine advisory "
-                "upgrade when ERA5-Ocean sea level exceeds COASTAL_ADVISORY_M. "
+                "Coastal events (2021_07a, 2022_10) CANNOT yet be scored: the modelled "
+                "sea-level record used by the live coastal signal begins in early 2023. "
+                "The two-tier coastal signal (surge >= 1.20 m; high tide >= 1.05 m, which "
+                "escalates rain-driven Watch only) is calibrated against the 2023-2026 "
+                "record to control false alarms, not yet validated against a real surge. "
                 "Oyan Dam events (2019_10) are covered by the GloFAS discharge advisory. "
                 "Hyper-local convective cells (2016_07, 2019_07) remain structural misses -- "
                 "the storm footprint is smaller than the free satellite grid (0.1 deg/~11 km) and "

@@ -8,6 +8,7 @@ without importing the geospatial stack that the router pulls in.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import os
 
 OTP_TTL_MINUTES  = 10
@@ -20,4 +21,7 @@ def otp_required() -> bool:
 
 def hash_code(code: str, phone: str) -> str:
     """sha256 over code+phone — binds the code to the requesting number."""
+    secret = os.getenv("DISPATCH_SECRET", "")
+    if secret:
+        return hmac.new(secret.encode(), f"{code}:{phone}".encode(), hashlib.sha256).hexdigest()
     return hashlib.sha256(f"{code}:{phone}".encode()).hexdigest()

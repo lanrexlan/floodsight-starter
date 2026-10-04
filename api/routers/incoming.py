@@ -158,3 +158,82 @@ def at_incoming(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     return {"status": "ignored", "reason": "unrecognised_keyword"}
+
+
+# ---------------------------------------------------------------------------
+# POST /at/delivery  —  Africa's Talking delivery report webhook
+# ---------------------------------------------------------------------------
+
+# Terminal AT statuses. Anything else (Sent, Submitted, Buffered) is a
+# transient hop and does not yet tell us whether the handset received it.
+_TERMINAL_STATUSES = {"Success", "Failed", "Rejected"}
+
+
+@router.post("/at/delivery")
+def at_delivery_report(
+    token: str = Query(""),
+    id: str = Form(""),
+    status: str = Form(""),
+    phoneNumber: str = Form(""),
+    failureReason: str = Form(""),
+):
+    """
+    Record an Africa's Talking delivery report.
+
+    Setup
+    -----
+    Africa's Talking dashboard -> SMS -> Callbacks -> Delivery reports:
+
+        https://<your-app>.onrender.com/at/delivery?token=<AT_WEBHOOK_TOKEN>
+
+    AT POSTs application/x-www-form-urlencoded with: id (the messageId
+    returned at submission), status, phoneNumber, networkCode, failureReason,
+    retryCount.
+
+    Why this endpoint exists
+    ------------------------
+    Submission and delivery are different events. Until this existed,
+    alert_log recorded only that a message had been handed to the gateway, so
+    the operator dashboard could describe "SMS sent" but never "SMS received"
+    — and the delivery percentages it displayed came from synthetic fallback
+    data. On Nigerian networks the gap is real: handsets off, out of coverage,
+    recycled numbers. For a life-safety service, and for a UNICEF PoC that has
+    to report reach, that number has to be measured rather than assumed.
+
+    Always returns HTTP 200 for an authenticated, well-formed callback, even
+    when no matching row is found. Delivery reports arrive for every message
+    including welcome and OTP texts, which are not alerts and are therefore
+    not logged; returning an error for those would make AT retry callbacks
+    that can never succeed.
+    """
+    _check_token(token)
+
+    if not id:
+        # Nothing to correlate on — accept and drop, do not make AT retry.
+        log.warning("Delivery report with no messageId — ignored")
+        return {"status": "ignored", "reason": "no_message_id"}
+
+    log.info(
+        "Delivery report: id=%s status=%s phone=%s reason=%s",
+        id, status, phoneNumber, failureReason or "-",
+    )
+
+    if status not in _TERMINAL_STATUSES:
+        # Transient hop; record nothing so a later terminal report is not
+        # overwritten by an earlier intermediate one.
+        return {"status": "ignored", "reason": "non_terminal", "at_status": status}
+
+    try:
+        from floodsight.db.supabase_client import record_delivery_report
+
+        matched = record_delivery_report(
+            at_message_id  = id,
+            status         = status,
+            failure_reason = failureReason or None,
+        )
+    except RuntimeError as exc:
+        # Supabase not configured — 503 is correct here: AT will retry, and
+        # once configuration is fixed the report still lands.
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    return {"status": "recorded", "matched": matched, "at_status": status}

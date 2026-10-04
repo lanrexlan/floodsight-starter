@@ -18,7 +18,9 @@ from __future__ import annotations
 import hmac
 import os
 
-from fastapi import HTTPException, Request
+from fastapi import HTTPException, Request, Security
+from fastapi.security import HTTPBearer
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def _require_bearer(request: Request, env_vars: tuple[str, ...]) -> None:
@@ -38,12 +40,12 @@ def _require_bearer(request: Request, env_vars: tuple[str, ...]) -> None:
         raise HTTPException(status_code=401, detail="Unauthorized.")
 
 
-def require_dispatch_secret(request: Request) -> None:
+def require_dispatch_secret(request: Request, credentials=Security(bearer_scheme)) -> None:
     """Operator/cron endpoints: dispatch, unsubscribe, log access."""
     _require_bearer(request, ("DISPATCH_SECRET",))
 
 
-def require_verify_secret(request: Request) -> None:
+def require_verify_secret(request: Request, credentials=Security(bearer_scheme)) -> None:
     """Field-partner endpoints: verification intake."""
     _require_bearer(request, ("VERIFY_SECRET", "DISPATCH_SECRET"))
 

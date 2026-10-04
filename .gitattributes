@@ -1,0 +1,30 @@
+# Normalise line endings so editing on Windows does not show every file as
+# modified. Without this, 26 files appeared changed in `git status` purely
+# because Windows tools rewrote LF as CRLF — no content had changed, and the
+# real edits were buried among them.
+#
+# text=auto: git stores LF in the repository and converts on checkout as
+# needed. Binary types are declared explicitly so they are never touched.
+
+* text=auto
+
+# Scripts and config that must stay LF even on Windows (shell, CI, Docker)
+*.sh   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+
+# Binary — never normalise
+*.docx    binary
+*.xlsx    binary
+*.pdf     binary
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.tif     binary
+*.tiff    binary
+*.gpkg    binary
+*.out     binary
+*.pkl     binary
+*.joblib  binary
+*.parquet binary
+*.zip     binary

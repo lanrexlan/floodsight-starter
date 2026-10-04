@@ -39,6 +39,7 @@ from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.model_selection import GroupShuffleSplit, train_test_split
 
 from floodsight.config import ML_FEATURE_COLUMNS, ML_MODEL_PATH, ML_TARGET_COLUMN
+from floodsight.ml.provenance import normalize_dataset
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -55,7 +56,7 @@ def _metrics_block(y_true, y_pred) -> dict:
     return {
         "mae_m": float(mean_absolute_error(y_true, y_pred)),
         "rmse_m": float(np.sqrt(np.mean((y_true - y_pred) ** 2))),
-        "r2": float(r2_score(y_true, y_pred)) if len(np.unique(y_true)) > 1 else float("nan"),
+        "r2": float(r2_score(y_true, y_pred)) if len(np.unique(y_true)) > 1 else None,
         "n": int(len(y_true)),
     }
 
@@ -78,31 +79,15 @@ def train_model(
     if missing:
         raise ValueError(f"Dataset is missing required columns: {missing}")
 
-    df = df.copy()
+    df = normalize_dataset(df)
 
     # Defensive cleanup: some dataset versions have blank event_name for the
     # 2024 Lekki rows (the `event` column carries the value instead), and
     # may lack label_source entirely. Repair rather than crash the split.
-    if "event_name" in df.columns:
-        if "event" in df.columns:
-            df["event_name"] = df["event_name"].fillna(df["event"])
-        df["event_name"] = df["event_name"].fillna("unknown_event")
-    if "label_source" not in df.columns and "event_name" in df.columns:
-        # Heuristic matching this project's history: lekki_* events are the
-        # SAR/FwDET-labeled ones; everything else was augmentation.
-        df["label_source"] = np.where(
-            df["event_name"].astype(str).str.startswith("lekki_"),
-            "sar_fwdet", "synthetic_augmented",
-        )
-        log.warning(
-            "Dataset has no label_source column — derived it from event_name "
-            "(lekki_* => sar_fwdet). Add the column to the CSV properly."
-        )
 
     # --- hand_m imputation (median), saved for serving-time consistency ---
     hand = pd.to_numeric(df["hand_m"], errors="coerce")
-    hand_median = float(hand.median()) if hand.notna().any() else 0.0
-    df["hand_m"] = hand.fillna(hand_median)
+    df["hand_m"] = hand
 
     # --- provenance ---
     if "label_source" in df.columns:
@@ -116,6 +101,7 @@ def train_model(
         "synthetic_rows": n_synth,
         "synthetic_fraction": round(n_synth / len(df), 3) if len(df) else 0.0,
         "real_label_sources": sorted(REAL_LABEL_SOURCES),
+        "unknown_rows": int((df["label_source"] == "unknown").sum()),
     }
 
     X = df[ML_FEATURE_COLUMNS]
@@ -153,6 +139,15 @@ def train_model(
             "autocorrelation within events."
         )
 
+    # Fit preprocessing on training rows only, never on held-out events.
+    train_hand = df["hand_m"].iloc[train_idx]
+    hand_median = float(train_hand.median()) if train_hand.notna().any() else 0.0
+    X = X.copy()
+    X["hand_m"] = X["hand_m"].fillna(hand_median)
+    if not np.isfinite(X.to_numpy(dtype=float)).all() or not np.isfinite(y.to_numpy(dtype=float)).all():
+        raise ValueError("Training features/labels contain missing or non-finite values.")
+    if (y < 0).any():
+        raise ValueError("Depth labels must be non-negative.")
     X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
     y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
 
@@ -176,10 +171,14 @@ def train_model(
             "split_strategy": split_strategy,
             "held_out_events": test_events,
             "trained_on_synthetic_data": is_synthetic,
-            "hand_impute_median_m": round(hand_median, 4),
+            "hand_impute_median_m": hand_median,
             "label_provenance": provenance,
         }
     )
+    metrics["baseline_train_mean"] = _metrics_block(y_test, np.full(len(y_test), y_train.mean()))
+    metrics["validation_status"] = "experimental"
+    metrics["training_events"] = sorted(df["event_name"].iloc[train_idx].unique().tolist()) if "event_name" in df else []
+    metrics["feature_ranges"] = {c: {"min": float(X_train[c].min()), "max": float(X_train[c].max())} for c in ML_FEATURE_COLUMNS}
 
     # --- honest metrics: real-labeled held-out rows only ---
     real_test = real_mask.iloc[test_idx].values
@@ -227,6 +226,8 @@ def train_model(
 
 
 def save_model(model: GradientBoostingRegressor, metrics: dict, path=ML_MODEL_PATH) -> None:
+    from pathlib import Path
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
     bundle = {
         "model": model,
         "metrics": metrics,

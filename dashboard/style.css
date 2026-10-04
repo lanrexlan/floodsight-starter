@@ -20,6 +20,20 @@
 
 * { box-sizing: border-box; }
 
+:focus-visible { outline: 3px solid var(--accent-bright); outline-offset: 3px; }
+
+@media (max-width: 720px) {
+  body #app { flex-direction: column-reverse; height: 100dvh; }
+  #app #sidebar { width: 100%; max-height: 45dvh; padding: 12px 16px; border-right: 0; border-top: 1px solid var(--panel-border); }
+  #app #map { min-height: 55dvh; width: 100%; }
+  .map-tip { display: none; }
+  input, button { min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
 html, body {
   margin: 0;
   height: 100%;

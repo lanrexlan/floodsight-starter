@@ -7,7 +7,11 @@
 const isLocalDev =
   window.location.protocol === "file:" ||
   ["localhost", "127.0.0.1"].includes(window.location.hostname);
-const API_BASE_URL = isLocalDev ? "http://localhost:8080" : "";
+const API_BASE_URL = window.location.protocol === "file:" ? "http://localhost:8000" : "";
+
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"}[c]));
+}
 
 const RISK_COLORS = {
   "Low":       "#2E7D5B",
@@ -128,6 +132,7 @@ map.on("load", () => {
 // ---------------------------------------------------------------------------
 async function loadForecastGrid() {
   try {
+    await syncProductConfig();
     const [gridRes, alertRes] = await Promise.all([
       fetch(`${API_BASE_URL}/risk/grid`),
       fetch(`${API_BASE_URL}/forecast/alerts`),
@@ -173,6 +178,20 @@ async function loadForecastGrid() {
     loadRiskGrid();
     loadForecastRainfall();
   }
+}
+
+async function syncProductConfig() {
+  const response = await fetch(`${API_BASE_URL}/product-status`);
+  if (!response.ok) throw new Error("Product configuration unavailable");
+  const config = await response.json();
+  Object.assign(ALERT_THRESHOLDS, config.alert_thresholds);
+  document.querySelectorAll('.legend li').forEach(li => {
+    const label = li.querySelector('strong')?.textContent;
+    const range = config.risk_breaks[label];
+    if (range) li.querySelector('.legend-hint').textContent = `${range[0]} – ${Math.min(1, range[1])} susceptibility score`;
+  });
+  const depthButton = document.getElementById('ml-depth-toggle');
+  if (depthButton) depthButton.hidden = !config.experimental_depth_enabled;
 }
 
 // ---------------------------------------------------------------------------
@@ -270,9 +289,9 @@ function applyGridLayers(geojson) {
   // Height: Warning cells 50% taller, Watch cells 15% taller
   const heightExpr = [
     "case",
-    ["==", ["get", "alert_level"], "Warning"], ["*", ["get", "flood_score"], 270],
-    ["==", ["get", "alert_level"], "Watch"],   ["*", ["get", "flood_score"], 207],
-    ["*", ["get", "flood_score"], 180]
+    ["==", ["get", "alert_level"], "Warning"], ["*", ["coalesce", ["get", "hazard_score"], ["get", "flood_score"]], 270],
+    ["==", ["get", "alert_level"], "Watch"],   ["*", ["coalesce", ["get", "hazard_score"], ["get", "flood_score"]], 207],
+    ["*", ["coalesce", ["get", "hazard_score"], ["get", "flood_score"]], 180]
   ];
 
   // 3D extrusion
@@ -345,11 +364,14 @@ function updateCityAlert(warnCount, watchCount, lgaAlerts) {
     msg = `Elevated risk — ${areas} and nearby areas`;
   }
   el.dataset.level = level;
-  el.innerHTML = `<strong>${level}</strong> · ${msg}`;
+  el.textContent = `${level} · ${msg}`;
   setBeacon(level);
 }
 
+let mapClickWired = false;
 function wireMapClick() {
+  if (mapClickWired) return;
+  mapClickWired = true;
   map.on("click", "flood-risk-3d", (e) => {
     const coords = e.lngLat;
     queryPoint(coords.lat, coords.lng, null);
@@ -371,8 +393,8 @@ function wireMapClick() {
 // ---------------------------------------------------------------------------
 async function reverseGeocode(lat, lon) {
   try {
-    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=14&accept-language=en`;
-    const res = await fetch(url, { headers: { "User-Agent": "FloodSight-Dashboard/1.0" } });
+    const url = `${API_BASE_URL}/places/reverse?lat=${lat}&lon=${lon}`;
+    const res = await fetch(url);
     const data = await res.json();
     const a = data.address || {};
     return (
@@ -416,13 +438,14 @@ async function queryPoint(lat, lon, locationName) {
     document.getElementById("result-alert").textContent = alert.alert_level;
     document.getElementById("result-alert").style.color = alertResultColor(alert.alert_level);
     document.getElementById("result-elev").textContent  = `${risk.elevation_m.toFixed(1)} m`;
-    document.getElementById("result-score").textContent = risk.flood_score.toFixed(3);
+    const susceptibility = risk.hazard_score ?? risk.flood_score;
+    document.getElementById("result-score").textContent = susceptibility.toFixed(3);
 
     const nudge      = document.getElementById("alert-nudge");
     const isHighRisk = ["High", "Very High"].includes(risk.risk_class);
     if (alert.alert_level === "No Alert" && isHighRisk) {
       nudge.hidden = false;
-      nudge.textContent = `⚠ ${risk.risk_class} risk — slide 24h rainfall above 50 mm for Watch, 100 mm for Warning.`;
+      nudge.textContent = `⚠ ${risk.risk_class} susceptibility. Sliders explore rainfall scenarios; they do not change the live forecast.`;
     } else {
       nudge.hidden = true;
     }
@@ -438,18 +461,21 @@ async function queryPoint(lat, lon, locationName) {
       .setLngLat([lon, lat])
       .setPopup(
         new maplibregl.Popup({ offset: 14, className: "fs-popup" }).setHTML(
-          `<strong>${risk.risk_class} risk</strong><br/>
-           Alert: <em>${alert.alert_level}</em><br/>
-           Elev: ${risk.elevation_m.toFixed(1)} m &nbsp;|&nbsp; Score: ${risk.flood_score.toFixed(3)}`
+          `<strong>${escapeHTML(risk.risk_class)} risk</strong><br/>
+           Rainfall scenario: <em>${escapeHTML(alert.alert_level)}</em><br/>
+           Elev: ${risk.elevation_m.toFixed(1)} m &nbsp;|&nbsp; Susceptibility: ${susceptibility.toFixed(3)}`
         )
       )
       .addTo(map);
     queryMarker.getPopup().addTo(map);
-
-    setApiStatus(true);
+    // Point lookups do not establish that the live forecast is fresh.
   } catch (err) {
     console.error("Query failed:", err);
-    setApiStatus(false);
+    const panel = document.getElementById("result-panel");
+    panel.hidden = false;
+    document.getElementById("result-location").textContent = "No result: location may be outside mapped coverage or data unavailable.";
+    for (const id of ["result-risk", "result-alert", "result-elev", "result-score"]) document.getElementById(id).textContent = "—";
+    if (queryMarker) queryMarker.remove();
   }
 }
 
@@ -487,13 +513,8 @@ document.addEventListener("click", (e) => {
 
 async function doSearch(query) {
   try {
-    const url = `https://nominatim.openstreetmap.org/search?` +
-      `q=${encodeURIComponent(query + ", Lagos, Nigeria")}` +
-      `&format=json&limit=7&accept-language=en` +
-      `&viewbox=3.05,6.75,3.80,6.30&bounded=0`;
-    const res = await fetch(url, {
-      headers: { "User-Agent": "FloodSight-Dashboard/1.0 (flood intelligence, Lagos)" },
-    });
+    const url = `${API_BASE_URL}/places/search?q=${encodeURIComponent(query)}`;
+    const res = await fetch(url);
     renderDropdown(await res.json());
   } catch (err) { console.error("Search failed:", err); hideDropdown(); }
 }
@@ -506,9 +527,9 @@ function renderDropdown(items) {
   }
   searchResults.innerHTML = items.map((item, i) => {
     const name = item.display_name.split(",").slice(0, 3).join(", ");
-    return `<li class="result-item" data-idx="${i}" data-lat="${item.lat}" data-lon="${item.lon}" data-name="${encodeURIComponent(name)}">
+    return `<li class="result-item" data-idx="${i}" data-lat="${Number(item.lat)}" data-lon="${Number(item.lon)}" data-name="${escapeHTML(encodeURIComponent(name))}">
       <svg class="result-pin" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="6" r="3"/><path d="M8 2C5.24 2 3 4.24 3 7c0 3.75 5 9 5 9s5-5.25 5-9c0-2.76-2.24-5-5-5z"/></svg>
-      <span>${name}</span>
+      <span>${escapeHTML(name)}</span>
     </li>`;
   }).join("");
   searchResults.hidden = false;
@@ -654,6 +675,12 @@ function setApiStatus(ok, fetchedAt) {
   }
 
   // Record when the next scheduled refresh will fire
+  if (!fetchedAt) {
+    el.classList.remove("ok");
+    el.textContent = "Static risk map · live forecast unavailable · click to retry";
+    clearInterval(_countdownTimer);
+    return;
+  }
   _nextRefreshAt = Date.now() + REFRESH_INTERVAL_MS;
 
   const updatedStr = fetchedAt
@@ -686,6 +713,7 @@ function setBeacon(level) {
 const STREETS_MIN_ZOOM = 13;
 let _streetsLoaded = false;    // guard: fetch exactly once
 let _streetsVisible = true;    // toggle state
+let _streetRequest = 0;
 
 // Street risk class → line colour (same palette as the grid)
 function _streetColor(riskClass) {
@@ -699,18 +727,28 @@ map.on("zoom", () => {
     _loadStreetsLayer();
   }
 });
+map.on("moveend", () => {
+  if (_streetsLoaded && map.getZoom() >= STREETS_MIN_ZOOM) _loadStreetsLayer();
+});
 
 async function _loadStreetsLayer() {
+  const requestId = ++_streetRequest;
   try {
-    const res = await fetch(`${API_BASE_URL}/risk/streets`);
+    const bounds = map.getBounds();
+    const bbox = [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()].join(',');
+    const res = await fetch(`${API_BASE_URL}/risk/streets?bbox=${encodeURIComponent(bbox)}`);
     if (!res.ok) {
       // 404 = script hasn't been run yet — silently skip, don't spam console
       if (res.status !== 404) console.warn("Streets layer HTTP", res.status);
       return;
     }
     const geojson = await res.json();
+    if (requestId !== _streetRequest) return;
 
-    if (map.getSource("street-risk")) return; // already added (shouldn't happen)
+    if (map.getSource("street-risk")) {
+      map.getSource("street-risk").setData(geojson);
+      return;
+    }
 
     map.addSource("street-risk", { type: "geojson", data: geojson });
 
@@ -760,9 +798,9 @@ async function _loadStreetsLayer() {
       new maplibregl.Popup({ className: "fs-popup", closeButton: false })
         .setLngLat(e.lngLat)
         .setHTML(
-          `<strong>${name}</strong><br>` +
-          `Type: ${p.highway}<br>` +
-          `Flood risk: <span style="color:${_streetColor(rc)};font-weight:600">${rc}</span>`
+          `<strong>${escapeHTML(name)}</strong><br>` +
+          `Type: ${escapeHTML(p.highway)}<br>` +
+          `Area susceptibility: <span style="color:${_streetColor(rc)};font-weight:600">${escapeHTML(rc)}</span>`
         )
         .addTo(map);
     });

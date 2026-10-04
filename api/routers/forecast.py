@@ -49,6 +49,8 @@ def get_rainfall_forecast(
     Results are cached for 30 minutes — the dashboard should call this once
     on page load, not on every map click.
     """
+    from api.coordinates import validate_location
+    validate_location(lat, lon)
     try:
         from floodsight.forecast.openmeteo import fetch_forecast
         return fetch_forecast(lat, lon)
@@ -91,6 +93,8 @@ def get_grid_alerts(
           "forecast": { ...city-centre summary for the status card... }
         }
     """
+    from api.coordinates import validate_location
+    validate_location(lat, lon)
     from floodsight.alerts.engine import compute_alert_level
     from floodsight.forecast.rainfall_grid import (
         fetch_rainfall_grid,
@@ -118,14 +122,13 @@ def get_grid_alerts(
     cell_rain = interpolate_to_cells(gdf, rainfall_grid, imerg_obs, imerg_source)
 
     # 4. Coastal/tidal signal — fetch early so it can upgrade coastal-LGA cells.
-    # NOTE: COASTAL_ADVISORY_M = 1.0 m MSL is a placeholder; calibrate against
-    # NiHSA tide gauge records + lekki_2021_07_12 before treating as operational.
-    from floodsight.forecast.marine import try_coastal_summary
+    # Two calibrated tiers (surge / high tide) — see floodsight/forecast/marine.py.
+    from floodsight.forecast.marine import coastal_upgrade, try_coastal_summary
     from floodsight.forecast.dam import try_dam_summary
     coastal = try_coastal_summary()
     dam     = try_dam_summary()
     has_lga          = "lga_name" in gdf.columns
-    _coastal_active  = bool(coastal and coastal.get("advisory") and has_lga)
+    _coastal_active  = bool(coastal and (coastal.get("advisory") or coastal.get("high_tide")) and has_lga)
     _dam_active      = bool(dam     and dam.get("advisory")     and has_lga)
 
     # 5. Compute per-cell alert levels (coastal/dam LGA cells promoted when advisory)
@@ -138,7 +141,7 @@ def get_grid_alerts(
         level = compute_alert_level(rc, r24, r72)
         lga   = str(gdf["lga_name"].iloc[i]) if has_lga else ""
         if _coastal_active and lga in COASTAL_UPGRADE_LGAS:
-            level = ALERT_UPGRADE.get(level, level)
+            level = coastal_upgrade(level, coastal)
         if _dam_active and lga in OGUN_UPGRADE_LGAS:
             level = ALERT_UPGRADE.get(level, level)
         alert_levels.append(level)
@@ -217,6 +220,8 @@ def get_alert_summary(
       }
     }
     """
+    from api.coordinates import validate_location
+    validate_location(lat, lon)
     from floodsight.alerts.engine import compute_alert_level
     from floodsight.forecast.rainfall_grid import (
         fetch_rainfall_grid,
@@ -236,12 +241,12 @@ def get_alert_summary(
     cell_rain = interpolate_to_cells(gdf, rainfall_grid, imerg_obs, imerg_source)
 
     # 2. Coastal signal — fetched early so it can upgrade coastal-LGA cells.
-    from floodsight.forecast.marine import try_coastal_summary
+    from floodsight.forecast.marine import coastal_upgrade, try_coastal_summary
     from floodsight.forecast.dam import try_dam_summary
     coastal = try_coastal_summary()
     dam     = try_dam_summary()
     has_lga          = "lga_name" in gdf.columns
-    _coastal_active  = bool(coastal and coastal.get("advisory") and has_lga)
+    _coastal_active  = bool(coastal and (coastal.get("advisory") or coastal.get("high_tide")) and has_lga)
     _dam_active      = bool(dam     and dam.get("advisory")     and has_lga)
 
     # 3. Count alert levels (coastal/dam LGA cells promoted when advisory)
@@ -254,7 +259,7 @@ def get_alert_summary(
         level = compute_alert_level(rc, r24, r72)
         lga   = str(gdf["lga_name"].iloc[i]) if has_lga else ""
         if _coastal_active and lga in COASTAL_UPGRADE_LGAS:
-            level = ALERT_UPGRADE.get(level, level)
+            level = coastal_upgrade(level, coastal)
         if _dam_active and lga in OGUN_UPGRADE_LGAS:
             level = ALERT_UPGRADE.get(level, level)
         counts[level] = counts.get(level, 0) + 1

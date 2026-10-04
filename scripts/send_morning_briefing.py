@@ -143,11 +143,16 @@ def format_message(summary: dict) -> str:
 
         msg = "\n".join(lines)
 
-    # Coastal/tidal advisory (P2 item 8)
+    # Coastal surge advisory (P2 item 8).
+    # Only the SURGE tier (>= 1.20 m) adds a line. The high-tide tier is
+    # deliberately silent here: on its own it is a predictable spring tide,
+    # which previously put a "HIGH TIDE ... expect possible tidal flooding"
+    # line into ~50 briefings a year. When high tide coincides with rain it
+    # already escalates the alert level itself (see marine.coastal_upgrade).
     coastal = summary.get("coastal") or {}
     if coastal.get("advisory"):
         msg += (
-            f"\nHIGH TIDE: sea level peaks {coastal['max_sea_level_m']}m. "
+            f"\nCOASTAL SURGE: sea level peaks {coastal['max_sea_level_m']}m. "
             "Coastal areas: expect possible tidal flooding."
         )
 

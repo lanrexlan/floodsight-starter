@@ -16,8 +16,14 @@
 // ---------------------------------------------------------------------------
 // Configuration — fill these in after Supabase project is set up
 // ---------------------------------------------------------------------------
-const SUPABASE_URL      = 'https://buwwsplrhsfgnkulhkpc.supabase.co';   // e.g. 'https://abcdefgh.supabase.co'
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ1d3dzcGxyaHNmZ25rdWxoa3BjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5NDY0NDAsImV4cCI6MjA5ODUyMjQ0MH0.VjPpQ702fz83afiNbVDDfyao-fUbLbV6v3VpqwySKJQ';   // Settings → API → anon (public) key
+let operatorToken = '';
+function setOperatorToken() {
+  operatorToken = window.prompt('Enter operator access token (kept in memory until this tab closes):') || '';
+  loadAll();
+}
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
+}
 
 // API base auto-detects local dev vs. Render deployment (same as existing app.js)
 const API_BASE = location.protocol === 'file:'
@@ -41,28 +47,27 @@ async function apiFetch(path) {
 }
 
 async function supabaseFetch(table, params = '') {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return [];
-  const url = `${SUPABASE_URL}/rest/v1/${table}?${params}`;
+  const routes = {dhis2_malaria_cases:'/health/cases', chew_responses:'/health/activity', mel_events:'/health/mel/events'};
+  if (!routes[table]) throw new Error('Unknown reporting view.');
+  const url = `${API_BASE}${routes[table]}`;
   const r = await fetch(url, {
     headers: {
-      'apikey':        SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'Authorization': `Bearer ${operatorToken}`,
       'Accept':        'application/json',
     }
   });
   if (!r.ok) {
-    console.warn(`Supabase ${table} → HTTP ${r.status}`);
-    return [];
+    throw new Error(r.status === 401 || r.status === 503 ? 'Operator access or reporting service unavailable. Use Operator access to sign in.' : `Reporting error ${r.status}`);
   }
   return r.json();
 }
 
 function tierBadge(tier) {
-  return `<span class="badge-tier tier-${tier}">${tier}</span>`;
+  return `<span class="badge-tier tier-${escapeHTML(tier)}">${escapeHTML(tier)}</span>`;
 }
 
 function probBar(prob) {
-  const pct = Math.round(prob * 100);
+  const pct = Math.max(0, Math.min(100, Math.round(Number(prob) * 100) || 0));
   let fillClass = '';
   if (pct >= 75) fillClass = 'critical';
   else if (pct >= 55) fillClass = 'high';
@@ -141,7 +146,7 @@ async function loadRiskTable() {
         ? `<span class="dot dot-sent"></span>Sent`
         : `<span class="dot dot-pending"></span>Pending`;
       return `<tr>
-        <td><strong>${lga.lga_name}</strong> ${armPill(lga.lga_name)}</td>
+        <td><strong>${escapeHTML(lga.lga_name)}</strong> ${armPill(lga.lga_name)}</td>
         <td>${tierBadge(lga.risk_tier)}</td>
         <td>${probBar(lga.outbreak_probability)}</td>
         <td>${(lga.inundation_area_km2 || 0).toFixed(2)} km²</td>
@@ -160,7 +165,7 @@ async function loadRiskTable() {
             <th>LGA</th>
             <th>Risk Tier</th>
             <th>Probability</th>
-            <th>Flood Area</th>
+            <th>At-risk grid area (proxy)</th>
             <th>Breeding Lag</th>
             <th>Outbreak Window</th>
             <th>Alert</th>
@@ -171,7 +176,7 @@ async function loadRiskTable() {
 
   } catch (e) {
     badge.textContent = 'error';
-    container.innerHTML = `<p class="state-msg" style="color:var(--red)">Error: ${e.message}</p>`;
+    container.innerHTML = `<p class="state-msg" style="color:var(--red)">Error: ${escapeHTML(e.message)}</p>`;
   }
 }
 
@@ -295,15 +300,15 @@ async function loadChewActivity() {
         <div class="activity-item">
           <span class="activity-icon">${icon}</span>
           <div class="activity-body">
-            <div class="activity-title">${label}${cases}</div>
-            <div class="activity-meta">${phone} · ${lga} · ${fmtDate(r.received_at)}</div>
+            <div class="activity-title">${escapeHTML(label)}${escapeHTML(cases)}</div>
+            <div class="activity-meta">${escapeHTML(phone)} · ${escapeHTML(lga)} · ${fmtDate(r.received_at)}</div>
           </div>
         </div>`;
     }).join('');
 
     container.innerHTML = `<div class="activity-list">${items}</div>`;
   } catch (e) {
-    container.innerHTML = `<p class="state-msg" style="color:var(--red)">Error: ${e.message}</p>`;
+    container.innerHTML = `<p class="state-msg" style="color:var(--red)">Error: ${escapeHTML(e.message)}</p>`;
   }
 }
 
@@ -344,11 +349,11 @@ async function loadMelTable() {
       const label = r.event_type.replace(/_/g, ' ');
       const qty   = r.quantity != null ? `${r.quantity} ${r.unit || ''}`.trim() : '—';
       return `<tr>
-        <td>${r.event_date || '—'}</td>
-        <td>${armPill(r.lga_name)} ${r.lga_name}</td>
-        <td>${icon} ${label}</td>
-        <td>${qty}</td>
-        <td style="font-size:.78rem;color:var(--muted)">${r.facility_name || '—'}</td>
+        <td>${escapeHTML(r.event_date || '—')}</td>
+        <td>${armPill(r.lga_name)} ${escapeHTML(r.lga_name)}</td>
+        <td>${icon} ${escapeHTML(label)}</td>
+        <td>${escapeHTML(qty)}</td>
+        <td style="font-size:.78rem;color:var(--muted)">${escapeHTML(r.facility_name || '—')}</td>
       </tr>`;
     }).join('');
 
@@ -363,7 +368,7 @@ async function loadMelTable() {
       </table>`;
   } catch (e) {
     badge.textContent = 'error';
-    container.innerHTML = `<p class="state-msg" style="color:var(--red)">Error: ${e.message}</p>`;
+    container.innerHTML = `<p class="state-msg" style="color:var(--red)">Error: ${escapeHTML(e.message)}</p>`;
   }
 }
 
