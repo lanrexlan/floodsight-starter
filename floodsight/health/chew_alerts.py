@@ -105,7 +105,7 @@ def dispatch_health_alerts(
         skipped_not_pilot, failed
     """
     import os
-    if os.getenv("FLOODSIGHT_ENV") == "production" and os.getenv("HEALTH_DISPATCH_ENABLED", "false").lower() != "true":
+    if os.getenv("HEALTH_DISPATCH_ENABLED", "false").lower() != "true":
         raise RuntimeError("Health SMS dispatch requires approval of the research pilot and HEALTH_DISPATCH_ENABLED=true.")
     from floodsight.db.supabase_client import (
         alert_already_sent_today,

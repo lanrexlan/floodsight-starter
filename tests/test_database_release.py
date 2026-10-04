@@ -21,13 +21,51 @@ def database():
         for role in ("anon", "authenticated", "service_role"):
             conn.execute(f"DO $$ BEGIN CREATE ROLE {role}; EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
         conn.execute("ALTER ROLE service_role BYPASSRLS")
-        for path in sorted((root / "scripts/sql").glob("0*.sql")):
+        core = sorted((root / "scripts/sql").glob("0*.sql"))
+        health = sorted((root / "supabase/migrations").glob("0*.sql"))
+        # Delivery tracking depends on health_alerts; mirror documented order.
+        for path in [*core[:5], *health, *core[5:]]:
             conn.execute(path.read_text(encoding="utf-8"))
         conn.execute("GRANT USAGE ON SCHEMA public TO anon,authenticated,service_role")
         conn.execute("GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role")
         conn.execute("GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO service_role")
         assert conn.execute("SELECT release_schema_version()").fetchone()[0] == 7
+        # All subsequent records are synthetic; this database is disposable.
+        conn.execute("TRUNCATE subscribers, pending_subscriptions, subscription_attempts CASCADE")
     yield psycopg
+
+
+def test_health_delivery_columns_exist(database):
+    with database.connect(DATABASE_URL) as conn:
+        columns = {r[0] for r in conn.execute(
+            "SELECT column_name FROM information_schema.columns WHERE table_name='health_alerts'")}
+        assert {'at_message_id', 'delivered_at', 'failure_reason'} <= columns
+
+
+def test_release_upgrade_is_repeatable_and_preserves_rows(database):
+    root = Path(__file__).resolve().parents[1]
+    with database.connect(DATABASE_URL) as conn:
+        conn.execute("INSERT INTO subscribers(phone,lat,lon) VALUES ('+2340000000009',6.52,3.37)")
+        before = conn.execute("SELECT id,phone,lat,lon FROM subscribers WHERE phone='+2340000000009'").fetchone()
+        for name in ('06_delivery_reports.sql', '07_release_hardening.sql'):
+            conn.execute((root / 'scripts/sql' / name).read_text(encoding='utf-8'))
+        assert conn.execute("SELECT id,phone,lat,lon FROM subscribers WHERE phone='+2340000000009'").fetchone() == before
+
+
+def test_pending_delivery_counts_null_provider_status(database):
+    with database.connect(DATABASE_URL) as conn:
+        subscriber = conn.execute("INSERT INTO subscribers(phone,lat,lon) VALUES ('+2340000000008',6.52,3.37) RETURNING id").fetchone()[0]
+        conn.execute("INSERT INTO alert_log(subscriber_id,event_date,alert_level) VALUES (%s,'2000-01-01','Watch')", (subscriber,))
+        assert conn.execute("SELECT submitted,pending,delivered,failed FROM alert_delivery_stats WHERE event_date='2000-01-01'").fetchone() == (1,1,0,0)
+
+
+def test_private_tables_and_functions_not_exposed(database):
+    with database.connect(DATABASE_URL) as conn:
+        for role in ('anon', 'authenticated'):
+            for table in ('prediction_log', 'verifications', 'dispatch_cells', 'briefing_log',
+                          'chew_subscribers', 'health_alerts', 'chew_responses', 'mel_events'):
+                assert conn.execute("SELECT has_table_privilege(%s,%s,'SELECT')", (role,table)).fetchone()[0] is False
+            assert conn.execute("SELECT has_function_privilege(%s,'deactivate_stale_subscribers()','EXECUTE')", (role,)).fetchone()[0] is False
 
 
 def test_private_logs_not_readable_by_anon(database):

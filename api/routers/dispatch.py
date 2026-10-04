@@ -91,6 +91,9 @@ def dispatch_alerts(request: Request, dry_run: bool = False):
     """
     _check_auth(request)
 
+    if not dry_run and os.getenv("ALERT_DISPATCH_ENABLED", "false").lower() != "true":
+        raise HTTPException(503, "Public SMS dispatch awaits pilot approval. Use dry_run=true to review the forecast.")
+
     # 1. Current alert levels for all grid cells
     from floodsight.alerts.engine import compute_alert_level
     from floodsight.forecast.rainfall_grid import (
@@ -120,10 +123,6 @@ def dispatch_alerts(request: Request, dry_run: bool = False):
     cell_alerts = alert_data["alert_levels"]
     if dry_run:
         return {"dry_run": True, "alert_counts": alert_data["alert_counts"], "highest_alert": alert_data["highest_alert"], "sent": 0}
-    from api.runtime import production
-    if production() and os.getenv("ALERT_DISPATCH_ENABLED", "false").lower() != "true":
-        raise HTTPException(503, "Public SMS dispatch awaits pilot approval. Use dry_run=true to review the forecast.")
-
     # 2. Build KD-tree from grid cell centroids (WGS84 lat/lon)
     gdf_wgs84 = gdf.to_crs("EPSG:4326")
     centroids  = gdf_wgs84.geometry.centroid

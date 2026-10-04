@@ -138,6 +138,43 @@ def test_bulk_testing_cannot_bypass_production_approval(client, monkeypatch):
     assert client.post('/alerts/test-sms?phone=08012345678', headers={'Authorization':'Bearer test-only'}).status_code == 403
 
 
+def test_explicit_depth_off_works_in_development(client, monkeypatch):
+    monkeypatch.setenv('ENABLE_EXPERIMENTAL_DEPTH', 'false')
+    assert client.get('/product-status').json()['experimental_depth_enabled'] is False
+    payload = {'elevation_m':2, 'slope_deg':0, 'flow_accum':10,
+        'dist_to_water_m':100, 'landcover_class':50, 'population_density':100,
+        'rain_24h_mm':20, 'rain_72h_mm':30}
+    assert client.post('/depth/predict', json=payload).status_code == 503
+
+
+def test_resident_dispatch_off_blocks_before_forecast(client, monkeypatch):
+    monkeypatch.setenv('ALERT_DISPATCH_ENABLED', 'false')
+    def forbidden(*args, **kwargs):
+        raise AssertionError('Disabled dispatch must not fetch weather or contact providers')
+    monkeypatch.setattr('api.routers.forecast.get_grid_alerts', forbidden)
+    assert client.post('/alerts/dispatch', headers={'Authorization':'Bearer test-only'}).status_code == 503
+
+
+def test_health_dispatch_off_blocks_before_provider(monkeypatch):
+    from floodsight.health.chew_alerts import dispatch_health_alerts
+    monkeypatch.setenv('FLOODSIGHT_ENV', 'development')
+    monkeypatch.setenv('HEALTH_DISPATCH_ENABLED', 'false')
+    with pytest.raises(RuntimeError, match='requires approval'):
+        dispatch_health_alerts([], {})
+
+
+def test_morning_briefing_off_blocks_before_network(monkeypatch):
+    from scripts import send_morning_briefing as briefing
+    monkeypatch.setenv('BRIEFING_DISPATCH_ENABLED', 'false')
+    monkeypatch.setattr('sys.argv', ['send_morning_briefing.py'])
+    def forbidden(*args, **kwargs):
+        raise AssertionError('Disabled briefing must not fetch weather or subscribers')
+    monkeypatch.setattr(briefing, 'fetch_summary', forbidden)
+    with pytest.raises(SystemExit) as exc:
+        briefing.main()
+    assert exc.value.code == 1
+
+
 def test_packaged_lga_mapping_works_without_raw_downloads(monkeypatch, tmp_path):
     from api import data_provider as data
     from floodsight import config

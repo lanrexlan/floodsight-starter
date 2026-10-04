@@ -151,10 +151,10 @@ DROP POLICY IF EXISTS "service only health_alerts"    ON health_alerts;
 DROP POLICY IF EXISTS "service only chew_responses"   ON chew_responses;
 DROP POLICY IF EXISTS "service only mel_events"       ON mel_events;
 
-CREATE POLICY "service only chew_subscribers" ON chew_subscribers USING (auth.role() = 'service_role');
-CREATE POLICY "service only health_alerts"    ON health_alerts    USING (auth.role() = 'service_role');
-CREATE POLICY "service only chew_responses"   ON chew_responses   USING (auth.role() = 'service_role');
-CREATE POLICY "service only mel_events"       ON mel_events       USING (auth.role() = 'service_role');
+CREATE POLICY "service only chew_subscribers" ON chew_subscribers TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "service only health_alerts"    ON health_alerts    TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "service only chew_responses"   ON chew_responses   TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "service only mel_events"       ON mel_events       TO service_role USING (true) WITH CHECK (true);
 
 -- Done
 SELECT 'FloodSight Health Intelligence Layer migrations complete' AS status;

@@ -1,6 +1,6 @@
 # FloodSight blocker remediation — 4 October 2026
 
-Current stage: controlled advisory pilot. Changes are local. No production migration, paid service purchase, public SMS activation, or external deployment has been performed.
+Current stage: controlled advisory pilot preparation. The first hardening release is merged and live on Render, but in development mode on a free host. A separately approved Supabase access-restriction migration has been applied and verified. No paid service purchase or public SMS activation has been performed. See `PILOT_ACCEPTANCE.md` for current evidence and rollout gates.
 
 | Blocker | Repository result | Remaining acceptance |
 |---|---|---|
@@ -25,6 +25,8 @@ Current stage: controlled advisory pilot. Changes are local. No production migra
 The next defensible release is a scoped pilot with human oversight. An autonomous public warning service or marketed accuracy/lead-time guarantee remains blocked by scientific and operational acceptance evidence.
 
 ## Verification receipt
+
+Update: 159 tests now pass locally, including eight real PostgreSQL migration/security/concurrency tests (no database tests skipped). The isolated local test server is PostgreSQL 18; PostgreSQL 17, Linux container checks and a real production restore must still be verified separately. The earlier receipt below describes the first hardening release, not this subsequent fix.
 
 Local automated tests, browser checks and offline request timings are release preparation, not production acceptance. `reports/release_verification.json` records actual local transfers/timings, and `reports/dependency_audit.json` records the deployment dependency scan. Docker/PostgreSQL execution is not available on this laptop; those checks must pass in CI before release. Live provider delivery, target-device/load testing, backup restoration and prospective flood validation remain unverified.
 
