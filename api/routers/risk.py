@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from api.data_provider import get_grid, get_grid_geojson, get_streets_geojson, get_swmm_flooding_geojson, nearest_cell
 from api.schemas import RiskAtPoint
@@ -9,22 +9,24 @@ router = APIRouter(prefix="/risk", tags=["risk"])
 
 
 @router.get("/grid")
-def risk_grid():
+def risk_grid(request: Request):
     """Full grid as GeoJSON (risk_class, flood_score per cell).
 
     Returns the cached WGS84 GeoJSON dict — serialisation only happens once
     per process lifetime (see data_provider.get_grid_geojson).
     """
-    geojson, _ = get_grid_geojson()
-    return geojson
+    from api.assets import map_response
+    return map_response("grid", request)
 
 
 @router.get("/point", response_model=RiskAtPoint)
 def risk_at_point(lat: float, lon: float):
     try:
         cell = nearest_cell(lat, lon)
+    except HTTPException:
+        raise
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=503, detail="Risk data temporarily unavailable.") from exc
 
     _, source = get_grid()
     return RiskAtPoint(
@@ -33,13 +35,14 @@ def risk_at_point(lat: float, lon: float):
         lon=lon,
         elevation_m=float(cell["elevation_m"]),
         flood_score=float(cell["flood_score"]),
+        hazard_score=float(cell.get("hazard_score", cell["flood_score"])),
         risk_class=str(cell["risk_class"]),
         data_source=source,
     )
 
 
 @router.get("/streets")
-def risk_streets():
+def risk_streets(request: Request, bbox: str | None = None):
     """
     OSM road segments tagged with flood risk class.
 
@@ -54,8 +57,9 @@ def risk_streets():
     **Pre-requisite:** run ``scripts/05_tag_street_risk.py`` to generate
     ``data/processed/streets_risk.gpkg``.  Returns 404 until that file exists.
     """
-    geojson, _ = get_streets_geojson()
-    if geojson is None:
+    from api.assets import map_response, prepared_asset
+    from api.data_provider import STREETS_RISK_PATH
+    if prepared_asset("streets") is None and not STREETS_RISK_PATH.exists():
         raise HTTPException(
             status_code=404,
             detail=(
@@ -63,7 +67,10 @@ def risk_streets():
                 "Run scripts/05_tag_street_risk.py to generate it."
             ),
         )
-    return geojson
+    if bbox is not None:
+        from api.street_tiles import street_window
+        return street_window(bbox, request)
+    return map_response("streets", request)
 
 
 @router.get("/swmm-flooding")

@@ -118,7 +118,7 @@ jobs:
               print(f"Could not parse dispatch response: {exc}")
               raise SystemExit(0)
 
-          sent    = d.get("sent", 0)
+          sent    = d.get("dispatched", 0)
           highest = d.get("highest_alert", "unknown")
           total   = d.get("subscribers", 0)
 

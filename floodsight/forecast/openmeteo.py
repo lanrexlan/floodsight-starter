@@ -89,14 +89,15 @@ def _fetch_model_hourly(
     Raises on any network or parse error.
     """
     model_param = f"&models={model}" if model else ""
+    from floodsight.forecast.provider import endpoint, credential_query
     url = (
-        "https://api.open-meteo.com/v1/forecast"
-        f"?latitude={lat}&longitude={lon}"
+        endpoint("forecast", "forecast")
+        + f"?latitude={lat}&longitude={lon}"
         "&hourly=precipitation"
         "&past_hours=24"
         "&forecast_days=3"
         "&timezone=UTC"
-        + model_param
+        + model_param + credential_query()
     )
     req = urllib.request.Request(
         url, headers={"User-Agent": "FloodSight/1.0 (flood-early-warning, Lagos)"}

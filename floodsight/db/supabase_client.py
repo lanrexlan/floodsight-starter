@@ -57,6 +57,35 @@ def _get_client():
 # Phone normalisation
 # ---------------------------------------------------------------------------
 
+def consume_subscription_attempt(phone: str, ip: str) -> bool:
+    """Atomic shared SMS cost limit; keys are hashed, never raw phone/IP."""
+    import hashlib
+    return bool(_get_client().rpc("consume_subscription_attempt", {
+        "phone_key": hashlib.sha256(phone.encode()).hexdigest(),
+        "ip_key": hashlib.sha256(ip.encode()).hexdigest(),
+    }).execute().data)
+
+
+def consume_pending_subscription(phone: str, code_hash: str) -> dict:
+    return _get_client().rpc("consume_pending_subscription", {
+        "p_phone": phone, "p_hash": code_hash,
+    }).execute().data
+
+
+def claim_alert(subscriber_id: str, event_date: str, level: str) -> bool:
+    return bool(_get_client().rpc("claim_alert", {
+        "p_subscriber": subscriber_id, "p_date": event_date, "p_level": level,
+    }).execute().data)
+
+
+def erase_subscriber(phone: str) -> None:
+    client = _get_client()
+    client.table("pending_subscriptions").delete().eq("phone", phone).execute()
+    client.table("verifications").delete().eq("reporter", phone).execute()
+    # Subscriber-linked message logs and reservations cascade.
+    client.table("subscribers").delete().eq("phone", phone).execute()
+
+
 def normalize_phone(phone: str) -> str:
     """
     Normalise a Nigerian phone number to E.164 (+234XXXXXXXXXX).

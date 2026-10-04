@@ -17,7 +17,7 @@ import time
 import urllib.request
 from datetime import date, timedelta
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from floodsight.config import ALERT_UPGRADE, COASTAL_UPGRADE_LGAS, OGUN_UPGRADE_LGAS
 from floodsight.forecast.marine import coastal_upgrade
 
@@ -563,11 +563,8 @@ def _compute_results() -> list[dict]:
         #   Warning expected, Watch predicted     → correct (detected the event, slightly under-alerted)
         #   Watch expected, Warning predicted     → correct (over-cautious is acceptable in a life-safety system)
         #   Warning/Watch expected, No Alert      → WRONG  (missed the event — the only truly bad case)
-        correct = (predicted == event["reported_severity"]) or (
-            event["reported_severity"] == "Warning" and predicted in ("Warning", "Watch")
-        ) or (
-            event["reported_severity"] == "Watch" and predicted == "Warning"
-        )
+        correct = predicted == event["reported_severity"]
+        detected = predicted in ("Watch", "Warning")
 
         results.append({
             **event,
@@ -583,6 +580,7 @@ def _compute_results() -> list[dict]:
             "alert_counts":   counts,
             "predicted_alert": predicted,
             "correct":         correct,
+            "detected":        detected,
             "warning_pct":    round(counts["Warning"] / total * 100, 1),
             "watch_pct":      round(counts["Watch"]   / total * 100, 1),
         })
@@ -593,7 +591,7 @@ def _compute_results() -> list[dict]:
 # ── Endpoint ──────────────────────────────────────────────────────────────
 
 @router.get("/events")
-def get_validation_events(refresh: bool = False):
+def get_validation_events(request: Request, refresh: bool = False):
     """
     Returns back-test results for each documented Lagos flood event.
 
@@ -610,6 +608,9 @@ def get_validation_events(refresh: bool = False):
     Dam-release events (2019_10, 2022_10) are included but noted as
     structurally hard for a rainfall-threshold model to detect.
     """
+    if refresh:
+        from api.auth import require_dispatch_secret
+        require_dispatch_secret(request)
     global _cached_results
     if _cached_results is None or refresh:
         try:
@@ -641,6 +642,8 @@ def get_validation_events(refresh: bool = False):
     return {
         "events": _cached_results,
         "summary": {
+            "metric_definition": "Exact historical severity agreement; not prospective forecast accuracy.",
+            "limitations": "Selected known flood events only. No non-flood control days or measured operational lead times; precision and false-alarm rate cannot be inferred.",
             "total_events":            total,
             "correct":                 correct,
             "accuracy_pct":            round(correct / total * 100) if total else 0,

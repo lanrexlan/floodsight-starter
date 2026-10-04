@@ -49,6 +49,8 @@ def get_rainfall_forecast(
     Results are cached for 30 minutes — the dashboard should call this once
     on page load, not on every map click.
     """
+    from api.coordinates import validate_location
+    validate_location(lat, lon)
     try:
         from floodsight.forecast.openmeteo import fetch_forecast
         return fetch_forecast(lat, lon)
@@ -91,6 +93,8 @@ def get_grid_alerts(
           "forecast": { ...city-centre summary for the status card... }
         }
     """
+    from api.coordinates import validate_location
+    validate_location(lat, lon)
     from floodsight.alerts.engine import compute_alert_level
     from floodsight.forecast.rainfall_grid import (
         fetch_rainfall_grid,
@@ -216,6 +220,8 @@ def get_alert_summary(
       }
     }
     """
+    from api.coordinates import validate_location
+    validate_location(lat, lon)
     from floodsight.alerts.engine import compute_alert_level
     from floodsight.forecast.rainfall_grid import (
         fetch_rainfall_grid,

@@ -52,7 +52,8 @@ def add_event_labels(
 
     df["rain_24h_mm"] = rain_24h_mm
     df["rain_72h_mm"] = rain_72h_mm
-    df["event"] = event_name
+    df["event_name"] = event_name
+    df["label_source"] = "sar_fwdet"
 
     return df
 

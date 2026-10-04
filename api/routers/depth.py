@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request, Depends
 
 from api.auth import require_dispatch_secret
 from api.schemas import DepthPredictionRequest, DepthPredictionResponse
@@ -56,6 +56,10 @@ def _log_prediction(req: DepthPredictionRequest, predicted_depth_m: float) -> No
         except Exception as exc:
             log.warning("Supabase prediction log failed (%s) — JSONL fallback", exc)
 
+        from api.runtime import production
+        if production():
+            log.error("Prediction audit storage unavailable; no ephemeral PII fallback in production.")
+            return
         LOGS_DIR.mkdir(parents=True, exist_ok=True)
         with open(PREDICTIONS_LOG, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry) + "\n")
@@ -65,6 +69,10 @@ def _log_prediction(req: DepthPredictionRequest, predicted_depth_m: float) -> No
 
 @router.post("/predict", response_model=DepthPredictionResponse)
 def predict_depth(req: DepthPredictionRequest):
+    from api.runtime import production
+    import os
+    if production() and os.getenv("ENABLE_EXPERIMENTAL_DEPTH", "false").lower() != "true":
+        raise HTTPException(503, "Experimental depth predictions are disabled for this pilot.")
     if not ML_MODEL_PATH.exists():
         raise HTTPException(
             status_code=503,
@@ -97,7 +105,7 @@ def predict_depth(req: DepthPredictionRequest):
             f"validated — see metrics.holdout_real_rows_only in /depth/model_info."
         )
     else:
-        note = None
+        note = "Experimental depth estimate. Event and location validation is incomplete; do not use as an observed depth."
 
     _log_prediction(req, depth)
 
@@ -118,8 +126,8 @@ def model_info():
     return model_metadata()
 
 
-@router.get("/predictions_log")
-def predictions_log(request: Request, limit: int = 100):
+@router.get("/predictions_log", dependencies=[Depends(require_dispatch_secret)])
+def predictions_log(request: Request, limit: int = Query(100, ge=1, le=1000)):
     """
     Return the most recent prediction log entries (newest first).
 
@@ -139,6 +147,8 @@ def predictions_log(request: Request, limit: int = 100):
     except Exception as exc:
         log.warning("Supabase predictions read failed (%s) — JSONL fallback", exc)
 
+    from api.runtime import require_durable_storage
+    require_durable_storage()
     if not PREDICTIONS_LOG.exists():
         return {"entries": [], "total": 0, "data_source": "local_jsonl"}
     lines = PREDICTIONS_LOG.read_text(encoding="utf-8").splitlines()
@@ -178,8 +188,8 @@ def ml_grid(
     ),
 ):
     """
-    Phase 21 — ML-predicted flood depth grid for Lagos under a 100-year
-    design storm (rain_24h=150 mm, rain_72h=150 mm).
+    Experimental ML depth grid under a 150 mm rainfall scenario.
+    No validated return period is assigned to this scenario.
 
     Returns a GeoJSON FeatureCollection of centroid points.  Each feature
     carries ``predicted_depth_m``, ``depth_class``, and ``depth_colour``
@@ -196,6 +206,10 @@ def ml_grid(
     - **High**    1.00 – 2.00 m
     - **Extreme** > 2.00 m
     """
+    from api.runtime import production
+    import os
+    if production() and os.getenv("ENABLE_EXPERIMENTAL_DEPTH", "false").lower() != "true":
+        raise HTTPException(503, "Experimental design-storm depth layer is disabled for this pilot.")
     if not ML_GRID_GEOJSON.exists():
         raise HTTPException(
             status_code=503,

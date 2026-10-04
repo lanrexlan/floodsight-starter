@@ -25,12 +25,36 @@ from __future__ import annotations
 import logging
 from datetime import date
 
-from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Request, Depends
+from api.auth import require_dispatch_secret
+
+
+def _health_rows(table, fields, order, limit):
+    from floodsight.db.supabase_client import _get_client
+    try:
+        return _get_client().table(table).select(fields).order(order, desc=True).limit(limit).execute().data or []
+    except Exception as exc:
+        raise HTTPException(503, "Health reporting data is unavailable.") from exc
+from pydantic import BaseModel, Field, ConfigDict
 
 log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/health", tags=["health"])
+
+
+@router.get("/activity", dependencies=[Depends(require_dispatch_secret)])
+def health_activity():
+    return _health_rows("chew_responses", "parsed_action,cases_reported,lga_name,received_at", "received_at", 8)
+
+
+@router.get("/cases")
+def health_cases():
+    return _health_rows("dhis2_malaria_cases", "lga_name,period,confirmed_cases", "period", 300)
+
+
+@router.get("/mel/events", dependencies=[Depends(require_dispatch_secret)])
+def health_events():
+    return _health_rows("mel_events", "lga_name,event_type,quantity,unit,event_date,facility_name", "event_date", 20)
 
 
 # ---------------------------------------------------------------------------
@@ -196,15 +220,12 @@ class ChewResponsePayload(BaseModel):
     Africa's Talking POST payload for inbound SMS.
     AT sends form-encoded data; FastAPI will parse it from JSON body too.
     """
-    from_: str | None = None   # "from" is a Python keyword; AT sends as "from"
+    from_: str | None = Field(default=None, alias="from")
     text: str = ""
     to: str | None = None
     date: str | None = None
 
-    class Config:
-        # Allow "from" as a field alias
-        populate_by_name = True
-        fields = {"from_": "from"}
+    model_config = ConfigDict(populate_by_name=True)
 
 
 @router.post("/chew-response")
@@ -227,6 +248,8 @@ async def receive_chew_response(request: Request):
     anything else     → logged as UNKNOWN for manual review
     """
     from floodsight.db.supabase_client import record_chew_response
+    from api.routers.incoming import _check_token
+    _check_token(request.query_params.get("token", ""))
 
     # AT sends form-encoded — parse raw body to handle both form and JSON
     content_type = request.headers.get("content-type", "")

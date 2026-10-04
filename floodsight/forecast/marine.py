@@ -165,11 +165,12 @@ def coastal_upgrade(level: str, coastal: dict | None) -> str:
 
 def _fetch_point(lat: float, lon: float, forecast_days: int = 3) -> tuple[list[str], list[float | None]]:
     """Fetch hourly sea_level_height_msl for one lat/lon. Returns (times, heights)."""
+    from floodsight.forecast.provider import endpoint, credential_query
     url = (
-        "https://marine-api.open-meteo.com/v1/marine"
-        f"?latitude={lat}&longitude={lon}"
+        endpoint("marine", "marine")
+        + f"?latitude={lat}&longitude={lon}"
         "&hourly=sea_level_height_msl"
-        f"&forecast_days={forecast_days}&timezone=UTC"
+        f"&forecast_days={forecast_days}&timezone=UTC" + credential_query()
     )
     req = urllib.request.Request(url, headers={"User-Agent": "FloodSight/1.0"})
     with urllib.request.urlopen(req, timeout=20) as resp:

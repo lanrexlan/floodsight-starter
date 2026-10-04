@@ -675,12 +675,12 @@ footer {
 <!-- ░░ HERO ░░ -->
 <section class="hero" style="padding-bottom:32px;">
   <div class="hero-text">
-    <div class="hero-eyebrow">FloodSight Lagos — Live Intelligence</div>
+    <div class="hero-eyebrow">FloodSight Lagos — Advisory Pilot</div>
     <h1>Know Before<br />the Water <em>Rises</em></h1>
     <p class="hero-sub">
-      FloodSight uses machine learning and live weather data to predict where
-      flooding is most likely in Lagos — giving residents, responders, and
-      planners hours of advance notice.
+      FloodSight combines mapped flood susceptibility and live weather forecasts
+      to help Lagos residents, responders, and planners assess changing risk.
+      This is a controlled pilot; warning accuracy and lead time are still being evaluated.
     </p>
     <div class="hero-actions">
       <a href="#live-map" class="btn btn-primary">View Live Map ↓</a>
@@ -726,21 +726,21 @@ footer {
 <!-- ░░ LIVE MAP ░░ -->
 <section id="live-map" style="padding-top:64px;">
   <div class="eyebrow">⬡ Interactive Risk Map</div>
-  <h2>See Every Street,<br />Every <em>Risk Level</em></h2>
+  <h2>Explore Mapped Areas,<br />Understand <em>Flood Risk</em></h2>
   <p class="section-lead">
-    The map below shows flood risk across Lagos in real time. Taller columns
-    mean higher risk. Red cells are under active flood warning right now.
-    Alert colours factor in <em>both</em> observed rainfall from the last 24 hours
-    and the upcoming 48-hour forecast. Click any cell for details.
+    The map covers selected Lagos areas in 200 m cells. Taller columns mean
+    higher susceptibility; road colours inherit area-level scores, not street-level
+    measurements. When live forecasts are available, alert colours use recent
+    rainfall estimates and forecasts. Check the map's freshness label and click for details.
   </p>
   <div class="map-wrap">
     <iframe
-      src="https://floodsight-starter.onrender.com/dashboard/"
+      src="/dashboard/"
       title="FloodSight Lagos Live Map"
       loading="lazy"
       allow="fullscreen"
     ></iframe>
-    <div class="map-overlay-badge" id="live-badge">◎ Live · Updates every 30 min</div>
+    <div class="map-overlay-badge" id="live-badge">◎ Checking forecast availability…</div>
   </div>
 </section>
 
@@ -760,13 +760,13 @@ footer {
       <div class="scale-icon">🌤</div>
       <div class="scale-name">Barely Any Rain</div>
       <div class="scale-range">0 – 5 mm / day</div>
-      <div class="scale-desc">A few stray drops. You won't need an umbrella. Streets stay dry.</div>
+      <div class="scale-desc">Low daily rainfall. Local flooding can still occur from earlier rain, drainage problems, or other sources.</div>
     </div>
     <div class="scale-item" data-level="1">
       <div class="scale-icon">🌦</div>
       <div class="scale-name">Light Shower</div>
       <div class="scale-range">5 – 20 mm / day</div>
-      <div class="scale-desc">A brief afternoon drizzle. Puddles form quickly but drain within minutes.</div>
+      <div class="scale-desc">Light daily rainfall. Its timing, intensity, and local drainage determine the impact.</div>
     </div>
     <div class="scale-item" data-level="2">
       <div class="scale-icon">🌧</div>
@@ -778,19 +778,19 @@ footer {
       <div class="scale-icon">⛈</div>
       <div class="scale-name">Heavy Downpour</div>
       <div class="scale-range">40 – 80 mm / day</div>
-      <div class="scale-desc">A serious Lagos storm. Gutters overflow. High-risk areas begin to flood. Drive carefully.</div>
+      <div class="scale-desc">Heavy daily rainfall can stress drainage. Avoid flooded roads and monitor local conditions.</div>
     </div>
     <div class="scale-item" data-level="4">
       <div class="scale-icon">🌊</div>
       <div class="scale-name">Very Heavy Rain</div>
       <div class="scale-range">80 – 150 mm / day</div>
-      <div class="scale-desc">Many roads flood. Vehicles get stranded. Avoid driving unless essential.</div>
+      <div class="scale-desc">Very heavy daily rainfall increases concern, especially in low-lying areas. Check official guidance.</div>
     </div>
     <div class="scale-item" data-level="5">
       <div class="scale-icon">🚨</div>
       <div class="scale-name">Extreme Rainfall</div>
       <div class="scale-range">150+ mm / day</div>
-      <div class="scale-desc">Among the worst Lagos sees. Severe flooding across the city. Stay home if possible.</div>
+      <div class="scale-desc">Extreme daily rainfall warrants close attention. Impacts vary by location; follow local emergency guidance.</div>
     </div>
   </div>
 </section>
@@ -809,13 +809,12 @@ footer {
   <div class="alert-cards">
     <div class="alert-card safe">
       <div class="alert-icon">✅</div>
-      <div class="alert-name">All Clear</div>
+      <div class="alert-name">No Alert</div>
       <div class="alert-meaning">
-        Rainfall is too light to trigger flooding in high-risk areas.
-        Conditions are safe across all 15 monitored LGAs.
+        No alert threshold is currently exceeded. Local flooding can still occur.
       </div>
       <ul class="alert-actions-list">
-        <li>Go about your day normally</li>
+        <li>Keep checking local conditions and official guidance</li>
         <li>Check again after heavy rain begins</li>
         <li>Know your nearest high ground just in case</li>
       </ul>
@@ -838,17 +837,18 @@ footer {
       <div class="alert-icon">🚨</div>
       <div class="alert-name">Flood Warning</div>
       <div class="alert-meaning">
-        Flooding is expected in high and very-high risk areas. Take
-        protective action now. Do not wait for water to arrive.
+        Pilot warning thresholds have been exceeded. Flooding is possible;
+        the location, timing and depth are not guaranteed. Follow local emergency guidance.
       </div>
       <ul class="alert-actions-list">
-        <li>Move to higher ground immediately</li>
+        <li>Plan a safe route to higher ground before flooding begins</li>
         <li>Do not drive through flooded roads</li>
-        <li>Disconnect electrical appliances</li>
+        <li>Do not touch wet electrical equipment or equipment while standing in water</li>
         <li>Contact emergency services if trapped: 112</li>
       </ul>
     </div>
   </div>
+  <p class="section-lead">Safety reference: <a href="https://www.redcross.org/get-help/how-to-prepare-for-emergencies/types-of-emergencies/flood.html">Red Cross flood safety guidance</a>. FloodSight is not an official emergency service.</p>
 </section>
 
 <div class="section-divider"></div>
@@ -858,7 +858,7 @@ footer {
   <div class="eyebrow">◎ The Science</div>
   <h2>How FloodSight <em>Works</em></h2>
   <p class="section-lead">
-    Four steps — from raw data to an alert on your phone — running automatically every morning.
+    Four components — from terrain data to pilot advisories. Public messaging requires an approved operational pilot.
   </p>
 
   <div class="steps">
@@ -866,13 +866,13 @@ footer {
       <div class="step-icon">🛰</div>
       <div class="step-num">01 · SENSE</div>
       <div class="step-title">Terrain Analysis</div>
-      <div class="step-desc">We mapped every 100m² of Lagos using satellite elevation data, drainage patterns, and distance to water bodies.</div>
+      <div class="step-desc">We map selected Lagos areas in 200 m × 200 m cells using elevation, drainage patterns, and distance to water bodies.</div>
     </div>
     <div class="step">
       <div class="step-icon">🤖</div>
       <div class="step-num">02 · MODEL</div>
       <div class="step-title">Machine Learning</div>
-      <div class="step-desc">A trained ML model scores each grid cell's inherent flood susceptibility — independent of any rainfall event.</div>
+      <div class="step-desc">A weighted terrain and drainage overlay scores susceptibility. A separate experimental ML model estimates depth under specified rainfall scenarios.</div>
     </div>
     <div class="step">
       <div class="step-icon">🛰</div>
@@ -884,7 +884,7 @@ footer {
       <div class="step-icon">📱</div>
       <div class="step-num">04 · ALERT</div>
       <div class="step-title">Morning Briefing</div>
-      <div class="step-desc">Every morning at 6am WAT, an automated SMS briefing is sent to registered responders with the day's flood outlook.</div>
+      <div class="step-desc">Responder briefings and resident SMS workflows are implemented. Delivery requires configured services, an approved audience, and operational testing.</div>
     </div>
   </div>
 </section>
@@ -896,8 +896,8 @@ footer {
   <div class="eyebrow">◈ Back-tested on Real Events</div>
   <h2>FloodSight's <em>Track Record</em></h2>
   <p class="section-lead">
-    We tested FloodSight against eight documented Lagos flood events using actual
-    historical rainfall recorded by weather satellites. Here's how it performed.
+    This retrospective comparison uses documented Lagos events and historical rainfall estimates.
+    Exact severity agreement is not prospective warning accuracy, and this small sample does not establish reliability.
   </p>
 
   <div class="accuracy-hero" id="accuracy-hero" style="display:none;">
@@ -994,7 +994,7 @@ footer {
         <div class="sub-field">
           <label>Your location <span style="color:var(--red)">*</span></label>
           <div class="sub-location-row">
-            <input type="text" id="sub-area" placeholder="Type your area or street…"
+            <input type="text" id="sub-area" placeholder="Type an LGA, or use GPS…"
                    oninput="subGeocode(this.value)" />
             <button class="btn-locate" onclick="subUseMyLocation()" title="Use GPS location">
               📍 Locate me
@@ -1002,12 +1002,13 @@ footer {
           </div>
         </div>
 
+        <p class="sub-note">Typing an LGA selects its area centre, not your address. Use GPS for your current location, and confirm the selected location before subscribing. GPS coordinates are stored with your subscription.</p>
         <div class="sub-risk-preview" id="sub-risk-preview"></div>
 
         <label class="sub-consent-wrap" id="sub-consent-label">
           <input type="checkbox" id="sub-consent" onchange="subCheckReady()" />
           <span>
-            I consent to receive flood alert SMS messages. I have read and agree to the
+            I confirm the selected location and consent to receive flood alert SMS messages. I have read and agree to the
             <a href="privacy.html" target="_blank">Privacy Policy</a>.
             I understand my phone number and location will be stored securely and I can
             unsubscribe at any time by replying <strong>STOP</strong>.
@@ -1067,7 +1068,10 @@ footer {
 
 <!-- ░░ LIVE DATA ░░ -->
 <script>
-const API = 'https://floodsight-starter.onrender.com';
+const API = location.protocol === 'file:' ? 'http://localhost:8000' : '';
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
+}
 
 // ── Rainfall plain-English labels ──────────────────────────────────
 // period: 'obs' (past 24h observed) | 24 (forecast 24h) | 72 (cumulative)
@@ -1128,8 +1132,8 @@ function alertCopy(level, counts, lgaAlerts) {
     return {
       dotClass: 'warn', labelClass: 'warn',
       label: '🚨 Flood Warning',
-      headline: 'Flooding is expected in parts of Lagos',
-      summary: `Active flood warning in effect. Most affected areas: ${lgas}. Avoid low-lying roads. If you are in a red area on the map, move to higher ground now.`,
+      headline: 'Flood warning thresholds are exceeded in parts of Lagos',
+      summary: `Pilot risk advisory: ${lgas}. Avoid flooded and low-lying roads, prepare to move valuables, and follow local authority instructions. Map colours indicate estimated risk, not observed flooding.`,
       barClass: 'warn',
       barText: '🚨 FLOOD WARNING ACTIVE — Check the map for affected areas in Lagos'
     };
@@ -1147,9 +1151,9 @@ function alertCopy(level, counts, lgaAlerts) {
   }
   return {
     dotClass: 'safe', labelClass: 'safe',
-    label: '✓ All Clear',
-    headline: 'Lagos looks safe from flooding today',
-    summary: 'Current rainfall is below the threshold for flood alerts across all 15 monitored LGAs. Conditions are calm — check back after any heavy rain.',
+    label: 'No active threshold alert',
+    headline: 'No active threshold alert in the pilot area',
+    summary: 'Current model thresholds are not exceeded. Local flooding, drainage failures, and missed storms remain possible. Follow local authority advice and avoid flooded roads.',
     barClass: '', barText: ''
   };
 }
@@ -1214,15 +1218,19 @@ function renderStatus(data) {
 }
 
 function renderError() {
+  clearInterval(_liveCountdownTimer);
+  document.getElementById('status-content').style.display = 'none';
+  document.getElementById('status-loading').style.display = 'block';
+  document.getElementById('live-badge').textContent = '◎ Forecast unavailable · see map status';
   document.getElementById('status-loading').innerHTML =
-    '<span style="color:var(--muted);font-size:13px;">⚠ Could not load live conditions. The server may be starting up — please refresh in 30 seconds.</span>';
+    '<span style="color:var(--muted);font-size:13px;">⚠ Live conditions are unavailable. Static susceptibility is not a current forecast. Check official guidance.</span>';
 }
 
 // ── Track Record ─────────────────────────────────────────────────
 function levelBadge(level) {
   if (level === 'Warning')  return '<span class="badge badge-warn">🚨 Warning</span>';
   if (level === 'Watch')    return '<span class="badge badge-watch">⚠ Watch</span>';
-  if (level === 'No Alert') return '<span class="badge badge-safe">✓ All Clear</span>';
+  if (level === 'No Alert') return '<span class="badge badge-safe">No Alert</span>';
   return '<span class="badge badge-na">—</span>';
 }
 
@@ -1239,39 +1247,23 @@ function renderTrackRecord(data) {
   const era5Misses    = summary.era5_misses ?? 0;
   const damEvents     = summary.dam_release_events ?? 0;
 
-  // Primary stat: meaningful-rain accuracy when available, otherwise overall
-  if (meaningfulAcc != null && meaningfulN > 0) {
-    document.getElementById('accuracy-num').textContent = meaningfulAcc + '%';
-    document.getElementById('accuracy-label').textContent = 'Accuracy on rainfall events';
-  } else {
-    document.getElementById('accuracy-num').textContent = correct + ' / ' + totalEvents;
-    document.getElementById('accuracy-label').textContent = 'Events correctly flagged';
-  }
-
-  document.getElementById('accuracy-desc').innerHTML =
-    `<strong>Where satellite data captured meaningful rainfall (≥10 mm), FloodSight correctly ` +
-    `flagged ${meaningfulAcc}% of events</strong> (${correct}/${totalEvents} overall). ` +
-    (era5Misses > 0
-      ? `The ${era5Misses} overall miss${era5Misses > 1 ? 'es are' : ' is'} explained by ERA5 ` +
-        `underestimating localised Lagos convective storms — a known limitation of global reanalysis ` +
-        `data at ~30 km resolution. Upgrading to IMERG or NIMET gauge data would close this gap. `
-      : '') +
-    (damEvents > 0
-      ? `${damEvents} event${damEvents > 1 ? 's are' : ' is'} dam-release flooding, undetectable by any rainfall-threshold system. `
-      : '');
+  document.getElementById('accuracy-num').textContent = correct + ' / ' + totalEvents;
+  document.getElementById('accuracy-label').textContent = 'Historical severity matches';
+  document.getElementById('accuracy-desc').textContent =
+    'Agreement on selected historical flood events. These are retrospective tests, not measured forecast lead times or a false-alarm rate. Independent flood and non-flood observations are still required.';
   document.getElementById('accuracy-hero').style.display = 'flex';
 
   // Table rows
   const tbody = document.getElementById('track-tbody');
   tbody.innerHTML = events.map(r => {
-    const warnPct = r.warning_pct;
+    const warnPct = Number(r.warning_pct) || 0;
     return `<tr>
       <td>
-        <div class="event-name">${r.name}</div>
-        <div class="event-areas">${r.areas}</div>
+        <div class="event-name">${escapeHTML(r.name)}</div>
+        <div class="event-areas">${escapeHTML(r.areas)}</div>
       </td>
-      <td class="event-rain">${r.rain_24h_mm} mm<br><span style="color:var(--muted);font-size:12px;">${r.rain_24h_label}</span></td>
-      <td class="event-rain">${r.rain_72h_mm} mm<br><span style="color:var(--muted);font-size:12px;">${r.rain_72h_label}</span></td>
+      <td class="event-rain">${Number(r.rain_24h_mm)} mm<br><span style="color:var(--muted);font-size:12px;">${escapeHTML(r.rain_24h_label)}</span></td>
+      <td class="event-rain">${Number(r.rain_72h_mm)} mm<br><span style="color:var(--muted);font-size:12px;">${escapeHTML(r.rain_72h_label)}</span></td>
       <td>${levelBadge(r.reported_severity)}</td>
       <td>${levelBadge(r.predicted_alert)}</td>
       <td>
@@ -1376,7 +1368,7 @@ function subSetLocation(lat, lon, areaLabel) {
       const rc    = d.risk_class || 'Unknown';
       const color = RISK_COLORS_SUB[rc] || '#aaa';
       document.getElementById('sub-risk-preview').innerHTML =
-        `Baseline flood risk for this location: <strong style="color:${color}">${rc}</strong>`;
+        `Baseline flood risk for this location: <strong style="color:${color}">${escapeHTML(rc)}</strong>`;
       subCheckReady();
     })
     .catch(() => {
@@ -1392,8 +1384,8 @@ function subGeocode(query) {
   clearTimeout(_subGeoTimer);
   if (query.trim().length < 3) return;
   _subGeoTimer = setTimeout(() => {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query + ', Lagos, Nigeria')}&format=json&limit=1&accept-language=en`;
-    fetch(url, { headers: { 'User-Agent': 'FloodSight-Subscribe/1.0' } })
+    const url = `${API}/places/search?q=${encodeURIComponent(query)}`;
+    fetch(url)
       .then(r => r.json())
       .then(results => {
         if (results && results.length > 0) {
@@ -1420,9 +1412,7 @@ function subUseMyLocation() {
       btn.disabled = false;
       const lat = pos.coords.latitude, lon = pos.coords.longitude;
       // Reverse geocode for a human label
-      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=14&accept-language=en`, {
-        headers: { 'User-Agent': 'FloodSight-Subscribe/1.0' }
-      })
+      fetch(`${API}/places/reverse?lat=${lat}&lon=${lon}`)
         .then(r => r.json())
         .then(d => {
           const a = d.address || {};
@@ -1447,7 +1437,7 @@ async function submitSubscription() {
   const statusEl = document.getElementById('sub-status');
   const submitBtn= document.getElementById('sub-submit');
 
-  if (!phone || _subLat === null) return;
+  if (!phone || _subLat === null || !document.getElementById('sub-consent').checked) return;
 
   submitBtn.disabled = true;
   submitBtn.textContent = 'Subscribing…';
@@ -1465,7 +1455,17 @@ async function submitSubscription() {
         consent: true,
       }),
     });
-    const data = await res.json();
+    let data = await res.json();
+    if (data.status === 'pending_confirmation') {
+      const code = window.prompt('Enter the six-digit code sent to your phone:');
+      if (!code) throw new Error('Phone confirmation was not completed. Your subscription is not active.');
+      const confirmed = await fetch(`${API}/subscribe/confirm`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({phone: data.phone, code})
+      });
+      data = await confirmed.json();
+      if (!confirmed.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Could not confirm phone number.');
+    }
 
     if (!res.ok) {
       throw new Error(data.detail || `Error ${res.status}`);
@@ -1475,8 +1475,8 @@ async function submitSubscription() {
     const area  = data.area_name  || areaName || 'your area';
     const color = RISK_COLORS_SUB[rc] || '#4fc3f7';
     statusEl.innerHTML =
-      `✓ Subscribed! Your area (<strong>${area}</strong>) has ` +
-      `<strong style="color:${color}">${rc || 'unknown'}</strong> baseline flood risk. ` +
+      `✓ Subscribed! Your area (<strong>${escapeHTML(area)}</strong>) has ` +
+      `<strong style="color:${color}">${escapeHTML(rc || 'unknown')}</strong> baseline flood risk. ` +
       `You’ll receive an SMS when a Watch or Warning is issued for your location.`;
     statusEl.className = 'sub-status success';
 

@@ -37,7 +37,7 @@
           <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.6"/>
           <path d="M13 13l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
         </svg>
-        <input id="search-input" type="text" placeholder="Try 'Lekki', 'Surulere', 'Yaba'…" autocomplete="off" />
+        <input id="search-input" type="text" placeholder="Search an LGA: Kosofe, Surulere…" aria-label="Search an LGA" autocomplete="off" />
         <button id="search-clear" class="search-clear" hidden>✕</button>
       </div>
       <ul id="search-results" class="search-dropdown" hidden></ul>
@@ -88,7 +88,7 @@
           <span id="result-risk" class="result-value">—</span>
         </div>
         <div class="result-cell">
-          <span class="result-label">Alert level</span>
+          <span class="result-label">Rainfall scenario alert</span>
           <span id="result-alert" class="result-value">—</span>
         </div>
         <div class="result-cell">
@@ -96,7 +96,7 @@
           <span id="result-elev" class="result-value mono">—</span>
         </div>
         <div class="result-cell">
-          <span class="result-label">Flood score</span>
+          <span class="result-label">Susceptibility score</span>
           <span id="result-score" class="result-value mono">—</span>
         </div>
       </div>
@@ -105,6 +105,7 @@
     <!-- Legend -->
     <section class="panel">
       <h2>Legend</h2>
+      <p class="hint">Pilot advisory. No Alert is not a guarantee against flooding. Area susceptibility uses 200 m cells; road colours are inherited from these cells.</p>
       <p class="hint" style="margin:0 0 8px">Active alerts override risk colours:</p>
       <ul class="legend">
         <li><span class="swatch swatch-pulse" style="background:#FF4040"></span><div><strong>Warning</strong><span class="legend-hint">High/Very High + heavy rain</span></div></li>
@@ -112,12 +113,12 @@
       </ul>
       <p class="hint" style="margin:10px 0 6px">Base risk class (no active alert):</p>
       <ul class="legend">
-        <li><span class="swatch" style="background:#2E7D5B"></span><div><strong>Low</strong><span class="legend-hint">Score &lt; 0.25</span></div></li>
-        <li><span class="swatch" style="background:#D9A441"></span><div><strong>Moderate</strong><span class="legend-hint">0.25 – 0.50</span></div></li>
-        <li><span class="swatch" style="background:#D9622B"></span><div><strong>High</strong><span class="legend-hint">0.50 – 0.75</span></div></li>
-        <li><span class="swatch" style="background:#C23B3B"></span><div><strong>Very High</strong><span class="legend-hint">&gt; 0.75 — taller columns</span></div></li>
+        <li><span class="swatch" style="background:#2E7D5B"></span><div><strong>Low</strong><span class="legend-hint">Score &lt; 0.578</span></div></li>
+        <li><span class="swatch" style="background:#D9A441"></span><div><strong>Moderate</strong><span class="legend-hint">0.578 – 0.640</span></div></li>
+        <li><span class="swatch" style="background:#D9622B"></span><div><strong>High</strong><span class="legend-hint">0.640 – 0.701</span></div></li>
+        <li><span class="swatch" style="background:#C23B3B"></span><div><strong>Very High</strong><span class="legend-hint">≥ 0.701 — taller columns</span></div></li>
       </ul>
-      <p class="hint" style="margin-top:8px">Column height = flood score. Click any cell for details.</p>
+      <p class="hint" style="margin-top:8px">Column height = susceptibility score. Point results use the rainfall sliders, not the live coastal/river alert map.</p>
       <p class="hint" style="margin-top:10px">
         Streets coloured by risk class appear at zoom ≥ 13.
         <button id="streets-toggle" class="lga-btn" hidden onclick="toggleStreetsLayer()" style="margin-top:6px;width:100%">Hide streets</button>
@@ -132,7 +133,7 @@
         <button id="swmm-toggle" class="lga-btn" hidden onclick="toggleSwmmLayer()" style="margin-top:6px;width:100%">Hide SWMM flood</button>
       </p>
       <p class="hint" style="margin-top:10px">
-        ML flood depth — 100-yr design storm (GBR model, Phase 21).
+        Experimental ML depth — 150 mm rainfall scenario (not a validated return period).
         <span style="display:inline-block;margin-top:4px">
           <span style="color:#FFF176;font-weight:600">■</span> Low (&lt;0.3 m) &nbsp;
           <span style="color:#FF9800;font-weight:600">■</span> Medium (0.3–1 m) &nbsp;
@@ -146,11 +147,11 @@
 
 
     <footer class="api-footer">
-      <span id="api-status" class="mono">connecting…</span>
+      <span id="api-status" class="mono" role="status" aria-live="polite">connecting…</span>
     </footer>
   </aside>
 
-  <main id="map"></main>
+  <main id="map" aria-label="Lagos flood susceptibility map"></main>
 </div>
 
 <!-- map controls overlay -->

@@ -39,7 +39,6 @@ import os
 
 import numpy as np
 from fastapi import APIRouter, HTTPException, Request
-from scipy.spatial import cKDTree
 
 log = logging.getLogger(__name__)
 
@@ -59,7 +58,7 @@ from api.auth import require_dispatch_secret as _check_auth
 # ---------------------------------------------------------------------------
 
 @router.post("/alerts/dispatch")
-def dispatch_alerts(request: Request):
+def dispatch_alerts(request: Request, dry_run: bool = False):
     """
     Compute current alert levels and send SMS to affected subscribers.
 
@@ -111,29 +110,25 @@ def dispatch_alerts(request: Request):
     )
     from floodsight.notifications.sms import send_sms
 
-    try:
-        rainfall_grid = fetch_rainfall_grid()
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=f"Rainfall fetch failed: {exc}") from exc
-
-    imerg_obs  = _try_imerg_observed()
-    gdf, _     = get_grid()
-    cell_rain  = interpolate_to_cells(gdf, rainfall_grid, imerg_obs)
-
-    cell_alerts = [
-        compute_alert_level(rc, r24, r72)
-        for rc, r24, r72 in zip(
-            gdf["risk_class"],
-            cell_rain["rain_24h_mm"],
-            cell_rain["rain_72h_mm"],
-        )
-    ]
+    # One engine for dashboard AND messages, including coastal/dam upgrades.
+    # The previous path passed the (observations, source) tuple as a dict and
+    # omitted those upgrades, so SMS could disagree with the public map.
+    from api.routers.forecast import get_grid_alerts
+    from floodsight.config import PILOT_LAT, PILOT_LON
+    alert_data = get_grid_alerts(PILOT_LAT, PILOT_LON)
+    gdf, _ = get_grid()
+    cell_alerts = alert_data["alert_levels"]
+    if dry_run:
+        return {"dry_run": True, "alert_counts": alert_data["alert_counts"], "highest_alert": alert_data["highest_alert"], "sent": 0}
+    from api.runtime import production
+    if production() and os.getenv("ALERT_DISPATCH_ENABLED", "false").lower() != "true":
+        raise HTTPException(503, "Public SMS dispatch awaits pilot approval. Use dry_run=true to review the forecast.")
 
     # 2. Build KD-tree from grid cell centroids (WGS84 lat/lon)
     gdf_wgs84 = gdf.to_crs("EPSG:4326")
     centroids  = gdf_wgs84.geometry.centroid
     grid_coords = np.column_stack([centroids.y, centroids.x])  # (lat, lon)
-    tree        = cKDTree(grid_coords)
+    cell_positions = {str(cell_id): i for i, cell_id in enumerate(gdf['cell_id'])}
 
     # 2b. Snapshot every Watch/Warning cell to Supabase. This is what
     # recalibration (scripts/recalibrate.py --analyse) compares field
@@ -189,11 +184,18 @@ def dispatch_alerts(request: Request):
     subscriber_detail = []  # per-subscriber outcome for diagnostics
     no_alert_subs     = []  # (sub, sub_id, area) — evaluated for all-clear below
 
-    sub_coords = np.array([[s["lat"], s["lon"]] for s in subscribers])
-    _, nearest_idx = tree.query(sub_coords, k=1)
-
     for i, sub in enumerate(subscribers):
-        level  = cell_alerts[nearest_idx[i]]
+        # Older subscriber records may predate coverage validation.
+        from api.coordinates import validate_location
+        from api.data_provider import nearest_cell
+        try:
+            validate_location(sub["lat"], sub["lon"])
+            cell = nearest_cell(sub["lat"], sub["lon"])
+        except HTTPException:
+            errors += 1
+            subscriber_detail.append({"area": sub.get("area_name"), "outcome": "outside_coverage"})
+            continue
+        level  = cell_alerts[cell_positions[str(cell['cell_id'])]]
         sub_id = str(sub["id"])
         area   = sub.get("area_name") or "Unknown"
 
@@ -214,6 +216,11 @@ def dispatch_alerts(request: Request):
 
         # Send SMS
         try:
+            if production():
+                from floodsight.db.supabase_client import claim_alert
+                if not claim_alert(sub_id, event_date, level):
+                    skipped_dedup += 1
+                    continue
             # Capture the AT recipient record so the messageId can be stored:
             # it is the only key that lets an inbound delivery report be
             # matched back to this alert_log row.
@@ -234,7 +241,7 @@ def dispatch_alerts(request: Request):
                 "level":   level,
                 "outcome": "sent",
             })
-            log.info("Dispatched %s alert to %s (%s)", level, sub["phone"], area)
+            log.info("Dispatched %s alert to subscriber %s", level, sub_id)
         except Exception as exc:
             errors += 1
             subscriber_detail.append({
@@ -242,7 +249,7 @@ def dispatch_alerts(request: Request):
                 "level":   level,
                 "outcome": f"error: {exc}",
             })
-            log.error("SMS failed for %s: %s", sub.get("phone", "?"), exc)
+            log.error("SMS failed for subscriber %s (%s)", sub_id, type(exc).__name__)
 
     # 5. All-clear pass: subscribers whose cell is quiet NOW but who
     # received a Watch/Warning today or yesterday get ONE stand-down SMS
@@ -272,19 +279,26 @@ def dispatch_alerts(request: Request):
         for sub, sub_id, area in no_alert_subs:
             if sub_id in alerted_recently and sub_id not in allclear_today:
                 try:
-                    send_sms(
+                    if production():
+                        from floodsight.db.supabase_client import claim_alert
+                        if not claim_alert(sub_id, event_date, "All Clear"):
+                            skipped_dedup += 1
+                            continue
+                    recipient = send_sms(
                         to_number   = sub["phone"],
                         alert_level = "All Clear",
                         area_name   = area,
                     )
-                    log_alert_sent(sub_id, "All Clear", event_date)
+                    log_alert_sent(sub_id, "All Clear", event_date,
+                        at_message_id=(recipient or {}).get("messageId"),
+                        at_status=(recipient or {}).get("status"))
                     all_clear_sent += 1
                     subscriber_detail.append({
                         "area":    area,
                         "level":   "All Clear",
                         "outcome": "all_clear_sent",
                     })
-                    log.info("All-clear sent to %s (%s)", sub["phone"], area)
+                    log.info("Threshold stand-down sent to subscriber %s", sub_id)
                 except Exception as exc:
                     errors += 1
                     subscriber_detail.append({
@@ -292,7 +306,7 @@ def dispatch_alerts(request: Request):
                         "level":   "All Clear",
                         "outcome": f"error: {exc}",
                     })
-                    log.error("All-clear SMS failed for %s: %s", sub.get("phone", "?"), exc)
+                    log.error("Threshold stand-down failed for subscriber %s (%s)", sub_id, type(exc).__name__)
             else:
                 skipped_no_alert += 1
                 subscriber_detail.append({
@@ -348,6 +362,10 @@ def test_sms(phone: str, request: Request):
     from floodsight.notifications.sms import send_sms
     import os
 
+    from api.runtime import production
+    if production() and phone not in {p.strip() for p in os.getenv("APPROVED_TEST_PHONES", "").split(",") if p.strip()}:
+        raise HTTPException(403, "Test messages are restricted to approved pilot numbers.")
+
     username = os.getenv("AT_USERNAME", "").strip()
     if not username:
         raise HTTPException(status_code=503, detail="AT_USERNAME not set in environment.")
@@ -384,6 +402,10 @@ def dispatch_force(request: Request):
         {"dispatched": 3, "errors": 0, "subscribers": 3, "note": "force-send; no dedup log written"}
     """
     _check_auth(request)
+
+    from api.runtime import production
+    if production():
+        raise HTTPException(403, "Bulk forced test messages are disabled in production.")
 
     from floodsight.db.supabase_client import get_active_subscribers
     from floodsight.notifications.sms import send_sms

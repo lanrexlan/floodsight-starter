@@ -1,0 +1,84 @@
+{
+  "status": "experimental",
+  "observed_events": [
+    "lekki_2021_07_12",
+    "lekki_2024_07_03"
+  ],
+  "observed_rows": 616,
+  "unknown_rows": 0,
+  "folds": [
+    {
+      "held_out_event": "lekki_2021_07_12",
+      "strategy": "observed_only",
+      "train_rows": 527,
+      "observed_test_rows": 89,
+      "model": {
+        "mae_m": 0.11342369902256637,
+        "rmse_m": 0.16310284280306522,
+        "r2": -5.287632393708894,
+        "n": 89
+      },
+      "baseline": {
+        "mae_m": 0.13928998859402145,
+        "rmse_m": 0.1489381980369039,
+        "r2": -4.242956708386381,
+        "n": 89
+      }
+    },
+    {
+      "held_out_event": "lekki_2021_07_12",
+      "strategy": "with_augmentation",
+      "train_rows": 2447,
+      "observed_test_rows": 89,
+      "model": {
+        "mae_m": 0.19145699880589825,
+        "rmse_m": 0.25327748047522997,
+        "r2": -14.162025966970688,
+        "n": 89
+      },
+      "baseline": {
+        "mae_m": 0.5027930481685048,
+        "rmse_m": 0.5069830175174327,
+        "r2": -59.75064669160353,
+        "n": 89
+      }
+    },
+    {
+      "held_out_event": "lekki_2024_07_03",
+      "strategy": "observed_only",
+      "train_rows": 89,
+      "observed_test_rows": 527,
+      "model": {
+        "mae_m": 0.1659368888467535,
+        "rmse_m": 0.27420045062823145,
+        "r2": -0.38636345027710295,
+        "n": 527
+      },
+      "baseline": {
+        "mae_m": 0.16098103763204136,
+        "rmse_m": 0.268671000521701,
+        "r2": -0.3310131834458867,
+        "n": 527
+      }
+    },
+    {
+      "held_out_event": "lekki_2024_07_03",
+      "strategy": "with_augmentation",
+      "train_rows": 2009,
+      "observed_test_rows": 527,
+      "model": {
+        "mae_m": 0.28595438944647433,
+        "rmse_m": 0.3359895540047485,
+        "r2": -1.0815762419137624,
+        "n": 527
+      },
+      "baseline": {
+        "mae_m": 0.47155192824537634,
+        "rmse_m": 0.5007300364215739,
+        "r2": -3.6232572433665027,
+        "n": 527
+      }
+    }
+  ],
+  "launch_evidence": "Additional independent flood AND non-flood observations, location holdouts, and prospective alert lead-time/false-alarm measurements required."
+}

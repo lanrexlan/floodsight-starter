@@ -280,27 +280,26 @@
         <td><a href="https://supabase.com" target="_blank" rel="noopener">Supabase</a></td>
         <td>Database hosting</td>
         <td>All subscriber fields listed in Section 2</td>
-        <td>EU West (Ireland) — encrypted at rest and in transit</td>
+        <td>Deployment region selected by the operator; confirm the region and transfer arrangements before the public pilot</td>
       </tr>
     </tbody>
   </table>
 
-  <p>No other third parties receive your personal data. We never sell subscriber data.</p>
+  <p>Your browser also contacts map and font providers (CARTO, OpenStreetMap services, and Google Fonts), which receive technical information such as your IP address and map requests. Area search runs within FloodSight. We do not sell subscriber data.</p>
 
-  <h2>6. Your Rights Under the NDPR</h2>
+  <h2>6. Your Data Protection Rights</h2>
   <p>You have the following rights regarding your personal data:</p>
   <ul>
     <li>
       <strong>Right to unsubscribe / withdraw consent</strong> — Reply <strong>STOP</strong>
-      to any alert SMS at any time. This immediately deactivates your subscription and
-      stops all future messages.
+      to any alert SMS at any time. When the configured inbound SMS service receives your reply, it deactivates your subscription. Messages already handed to the network may still arrive. If STOP does not work, contact the address below.
     </li>
     <li>
       <strong>Right of access</strong> — Request a copy of the data we hold about you
       by emailing <a href="mailto:ahadegok@asu.edu">ahadegok@asu.edu</a>.
     </li>
     <li>
-      <strong>Right to rectification</strong> — Re-subscribe with corrected information
+      <strong>Right to rectification</strong> — Re-subscribe with corrected information and confirm the code sent to your phone
       (your phone number is the unique key; resubscribing updates your record).
     </li>
     <li>
@@ -317,26 +316,22 @@
   <h2>7. Data Retention</h2>
   <p>
     We retain your subscriber record for as long as your subscription is active.
-    If your subscription has been inactive (no alerts sent) for <strong>12 consecutive months</strong>,
-    your record is automatically deactivated and marked for deletion. Full deletion
-    occurs within 30 days of deactivation.
+    After you unsubscribe, your record is scheduled for deletion after <strong>30 days</strong>.
+    Operators run the documented daily cleanup task. A quiet weather period alone does not deactivate your subscription.
   </p>
   <p>
-    Alert log records (which track that a message was sent, without repeating your
-    personal data) are retained for 24 months to support system audit and validation.
+    Message logs linked to your subscriber record are retained for up to 24 months and deleted with that record. Prediction logs are retained for 90 days; verification reports for up to 24 months. These records may contain location or reporter details and are restricted to authorized operators.
   </p>
 
   <h2>8. Security</h2>
   <p>
     All subscriber data is stored in an encrypted PostgreSQL database (Supabase,
-    hosted in EU West / Ireland). Access is restricted to the FloodSight API using
+    hosted in the configured deployment region). Access is restricted to the FloodSight API using
     a service-role key with row-level security enabled. Your phone number and
     location are never exposed via any public API endpoint.
   </p>
   <p>
-    The only time your phone number leaves our database is when we instruct
-    Africa's Talking to deliver an alert SMS — and only the phone number and
-    message text are transmitted, nothing else.
+    Africa's Talking receives your phone number and message text for SMS delivery. Infrastructure providers process operational records under the operator's access and retention controls.
   </p>
 
   <h2>9. Children</h2>

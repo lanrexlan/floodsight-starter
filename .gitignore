@@ -16,6 +16,7 @@ data/processed/**
 # rather than requiring a Render deploy to regenerate the whole
 # pipeline from scratch.
 !data/processed/scored_grid.gpkg
+!data/processed/lga_index.json
 # Exception: street-level risk layer — served by /risk/streets
 !data/processed/streets_risk.gpkg
 # Exception: real labeled training dataset — hard to regenerate (requires
@@ -41,6 +42,10 @@ data/models/**
 data/logs/
 
 .pytest_cache/
+.release-venv/
+.test-tmp*/
+data/processed/web/
+reports/depth_candidate.joblib
 .DS_Store
 
 # Intermediate/temporary files — never commit

@@ -38,7 +38,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends
 
 from api.auth import has_dispatch_secret, require_verify_secret
 from api.schemas import VerifyRequest, VerifyResponse
@@ -62,6 +62,8 @@ def _load_entries() -> tuple[list[dict], str]:
     except Exception as exc:
         log.warning("Supabase verifications read failed (%s) — JSONL fallback", exc)
 
+    from api.runtime import require_durable_storage
+    require_durable_storage()
     if not VERIFICATIONS_LOG.exists():
         return [], "local_jsonl"
     lines = VERIFICATIONS_LOG.read_text(encoding="utf-8").splitlines()
@@ -109,6 +111,8 @@ def store_verification(
         log.error("Supabase verification insert failed (%s) — JSONL fallback", exc)
 
     if not stored:
+        from api.runtime import require_durable_storage
+        require_durable_storage()
         LOGS_DIR.mkdir(parents=True, exist_ok=True)
         with open(VERIFICATIONS_LOG, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry) + "\n")
@@ -120,7 +124,7 @@ def store_verification(
     return entry
 
 
-@router.post("", response_model=VerifyResponse)
+@router.post("", response_model=VerifyResponse, dependencies=[Depends(require_verify_secret)])
 def submit_verification(req: VerifyRequest, request: Request):
     """Record a field verification report for a location after a flood event."""
     require_verify_secret(request)
@@ -128,7 +132,7 @@ def submit_verification(req: VerifyRequest, request: Request):
     entry = store_verification(
         lat=req.lat,
         lon=req.lon,
-        event_date=req.event_date,
+        event_date=req.event_date.isoformat(),
         observed_flooded=req.observed_flooded,
         observed_depth_m=req.observed_depth_m,
         reporter=req.reporter,

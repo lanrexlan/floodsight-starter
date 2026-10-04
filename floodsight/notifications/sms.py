@@ -78,8 +78,8 @@ def _build_message(alert_level: str, area_name: str | None) -> str:
         head   = f"FloodSight ALERT: Flood Warning for {area}."
         detail = " Avoid low roads. Move to higher ground if needed."
     elif alert_level == "All Clear":
-        head   = f"FloodSight: All clear for {area}."
-        detail = " Flood alert has ended. Stay careful near drains and canals."
+        head   = f"FloodSight: All clear threshold status for {area}."
+        detail = " Flooding can still occur. Avoid flooded roads."
     else:  # Watch
         head   = f"FloodSight: Flood Watch for {area}."
         detail = " Heavy rain expected - avoid flood-prone streets."
