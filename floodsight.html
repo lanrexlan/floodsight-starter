@@ -987,12 +987,12 @@ footer {
 
         <div class="sub-field">
           <label for="sub-phone">Phone number <span style="color:var(--red)">*</span></label>
-          <input type="tel" id="sub-phone" placeholder="e.g. 08012345678 or +2348012345678"
+          <input type="tel" id="sub-phone" autocomplete="tel" placeholder="e.g. 08012345678 or +2348012345678"
                  oninput="subCheckReady()" />
         </div>
 
         <div class="sub-field">
-          <label>Your location <span style="color:var(--red)">*</span></label>
+          <label for="sub-area">Your location <span style="color:var(--red)">*</span></label>
           <div class="sub-location-row">
             <input type="text" id="sub-area" placeholder="Type an LGA, or use GPS…"
                    oninput="subGeocode(this.value)" />
@@ -1000,6 +1000,7 @@ footer {
               📍 Locate me
             </button>
           </div>
+          <ul id="sub-places" aria-label="Choose an LGA centre" hidden></ul>
         </div>
 
         <p class="sub-note">Typing an LGA selects its area centre, not your address. Use GPS for your current location, and confirm the selected location before subscribing. GPS coordinates are stored with your subscription.</p>
@@ -1019,7 +1020,14 @@ footer {
           Subscribe to flood alerts
         </button>
 
-        <div class="sub-status" id="sub-status"></div>
+        <div id="sub-otp-panel" class="sub-field" hidden>
+          <label for="sub-code">Six-digit SMS confirmation code</label>
+          <input id="sub-code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" aria-describedby="sub-status" />
+          <button id="sub-confirm" type="button" onclick="subConfirmCode()">Confirm phone number</button>
+          <button id="sub-cancel" type="button" onclick="subCancelConfirmation()">Cancel confirmation</button>
+          <p class="sub-note">Not active until confirmed. To request a new code, cancel and subscribe again; rate limits apply.</p>
+        </div>
+        <div class="sub-status" id="sub-status" role="status" aria-live="polite"></div>
         <p class="sub-note">
           Alerts sent only during active Watch or Warning events.
           Reply STOP at any time to opt out.
@@ -1340,163 +1348,8 @@ setInterval(loadLiveConditions, LIVE_REFRESH_MS);
 // ═══════════════════════════════════════════════════════════════════
 // Phase 16 — Subscription form
 // ═══════════════════════════════════════════════════════════════════
-let _subLat = null, _subLon = null, _subGeoTimer = null;
-
-const RISK_COLORS_SUB = {
-  'Very High': '#f87171',
-  'High':      '#fb923c',
-  'Moderate':  '#fbbf24',
-  'Low':       '#34d399',
-};
-
-function subCheckReady() {
-  const phone   = document.getElementById('sub-phone').value.trim();
-  const consent = document.getElementById('sub-consent').checked;
-  const ready   = phone.length >= 7 && _subLat !== null && consent;
-  document.getElementById('sub-submit').disabled = !ready;
-}
-
-function subSetLocation(lat, lon, areaLabel) {
-  _subLat = lat;
-  _subLon = lon;
-  document.getElementById('sub-area').value = areaLabel;
-  subCheckReady();
-  // Fetch risk class for this location
-  fetch(`${API}/risk/point?lat=${lat}&lon=${lon}`)
-    .then(r => r.json())
-    .then(d => {
-      const rc    = d.risk_class || 'Unknown';
-      const color = RISK_COLORS_SUB[rc] || '#aaa';
-      document.getElementById('sub-risk-preview').innerHTML =
-        `Baseline flood risk for this location: <strong style="color:${color}">${escapeHTML(rc)}</strong>`;
-      subCheckReady();
-    })
-    .catch(() => {
-      document.getElementById('sub-risk-preview').textContent = '';
-    });
-}
-
-// Geocode typed area name (debounced 600 ms)
-function subGeocode(query) {
-  _subLat = null; _subLon = null;
-  document.getElementById('sub-risk-preview').textContent = '';
-  subCheckReady();
-  clearTimeout(_subGeoTimer);
-  if (query.trim().length < 3) return;
-  _subGeoTimer = setTimeout(() => {
-    const url = `${API}/places/search?q=${encodeURIComponent(query)}`;
-    fetch(url)
-      .then(r => r.json())
-      .then(results => {
-        if (results && results.length > 0) {
-          const { lat, lon, display_name } = results[0];
-          subSetLocation(parseFloat(lat), parseFloat(lon), display_name.split(',').slice(0,2).join(', '));
-        }
-      })
-      .catch(() => {});
-  }, 600);
-}
-
-// Use browser GPS
-function subUseMyLocation() {
-  if (!navigator.geolocation) {
-    alert('Geolocation is not supported by your browser.');
-    return;
-  }
-  const btn = document.querySelector('.btn-locate');
-  btn.textContent = 'Locating…';
-  btn.disabled = true;
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      btn.textContent = '📍 Locate me';
-      btn.disabled = false;
-      const lat = pos.coords.latitude, lon = pos.coords.longitude;
-      // Reverse geocode for a human label
-      fetch(`${API}/places/reverse?lat=${lat}&lon=${lon}`)
-        .then(r => r.json())
-        .then(d => {
-          const a = d.address || {};
-          const label = a.neighbourhood || a.suburb || a.city_district || a.town || d.display_name.split(',')[0];
-          subSetLocation(lat, lon, label);
-        })
-        .catch(() => subSetLocation(lat, lon, `${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E`));
-    },
-    (err) => {
-      btn.textContent = '📍 Locate me';
-      btn.disabled = false;
-      alert('Could not get your location. Please type your area instead.');
-    },
-    { timeout: 10000 }
-  );
-}
-
-async function submitSubscription() {
-  const phone    = document.getElementById('sub-phone').value.trim();
-  const name     = document.getElementById('sub-name').value.trim();
-  const areaName = document.getElementById('sub-area').value.trim();
-  const statusEl = document.getElementById('sub-status');
-  const submitBtn= document.getElementById('sub-submit');
-
-  if (!phone || _subLat === null || !document.getElementById('sub-consent').checked) return;
-
-  submitBtn.disabled = true;
-  submitBtn.textContent = 'Subscribing…';
-  statusEl.className = 'sub-status';
-  statusEl.style.display = 'none';
-
-  try {
-    const res = await fetch(`${API}/subscribe`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        phone, name: name || null,
-        lat: _subLat, lon: _subLon,
-        area_name: areaName || null,
-        consent: true,
-      }),
-    });
-    let data = await res.json();
-    if (data.status === 'pending_confirmation') {
-      const code = window.prompt('Enter the six-digit code sent to your phone:');
-      if (!code) throw new Error('Phone confirmation was not completed. Your subscription is not active.');
-      const confirmed = await fetch(`${API}/subscribe/confirm`, {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({phone: data.phone, code})
-      });
-      data = await confirmed.json();
-      if (!confirmed.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Could not confirm phone number.');
-    }
-
-    if (!res.ok) {
-      throw new Error(data.detail || `Error ${res.status}`);
-    }
-
-    const rc    = data.risk_class || '';
-    const area  = data.area_name  || areaName || 'your area';
-    const color = RISK_COLORS_SUB[rc] || '#4fc3f7';
-    statusEl.innerHTML =
-      `✓ Subscribed! Your area (<strong>${escapeHTML(area)}</strong>) has ` +
-      `<strong style="color:${color}">${escapeHTML(rc || 'unknown')}</strong> baseline flood risk. ` +
-      `You’ll receive an SMS when a Watch or Warning is issued for your location.`;
-    statusEl.className = 'sub-status success';
-
-    // Reset form
-    document.getElementById('sub-phone').value   = '';
-    document.getElementById('sub-name').value    = '';
-    document.getElementById('sub-area').value    = '';
-    document.getElementById('sub-consent').checked = false;
-    document.getElementById('sub-risk-preview').textContent = '';
-    _subLat = null; _subLon = null;
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Subscribe to flood alerts';
-
-  } catch (err) {
-    statusEl.textContent = `✗ ${err.message || 'Could not subscribe. Please try again.'}`;
-    statusEl.className = 'sub-status error';
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Subscribe to flood alerts';
-  }
-}
+// Subscription behavior is maintained in dashboard/subscription.js.
 </script>
+<script src="dashboard/subscription.js"></script>
 </body>
 </html>

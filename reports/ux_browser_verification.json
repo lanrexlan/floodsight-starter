@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-05",
+  "status": "passed",
+  "browser": "Headless Chromium-compatible browser",
+  "scope": "Local pages; API, SMS, database and map renderer mocked; external requests blocked",
+  "checks": [
+    "Scenario refresh and deliberate return to live",
+    "Keyboard LGA selection and location result",
+    "Dashboard 390px viewport has no horizontal overflow",
+    "Explicit location, inline OTP, wrong-code retry without another SMS request",
+    "Signup 390px viewport has no horizontal overflow",
+    "Inline operator access and token clearing",
+    "Unavailable map dependency explicitly disables unsupported controls"
+  ],
+  "limitations": [
+    "Not actual map rendering or target-device acceptance",
+    "Not load, live SMS, backup restoration or scientific approval"
+  ]
+}

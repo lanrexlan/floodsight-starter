@@ -521,3 +521,8 @@ input[type="range"] {
   transition: transform 0.15s;
 }
 .query-dot:hover { transform: scale(1.2); }
+
+[hidden] { display: none !important; }
+.result-item[aria-selected="true"] { background: #19384b; outline: 2px solid #90caf9; }
+.api-footer .lga-btn { margin: 8px 0; }
+.api-footer a { color: #90caf9; }

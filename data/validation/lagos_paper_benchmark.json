@@ -1,0 +1,82 @@
+{
+  "status": "selected_published_model_summaries_research_only",
+  "review_date": "2026-10-05",
+  "source": {
+    "doi": "10.1038/s41598-026-38544-1",
+    "url": "https://www.nature.com/articles/s41598-026-38544-1",
+    "full_text": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12960691/",
+    "authors": "Aniramu, Iyanda and Orimoogunje",
+    "year": 2026,
+    "article_license": "CC BY-NC-ND 4.0",
+    "commercial_training_or_redistribution_permission": "not_acquired; underlying-data sharing declined; public-source rights require separate assessment",
+    "corresponding_author": "Opeyemi Aniramu",
+    "contact": "samuelaniramu@gmail.com",
+    "contact_source": "https://www.nature.com/articles/s41598-026-38544-1#author-information"
+  },
+  "extraction": "Selected factual numerical values transcribed from Tables 6-8; NOT underlying observations or complete results",
+  "table_7": {
+    "label_type": "scenario_forcing_and_simulated_basin_outputs",
+    "units": {"peak_discharge": "m3/s", "rainfall": "mm", "loss": "mm", "excess": "mm", "impervious": "%"},
+    "columns": ["subbasin", "peak_discharge", "rainfall", "loss", "excess", "impervious"],
+    "rows": [
+      [1, 12.5, 605.5, 107.33, 498.17, 87.2],
+      [2, 7.0, 605.5, 107.00, 498.01, 87.1],
+      [3, 4.2, 605.5, 105.98, 499.52, 88.5],
+      [4, 4.5, 605.5, 107.38, 498.12, 87.2],
+      [5, 0.4, 605.5, 107.10, 498.49, 87.5],
+      [6, 5.8, 605.5, 106.04, 499.46, 88.5],
+      [7, 1.5, 605.5, 106.31, 499.19, 88.2]
+    ]
+  },
+  "table_6_sink": {
+    "label_type": "simulated_catchment_summary",
+    "drainage_area_km2": 100.2,
+    "peak_discharge_m3_s": 35.9,
+    "runoff_volume_equivalent_mm": 498.50,
+    "published_peak_timestamp": "2023-06-24T01:00:00",
+    "timestamp_timezone": "not_established_from_table; not an observed depth timestamp"
+  },
+  "table_7_performance": {
+    "quantity": "discharge",
+    "computation_point": "sink",
+    "rmse_m3_s": 12.65,
+    "nse": 0.79,
+    "bias_pct": 14.97,
+    "r_squared": 0.80,
+    "meaning": "Authors' model performance; NOT FloodSight scores or depth errors"
+  },
+  "table_8": {
+    "label_type": "modeled_extent_scenario_summary",
+    "area_unit": "ha",
+    "columns": ["class", "maximum_affected_area", "mean_affected_area", "total_area_affected", "duration_as_published"],
+    "rows": [
+      ["Low", 46018.18, 17.18, 71552.6, "<12 h"],
+      ["Moderate", 103665.78, 20.15, 125218.43, "12-24 h"],
+      ["High", 211230.22, 86.4, 280578.01, "30 days"]
+    ]
+  },
+  "observed_depth_rows": [],
+  "usable_for_depth_training": false,
+  "usable_for_independent_depth_acceptance": false,
+  "depth_release_approved": false,
+  "author_contacted": true,
+  "underlying_data_request": {
+    "status": "sharing_declined",
+    "status_recorded_on": "2026-10-05",
+    "evidence": "Owner-provided author reply; email account not accessed",
+    "reasons": [
+      "Institutional and ethical restrictions on commercial data sharing",
+      "Third-party agreements prohibiting redistribution",
+      "Confidential ongoing research and publication commitments"
+    ],
+    "underlying_data_acquired": false,
+    "reuse_permission_acquired": false
+  },
+  "limitations": [
+    "No measured-depth records paired with site and observation time in this intake",
+    "Basin runoff expressed in mm is not street inundation depth",
+    "No common catchment, storm forcing or paired outcomes established with FloodSight",
+    "Original observations, spatial model files and validation split details have not been acquired",
+    "Commercial product incorporation and adapted-map redistribution require a separate rights assessment"
+  ]
+}

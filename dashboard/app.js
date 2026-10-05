@@ -52,6 +52,8 @@ function applySliderAlerts() {
   let warn = 0, watch = 0;
   _cachedGeojson.features.forEach(feat => {
     const level = computeAlertLevel(feat.properties.risk_class, rain24, rain72);
+    feat.properties.forecast_rain_24h_mm = rain24;
+    feat.properties.forecast_rain_72h_mm = rain72;
     if (level !== "No Alert") { feat.properties.alert_level = level; }
     else { delete feat.properties.alert_level; }
     if (level === "Warning") warn++;
@@ -59,6 +61,9 @@ function applySliderAlerts() {
   });
   map.getSource("risk-grid")?.setData(_cachedGeojson);
   updateCityAlert(warn, watch, {});
+  const banner = document.getElementById("city-alert");
+  banner.hidden = false;
+  banner.textContent = `Scenario only · ${warn} Warning cells · ${watch} Watch cells. Not a live warning.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -69,6 +74,55 @@ const REFRESH_INTERVAL_MS = 30 * 60 * 1000;
 let _nextRefreshAt  = null;
 let _countdownTimer = null;
 let _cachedGeojson  = null;   // geometry cached after first load
+let _liveAlerts = null;
+let _scenarioMode = false;
+let _refreshing = false;
+let _configReady = false;
+let _forecastStale = false;
+
+function showMapMode() {
+  document.getElementById("map-mode").textContent = _scenarioMode
+    ? "SCENARIO map — hypothetical rainfall, not a live warning."
+    : _liveAlerts ? (_forecastStale ? "STALE forecast map — freshness not confirmed. Check the status below." : "Live forecast alert map — check the update time below.")
+    : "STATIC susceptibility map — no live alert information.";
+  document.getElementById("reset-forecast").hidden = !_scenarioMode;
+}
+
+function applyLiveAlerts(data) {
+  if (!_cachedGeojson || !Array.isArray(data.alert_levels) ||
+      data.alert_levels.length !== _cachedGeojson.features.length ||
+      data.alert_levels.some(level => !["No Alert", "Watch", "Warning"].includes(level))) {
+    throw new Error("Grid/alert data do not match; refusing partial map update");
+  }
+  if (!data.forecast || !['rain_24h_mm', 'rain_72h_mm'].every(key =>
+      Number.isFinite(data.forecast[key]) && data.forecast[key] >= 0)) {
+    throw new Error('Forecast rainfall unavailable; refusing live alert display');
+  }
+  _liveAlerts = data;
+  if (_scenarioMode) { applySliderAlerts(); showMapMode(); return; }
+  _cachedGeojson.features.forEach((feat, i) => {
+    feat.properties.alert_level = data.alert_levels[i];
+    feat.properties.forecast_rain_24h_mm = data.forecast?.rain_24h_mm;
+    feat.properties.forecast_rain_72h_mm = data.forecast?.rain_72h_mm;
+  });
+  map.getSource("risk-grid")?.setData(_cachedGeojson);
+  if (data.forecast) updateForecastSliders(data.forecast);
+  updateCityAlert(data.alert_levels.filter(level => level === 'Warning').length,
+    data.alert_levels.filter(level => level === 'Watch').length, data.lga_alerts || {});
+  showMapMode();
+}
+
+document.getElementById("reset-forecast").addEventListener("click", () => {
+  _scenarioMode = false;
+  if (_liveAlerts) applyLiveAlerts(_liveAlerts);
+  else {
+    _cachedGeojson?.features.forEach(feat => delete feat.properties.alert_level);
+    if (_cachedGeojson) map.getSource('risk-grid')?.setData(_cachedGeojson);
+    document.getElementById('city-alert').textContent = 'Live alerts unavailable — static susceptibility only.';
+    setBeacon('Unavailable'); showMapMode();
+  }
+  invalidatePointResult();
+});
 
 // Alert colors override risk colors when forecasts fire
 const ALERT_COLORS = {
@@ -113,13 +167,15 @@ setTimeout(() => {
 let queryMarker = null;
 
 map.on("load", () => {
+  window.floodsightMapReady = true;
+  document.getElementById("refresh-forecast").disabled = false;
   loadForecastGrid();   // live alert colours + auto-populates sliders
 
   // Re-fetch alerts every 30 min without touching the heavy grid geometry
   setInterval(refreshAlerts, REFRESH_INTERVAL_MS);
 
   // Click the status bar to refresh immediately
-  document.getElementById("api-status").addEventListener("click", refreshAlerts);
+  document.getElementById("refresh-forecast").addEventListener("click", refreshAlerts);
 });
 
 // ---------------------------------------------------------------------------
@@ -145,6 +201,7 @@ async function loadForecastGrid() {
 
     // Merge compact alert_levels into grid features (same order guaranteed)
     const levels = alertData.alert_levels || [];
+    if (levels.length !== geojson.features.length) throw new Error("Grid/alert mismatch");
     (geojson.features || []).forEach((feat, i) => {
       const level = levels[i];
       if (level && level !== "No Alert") {
@@ -161,22 +218,17 @@ async function loadForecastGrid() {
 
     _cachedGeojson = geojson;   // cache for lightweight alert refreshes
     applyGridLayers(geojson);
+    applyLiveAlerts(alertData);
 
-    if (geojson.forecast) {
-      updateForecastSliders(geojson.forecast);
-    }
-
-    const counts    = alertData.alert_counts || {};
-    const lgaAlerts = alertData.lga_alerts  || {};
-    updateCityAlert(counts.Warning || 0, counts.Watch || 0, lgaAlerts);
-
+    _forecastStale = false;
+    showMapMode();
     showDataSourceBanner(geojson.data_source);
     setApiStatus(true, alertData.forecast?.fetched_at);
     wireMapClick();
   } catch (err) {
     console.warn("Forecast grid unavailable, falling back to static risk grid:", err);
-    loadRiskGrid();
-    loadForecastRainfall();
+    await loadRiskGrid();
+    if (!_scenarioMode) await loadForecastRainfall();
   }
 }
 
@@ -184,6 +236,7 @@ async function syncProductConfig() {
   const response = await fetch(`${API_BASE_URL}/product-status`);
   if (!response.ok) throw new Error("Product configuration unavailable");
   const config = await response.json();
+  if (!config.alert_thresholds || !config.risk_breaks) throw new Error('Incomplete product configuration');
   Object.assign(ALERT_THRESHOLDS, config.alert_thresholds);
   document.querySelectorAll('.legend li').forEach(li => {
     const label = li.querySelector('strong')?.textContent;
@@ -192,6 +245,10 @@ async function syncProductConfig() {
   });
   const depthButton = document.getElementById('ml-depth-toggle');
   if (depthButton) depthButton.hidden = !config.experimental_depth_enabled;
+  document.getElementById('depth-description').parentElement.hidden = !config.experimental_depth_enabled;
+  _configReady = true;
+  document.getElementById('rain24').disabled = false;
+  document.getElementById('rain72').disabled = false;
 }
 
 // ---------------------------------------------------------------------------
@@ -205,6 +262,12 @@ async function loadRiskGrid() {
 
     _cachedGeojson = geojson;   // cache so sliders work on fallback path too
     applyGridLayers(geojson);
+    _liveAlerts = null;
+    showMapMode();
+    const banner = document.getElementById("city-alert");
+    banner.hidden = false;
+    banner.textContent = "Live alerts unavailable — showing static susceptibility, not a current flood warning.";
+    setBeacon("Unavailable");
     showDataSourceBanner(geojson.data_source);
     setApiStatus(true);
     wireMapClick();
@@ -220,41 +283,34 @@ async function loadRiskGrid() {
 // grid GeoJSON.  Called on 30-min timer and on manual status-bar click.
 // ---------------------------------------------------------------------------
 async function refreshAlerts() {
+  if (_refreshing) return;
+  _refreshing = true;
+  document.getElementById("refresh-forecast").disabled = true;
   const statusEl = document.getElementById("api-status");
+  clearInterval(_countdownTimer);
   statusEl.textContent = "Refreshing…";
   try {
     const alertRes = await fetch(`${API_BASE_URL}/forecast/alerts`);
     if (!alertRes.ok) throw new Error(`HTTP ${alertRes.status}`);
     const alertData = await alertRes.json();
 
-    // Update cached geojson alert properties and push to map
-    if (_cachedGeojson) {
-      const levels = alertData.alert_levels || [];
-      const fc     = alertData.forecast || {};
-      _cachedGeojson.features.forEach((feat, i) => {
-        const level = levels[i];
-        if (level && level !== "No Alert") { feat.properties.alert_level = level; }
-        else { delete feat.properties.alert_level; }
-        feat.properties.forecast_rain_24h_mm   = fc.rain_24h_mm  ?? 0;
-        feat.properties.forecast_rain_72h_mm   = fc.rain_72h_mm  ?? 0;
-      });
-      map.getSource("risk-grid")?.setData(_cachedGeojson);
-    }
-
-    const counts    = alertData.alert_counts || {};
-    const lgaAlerts = alertData.lga_alerts   || {};
-    updateCityAlert(counts.Warning || 0, counts.Watch || 0, lgaAlerts);
-
-    // Don't reset sliders if user has manually adjusted them
-    const _badge = document.getElementById("forecast-badge");
-    if (alertData.forecast && !(_badge?.dataset.manual)) {
-      updateForecastSliders(alertData.forecast);
-    }
+    if (!_configReady) await syncProductConfig();
+    if (!_cachedGeojson) { await loadForecastGrid(); return; }
+    applyLiveAlerts(alertData);
+    _forecastStale = false;
+    showMapMode();
 
     setApiStatus(true, alertData.forecast?.fetched_at);
   } catch (err) {
     console.warn("Alert refresh failed:", err);
-    statusEl.textContent = "Refresh failed — click to retry";
+    statusEl.classList.remove("ok");
+    _forecastStale = true;
+    statusEl.classList.add("err");
+    statusEl.textContent = "Refresh failed — displayed forecast may be stale. Use Refresh forecast to retry.";
+    if (!_scenarioMode) document.getElementById("map-mode").textContent = "STALE forecast map — not confirmed current. Refresh failed.";
+  } finally {
+    _refreshing = false;
+    document.getElementById("refresh-forecast").disabled = false;
   }
 }
 
@@ -333,8 +389,8 @@ function applyGridLayers(geojson) {
 // Static fallback area names — used when the API doesn't return lga_alerts
 // (e.g. boundary file unavailable on server).  Reflects the known risk
 // distribution from the Phase 13 calibration run.
-const WATCH_AREAS = "Alimosho, Kosofe, Mushin, Oshodi-Isolo";
-const WARN_AREAS  = "Kosofe, Alimosho, Eti-Osa, Lagos Island";
+const WATCH_AREAS = "mapped areas (area breakdown unavailable)";
+const WARN_AREAS  = "mapped areas (area breakdown unavailable)";
 
 function _lgaText(lgaAlerts, fallback, n) {
   const names = Object.keys(lgaAlerts || {}).slice(0, n);
@@ -346,7 +402,9 @@ function updateCityAlert(warnCount, watchCount, lgaAlerts) {
   if (!el) return;
 
   if (warnCount === 0 && watchCount === 0) {
-    el.hidden = true;
+    el.hidden = false;
+    el.textContent = 'No current rule alert — flooding is still possible. This is not an all-clear.';
+    el.dataset.level = 'No Alert';
     setBeacon("No Alert");
     return;
   }
@@ -356,7 +414,7 @@ function updateCityAlert(warnCount, watchCount, lgaAlerts) {
   if (warnCount > 0) {
     level = "Warning";
     const areas = _lgaText(lgaAlerts, WARN_AREAS, 3);
-    msg = `Flood warning — most affected: ${areas}`;
+    msg = `Forecast rule warning — ${areas}`;
     if (watchCount > 0) msg += ` (+ watch in other areas)`;
   } else {
     level = "Watch";
@@ -408,11 +466,29 @@ async function reverseGeocode(lat, lon) {
 // ---------------------------------------------------------------------------
 // Query point — risk + alert for clicked/searched location
 // ---------------------------------------------------------------------------
+let _pointRequest = 0;
+function invalidatePointResult() {
+  _pointRequest++;
+  document.getElementById("result-panel").hidden = true;
+  document.getElementById("result-panel").setAttribute("aria-busy", "false");
+  document.getElementById("alert-nudge").hidden = true;
+  if (queryMarker) queryMarker.remove();
+}
+
 async function queryPoint(lat, lon, locationName) {
+  const request = ++_pointRequest;
+  const panel = document.getElementById("result-panel");
+  panel.hidden = false;
+  panel.setAttribute("aria-busy", "true");
+  document.getElementById("result-location").textContent = "Checking selected location…";
+  document.getElementById("alert-nudge").hidden = true;
+  for (const id of ["result-risk", "result-alert", "result-elev", "result-score"]) document.getElementById(id).textContent = "—";
+  if (queryMarker) queryMarker.remove();
   const rain24 = Number(document.getElementById("rain24").value);
   const rain72 = Number(document.getElementById("rain72").value);
 
   if (!locationName) locationName = await reverseGeocode(lat, lon);
+  if (request !== _pointRequest) return;
 
   try {
     const [riskRes, alertRes] = await Promise.all([
@@ -426,6 +502,7 @@ async function queryPoint(lat, lon, locationName) {
     if (!riskRes.ok || !alertRes.ok) throw new Error("API error");
     const risk  = await riskRes.json();
     const alert = await alertRes.json();
+    if (request !== _pointRequest) return;
 
     const panel = document.getElementById("result-panel");
     panel.hidden = false;
@@ -450,7 +527,7 @@ async function queryPoint(lat, lon, locationName) {
       nudge.hidden = true;
     }
 
-    setBeacon(alert.alert_level);
+    // A point scenario must not overwrite the city-wide forecast beacon.
 
     if (queryMarker) queryMarker.remove();
     const el = document.createElement("div");
@@ -470,12 +547,15 @@ async function queryPoint(lat, lon, locationName) {
     queryMarker.getPopup().addTo(map);
     // Point lookups do not establish that the live forecast is fresh.
   } catch (err) {
+    if (request !== _pointRequest) return;
     console.error("Query failed:", err);
     const panel = document.getElementById("result-panel");
     panel.hidden = false;
     document.getElementById("result-location").textContent = "No result: location may be outside mapped coverage or data unavailable.";
     for (const id of ["result-risk", "result-alert", "result-elev", "result-score"]) document.getElementById(id).textContent = "—";
     if (queryMarker) queryMarker.remove();
+  } finally {
+    if (request === _pointRequest) panel.setAttribute("aria-busy", "false");
   }
 }
 
@@ -490,8 +570,12 @@ const searchInput   = document.getElementById("search-input");
 const searchResults = document.getElementById("search-results");
 const searchClear   = document.getElementById("search-clear");
 let searchTimer = null;
+let _searchRequest = 0;
+let _searchActive = -1;
 
 searchInput.addEventListener("input", () => {
+  _searchRequest++;
+  hideDropdown();
   const q = searchInput.value.trim();
   searchClear.hidden = q.length === 0;
   clearTimeout(searchTimer);
@@ -499,9 +583,21 @@ searchInput.addEventListener("input", () => {
   searchTimer = setTimeout(() => doSearch(q), 320);
 });
 searchInput.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") { hideDropdown(); searchInput.blur(); }
+  if (e.key === "Escape") { _searchRequest++; hideDropdown(); }
+  const options = Array.from(searchResults.querySelectorAll(".result-item"));
+  if (!searchResults.hidden && options.length && ["ArrowDown", "ArrowUp"].includes(e.key)) {
+    e.preventDefault();
+    _searchActive = (_searchActive + (e.key === "ArrowDown" ? 1 : -1) + options.length) % options.length;
+    options.forEach((option, i) => option.setAttribute("aria-selected", String(i === _searchActive)));
+    searchInput.setAttribute("aria-activedescendant", options[_searchActive].id);
+    options[_searchActive].scrollIntoView({block: "nearest"});
+  } else if (e.key === "Enter" && _searchActive >= 0 && !searchResults.hidden) {
+    e.preventDefault(); options[_searchActive]?.click();
+  }
 });
 searchClear.addEventListener("click", () => {
+  _searchRequest++;
+  clearTimeout(searchTimer);
   searchInput.value = "";
   searchClear.hidden = true;
   hideDropdown();
@@ -512,27 +608,38 @@ document.addEventListener("click", (e) => {
 });
 
 async function doSearch(query) {
+  const request = ++_searchRequest;
+  document.getElementById("search-status").textContent = "Searching LGAs…";
   try {
     const url = `${API_BASE_URL}/places/search?q=${encodeURIComponent(query)}`;
     const res = await fetch(url);
-    renderDropdown(await res.json());
-  } catch (err) { console.error("Search failed:", err); hideDropdown(); }
+    if (!res.ok) throw new Error("Search unavailable");
+    const results = await res.json();
+    if (request !== _searchRequest || searchInput.value.trim() !== query) return;
+    document.getElementById("search-status").textContent = results.length ? "Use arrow keys and Enter to choose an LGA centre." : "No matching LGAs.";
+    renderDropdown(results);
+  } catch (err) {
+    if (request !== _searchRequest) return;
+    hideDropdown(); document.getElementById("search-status").textContent = "Search unavailable. Try again or use an LGA button.";
+  }
 }
 
 function renderDropdown(items) {
   if (!items || items.length === 0) {
     searchResults.innerHTML = `<li class="no-result">No places found in Lagos</li>`;
     searchResults.hidden = false;
+    searchInput.setAttribute("aria-expanded", "true");
     return;
   }
   searchResults.innerHTML = items.map((item, i) => {
-    const name = item.display_name.split(",").slice(0, 3).join(", ");
-    return `<li class="result-item" data-idx="${i}" data-lat="${Number(item.lat)}" data-lon="${Number(item.lon)}" data-name="${escapeHTML(encodeURIComponent(name))}">
+    const name = String(item.display_name || "Unnamed LGA").split(",").slice(0, 3).join(", ");
+    return `<li id="search-option-${i}" role="option" aria-selected="false" class="result-item" data-idx="${i}" data-lat="${Number(item.lat)}" data-lon="${Number(item.lon)}" data-name="${escapeHTML(encodeURIComponent(name))}">
       <svg class="result-pin" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="6" r="3"/><path d="M8 2C5.24 2 3 4.24 3 7c0 3.75 5 9 5 9s5-5.25 5-9c0-2.76-2.24-5-5-5z"/></svg>
       <span>${escapeHTML(name)}</span>
     </li>`;
   }).join("");
   searchResults.hidden = false;
+  searchInput.setAttribute("aria-expanded", "true");
   searchResults.querySelectorAll(".result-item").forEach(li => {
     li.addEventListener("click", () => {
       selectPlace(parseFloat(li.dataset.lat), parseFloat(li.dataset.lon), decodeURIComponent(li.dataset.name));
@@ -544,10 +651,15 @@ function selectPlace(lat, lon, name) {
   hideDropdown();
   searchInput.value = name.split(",")[0];
   searchClear.hidden = false;
-  if (isFinite(lat) && isFinite(lon)) map.flyTo({ center: [lon, lat], zoom: 15, pitch: PILOT_PITCH, bearing: PILOT_BEARING, duration: 1400, essential: true });
+  if (isFinite(lat) && isFinite(lon)) map.flyTo({ center: [lon, lat], zoom: 15, pitch: PILOT_PITCH, bearing: PILOT_BEARING, duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1400 });
   queryPoint(lat, lon, name);
 }
-function hideDropdown() { searchResults.hidden = true; searchResults.innerHTML = ""; }
+function hideDropdown() {
+  _searchActive = -1;
+  searchResults.hidden = true; searchResults.innerHTML = "";
+  searchInput.setAttribute("aria-expanded", "false");
+  searchInput.removeAttribute("aria-activedescendant");
+}
 
 // ---------------------------------------------------------------------------
 // LGA quick-jump buttons
@@ -558,7 +670,7 @@ document.querySelectorAll(".lga-btn").forEach(btn => {
     const lon  = parseFloat(btn.dataset.lon);
     const zoom = parseFloat(btn.dataset.zoom);
     if (isFinite(lat) && isFinite(lon)) {
-      map.flyTo({ center: [lon, lat], zoom, pitch: PILOT_PITCH, bearing: PILOT_BEARING, duration: 1200, essential: true });
+      map.flyTo({ center: [lon, lat], zoom, pitch: PILOT_PITCH, bearing: PILOT_BEARING, duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1200 });
       queryPoint(lat, lon, btn.textContent.trim());
     }
   });
@@ -569,6 +681,8 @@ document.querySelectorAll(".lga-btn").forEach(btn => {
 // ---------------------------------------------------------------------------
 const rain24Input = document.getElementById("rain24");
 const rain72Input = document.getElementById("rain72");
+rain24Input.disabled = true;
+rain72Input.disabled = true;
 
 rain24Input.addEventListener("input", () => {
   document.getElementById("rain24-val").textContent = `${rain24Input.value} mm`;
@@ -582,8 +696,11 @@ rain72Input.addEventListener("input", () => {
 });
 
 function markManual() {
+  _scenarioMode = true;
+  invalidatePointResult();
+  showMapMode();
   const badge = document.getElementById("forecast-badge");
-  if (badge) badge.dataset.manual = "true";
+  if (badge) { badge.dataset.manual = "true"; badge.hidden = false; badge.textContent = "Scenario only — not a live forecast"; }
   const hint = document.getElementById("rainfall-hint");
   if (hint) hint.textContent = "Scenario mode — drag sliders to simulate storm events.";
 }
@@ -665,11 +782,10 @@ function setApiStatus(ok, fetchedAt) {
   const el = document.getElementById("api-status");
   el.classList.toggle("ok", ok);
   el.classList.toggle("err", !ok);
-  el.title  = "Click to refresh now";
-  el.style.cursor = "pointer";
+  el.title = "Use Refresh forecast to update";
 
   if (!ok) {
-    el.textContent = `Cannot reach API · click to retry`;
+    el.textContent = `Cannot reach API · use Refresh forecast to retry`;
     clearInterval(_countdownTimer);
     return;
   }
@@ -677,8 +793,22 @@ function setApiStatus(ok, fetchedAt) {
   // Record when the next scheduled refresh will fire
   if (!fetchedAt) {
     el.classList.remove("ok");
-    el.textContent = "Static risk map · live forecast unavailable · click to retry";
+    if (_liveAlerts) {
+      el.classList.add('err');
+      _forecastStale = true;
+      el.textContent = 'Forecast timestamp unavailable — freshness cannot be confirmed.';
+      showMapMode();
+    } else el.textContent = "Static risk map · live forecast unavailable";
     clearInterval(_countdownTimer);
+    return;
+  }
+  const forecastAge = Date.now() - Date.parse(fetchedAt);
+  if (!Number.isFinite(forecastAge) || forecastAge > 2 * REFRESH_INTERVAL_MS || forecastAge < -5 * 60 * 1000) {
+    el.classList.remove('ok');
+    el.classList.add('err');
+    el.textContent = 'Forecast timestamp missing, old or in the future — freshness cannot be confirmed.';
+    _forecastStale = true;
+    showMapMode();
     return;
   }
   _nextRefreshAt = Date.now() + REFRESH_INTERVAL_MS;
@@ -688,14 +818,7 @@ function setApiStatus(ok, fetchedAt) {
     : new Date().toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Lagos" });
 
   clearInterval(_countdownTimer);
-  _countdownTimer = setInterval(() => {
-    const remaining = Math.max(0, _nextRefreshAt - Date.now());
-    const m = Math.floor(remaining / 60000);
-    const s = Math.floor((remaining % 60000) / 1000);
-    el.textContent = remaining > 0
-      ? `Updated ${updatedStr} · Next in ${m}:${String(s).padStart(2, "0")} · Click to refresh`
-      : "Refreshing…";
-  }, 1000);
+  el.textContent = `Forecast updated ${updatedStr} Lagos time · auto-refresh every 30 min`;
 }
 
 function setBeacon(level) {
@@ -901,7 +1024,7 @@ async function _loadSwmmLayer() {
       new maplibregl.Popup({ className: "fs-popup", closeButton: false })
         .setLngLat(e.lngLat)
         .setHTML(
-          `<strong>${p.node_id}</strong><br>` +
+          `<strong>${escapeHTML(p.node_id)}</strong><br>` +
           `Severity: <span style="color:${colHex};font-weight:600">${p.flood_class}</span><br>` +
           `Peak rate: ${p.max_rate_cms} m³/s<br>` +
           `Hours flooded: ${p.hours_flooded} h<br>` +
@@ -950,79 +1073,7 @@ async function _loadSubCount() {
   } catch (_) {}
 }
 
-function dashSubCheck() {
-  const phone   = (document.getElementById("dash-sub-phone")?.value || "").trim();
-  const consent = document.getElementById("dash-sub-consent")?.checked || false;
-  const btn     = document.getElementById("dash-sub-btn");
-  if (!btn) return;
-  const ready = phone.length >= 7 && consent;
-  btn.disabled      = !ready;
-  btn.style.cursor  = ready ? "pointer"  : "not-allowed";
-  btn.style.opacity = ready ? "1"        : "0.5";
-}
-
-async function dashSubscribe() {
-  const phoneEl  = document.getElementById("dash-sub-phone");
-  const areaEl   = document.getElementById("dash-sub-area");
-  const statusEl = document.getElementById("dash-sub-status");
-  const btn      = document.getElementById("dash-sub-btn");
-  if (!phoneEl || !statusEl) return;
-
-  const phone    = phoneEl.value.trim();
-  const areaName = areaEl?.value.trim() || null;
-  if (!phone) return;
-
-  // Use current map centre as the subscriber's location
-  const centre = map.getCenter();
-  const lat    = parseFloat(centre.lat.toFixed(5));
-  const lon    = parseFloat(centre.lng.toFixed(5));
-
-  btn.disabled    = true;
-  btn.textContent = "Subscribing…";
-  statusEl.style.color = "#90CAF9";
-  statusEl.textContent = "";
-
-  try {
-    const res = await fetch(`${API_BASE_URL}/subscribe`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ phone, lat, lon, area_name: areaName || undefined, consent: true }),
-    });
-    let data = await res.json();
-    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
-
-    // OTP flow (REQUIRE_OTP=true on the server): a 6-digit code was texted
-    // to the number; the subscription completes via /subscribe/confirm.
-    if (data.status === "pending_confirmation") {
-      statusEl.style.color = "#90CAF9";
-      statusEl.textContent = "Code sent by SMS — check your phone";
-      const code = (window.prompt("Enter the 6-digit code we sent to " + phone) || "").trim();
-      if (!code) throw new Error("Confirmation cancelled");
-      const confRes = await fetch(`${API_BASE_URL}/subscribe/confirm`, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ phone, code }),
-      });
-      data = await confRes.json();
-      if (!confRes.ok) throw new Error(data.detail || `HTTP ${confRes.status}`);
-    }
-
-    statusEl.style.color = "#81C784";
-    statusEl.textContent = `✓ Subscribed — ${data.risk_class || "?"} risk area`;
-    phoneEl.value = "";
-    if (areaEl) areaEl.value = "";
-    const consentEl = document.getElementById("dash-sub-consent");
-    if (consentEl) consentEl.checked = false;
-    await _loadSubCount();
-  } catch (err) {
-    statusEl.style.color = "#EF9A9A";
-    statusEl.textContent = `✗ ${err.message}`;
-  } finally {
-    btn.disabled    = false;
-    btn.textContent = "Subscribe";
-    dashSubCheck();
-  }
-}
+// Signup uses the location-confirming inline OTP flow on the landing page.
 
 // Load subscriber count on page load (after map init)
 map.on("load", _loadSubCount);
@@ -1121,16 +1172,16 @@ async function _loadMlDepthLayer() {
     // Click popup
     map.on("click", "ml-depth-dots", (e) => {
       const p   = e.features[0].properties;
-      const col = p.depth_colour || "#888";
+      const col = /^#[0-9a-f]{6}$/i.test(p.depth_colour || '') ? p.depth_colour : "#888";
       new maplibregl.Popup({ className: "fs-popup", closeButton: false })
         .setLngLat(e.lngLat)
         .setHTML(
-          `<strong>Grid cell ${p.cell_id}</strong><br>` +
-          `<span style="font-size:11px;color:#aaa">Phase 21 ML depth (100-yr storm)</span><br>` +
-          `Predicted depth: <span style="color:${col};font-weight:600">${p.predicted_depth_m} m</span><br>` +
-          `Class: <span style="color:${col}">${p.depth_class}</span><br>` +
+          `<strong>Grid cell ${escapeHTML(p.cell_id)}</strong><br>` +
+          `<span style="font-size:11px;color:#aaa">Experimental depth · 150 mm rainfall scenario; not validated observations</span><br>` +
+          `Modeled depth: <span style="color:${col};font-weight:600">${escapeHTML(p.predicted_depth_m)} m</span><br>` +
+          `Class: <span style="color:${col}">${escapeHTML(p.depth_class)}</span><br>` +
           `Elevation: ${p.elevation_m != null ? Number(p.elevation_m).toFixed(1) : "—"} m<br>` +
-          `Risk class: ${p.risk_class || "—"}`
+          `Risk class: ${escapeHTML(p.risk_class || "—")}`
         )
         .addTo(map);
     });

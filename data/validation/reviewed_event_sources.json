@@ -1,0 +1,82 @@
+{
+  "review_date": "2026-10-05",
+  "reviewer": "Codex desk review; not field or hydrological acceptance",
+  "scope": "Event occurrence and approximate time/community only; NOT individual Groundsource polygons or numerical depths",
+  "reserved_months": ["2025-08", "2025-09"],
+  "marine_covariate_exposure": {
+    "start": "2023-01-01",
+    "end": "2026-10-01",
+    "evidence_file": "scripts/calibrate_coastal_threshold.py",
+    "meaning": "Sea-level input distribution used for threshold calibration, not independently verified flood outcomes"
+  },
+  "cases": [
+    {
+      "id": "lagos_river_assessment_2024_10",
+      "start": "2024-10-11",
+      "end": "2024-10-14",
+      "time_precision": "Assessment window, NOT flood onset or peak; ongoing inundation reported by October 14",
+      "communities": ["Ikosi Ketu", "Mile 12", "Ajegunle", "Owode", "Agboyi"],
+      "occurrence_status": "corroborated_at_community_level",
+      "mechanism": "River/dam-release context reported by NEMA; attribution not independently quantified",
+      "sources": [
+        {"publisher": "NEMA", "publication_date": "2024-10-14", "url": "https://nema.gov.ng/impact-assessment-of-dam-water-release-by-ogun-osun-river-basin-development-authority-orbda/", "support": "Agency assessment describes houses and roads inundated; monitoring began October 11. Some named communities cross the Lagos/Ogun boundary."}
+      ],
+      "depth_data_status": "No numerical measurements supplied",
+      "spatial_review_status": "Precise sites and state-boundary assignments still required"
+    },
+    {
+      "id": "ikorodu_rain_flood_2025_08",
+      "start": "2025-08-03",
+      "end": "2025-08-04",
+      "time_precision": "Rainfall/report window; university eyewitness account explicitly identifies August 4",
+      "communities": ["Agric, Ikorodu", "Ijede, Ikorodu"],
+      "occurrence_status": "corroborated_at_community_level",
+      "mechanism": "Heavy rainfall with reported drainage/construction constraints",
+      "sources": [
+        {"publisher": "Ohio State Office of International Affairs", "publication_date": "2025-09-29", "url": "https://oia.osu.edu/news/2025/09/29/documenting-floods-and-building-resilience-lagos", "support": "Researcher and team documented the August 4 flood on the ground; rainy-season project used rain gauge and measuring staff."},
+        {"publisher": "Channels Television", "publication_date": "2025-08-04", "url": "https://www.channelstv.com/2025/08/04/lagos-communities-flooded-vehicles-submerged-after-marathon-rainfall/", "support": "Contemporary community reports/video and commissioner acknowledgement of flash flooding after prolonged rain."}
+      ],
+      "depth_data_status": "Measured-depth research lead; table, site/time precision, quality and reuse permission NOT acquired",
+      "spatial_review_status": "Community evidence does not verify every temporally overlapping polygon"
+    },
+    {
+      "id": "lagos_rain_flood_2025_09",
+      "start": "2025-09-23",
+      "end": "2025-09-24",
+      "time_precision": "Dated contemporary reports and embedded resident posts; not a measured peak",
+      "communities": ["Ikota/Lekki", "Ago Palace Way", "Apple Junction", "Mile 2"],
+      "occurrence_status": "corroborated_at_community_level",
+      "mechanism": "Heavy rainfall with drainage obstruction reported; not a causal estimate",
+      "sources": [
+        {"publisher": "Channels Television", "publication_date": "2025-09-27", "url": "https://www.channelstv.com/2025/09/27/flood-ikota-lekki-residents-urge-govt-to-act-against-illegal-structures-on-waterways/", "support": "Resident accounts of Tuesday flooding in Ikota/Lekki. Tuesday inferred as September 23; page images marked file photos."},
+        {"publisher": "TheCable", "publication_date": "2025-09-24", "url": "https://www.thecable.ng/houses-vehicles-submerged-as-flood-ravages-lagos-communities/", "support": "Contemporary reports include September 23/24 resident posts and named mainland/Lekki communities."}
+      ],
+      "depth_data_status": "Qualitative occurrence only; no numerical ground-referenced measurements",
+      "spatial_review_status": "Exact sites/times and original-media provenance still required"
+    }
+  ],
+  "reference_only": [
+    {
+      "id": "lagos_island_pumping_2025_04",
+      "url": "https://punchng.com/lagos-evacuates-water-from-flooded-communities/",
+      "publication_date": "2025-04-11",
+      "assessment": "Government statement on Thursday (April 10, inferred) describes flooding and pumping around Aroloya, Ojo-Giwa, Binuyo and Oroyinyin. Onset/peak unknown; NOT used to assign event dates or candidate labels."
+    }
+  ],
+  "measurement_lead": {
+    "researcher": "Oluwadamilola Salau",
+    "institution": "Ohio State University, Geography",
+    "public_professional_contact": "salau.2@osu.edu",
+    "contact_source": "https://geography.osu.edu/people/salau.2",
+    "contacted": false,
+    "public_download_found": false,
+    "requested_fields": ["permission for commercial-product validation and any redistribution", "ground-referenced depth and units", "coordinates/site IDs and spatial uncertainty", "observation timestamps and time zone", "method, instrument calibration and measurement uncertainty", "rainfall station metadata", "wet and dry observations and sampling protocol", "original quality flags", "whether sites/events overlap FloodSight's existing labeling or tuning"]
+  },
+  "limitations": [
+    "Source pages are references, not licensed article datasets; no full articles/media reproduced or imported for training",
+    "Different reports may share observers; corroboration is not proof of statistically independent observations",
+    "No verified dry controls or numerical depth labels created",
+    "Proposed reserve is a new-label historical challenge set, not a pristine whole-system or prospective holdout",
+    "Owner must confirm omitted external training/presentation history; site leakage cannot be audited from a coordinate-free CSV"
+  ]
+}

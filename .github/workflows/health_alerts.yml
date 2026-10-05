@@ -3,10 +3,10 @@ name: FloodSight Health Alerts
 on:
   schedule:
     # Primary run — 07:30 WAT = 06:30 UTC
-    # 30 min before the resident flood briefing (07:00 WAT / 06:00 UTC)
+    # After the resident briefing schedules; channel acceptance is independent.
     - cron: "30 6 * * *"
     # Backup run — 07:45 WAT = 06:45 UTC
-    # Fires if the primary run is skipped due to Render cold-start delay.
+    # Also scheduled when primary succeeds; delivery reservations prevent duplicates.
     # Idempotency keys in Supabase prevent double-sending.
     - cron: "45 6 * * *"
 
@@ -16,11 +16,18 @@ on:
       dry_run:
         description: "Dry run (score but do not send SMS or write to DB)"
         required: false
-        default: "false"
+        default: 'true'
         type: choice
         options:
           - "false"
           - "true"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: floodsight-health-alerts
+  cancel-in-progress: false
 
 jobs:
   send-health-alerts:
@@ -28,18 +35,28 @@ jobs:
     timeout-minutes: 12
 
     steps:
-      - name: Checkout repo
+      - name: Checkout for approval gate
         uses: actions/checkout@v4
 
+      - name: Check channel approval
+        id: gate
+        env:
+          CHANNEL_ENABLED: ${{ secrets.HEALTH_DISPATCH_ENABLED }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: python3 scripts/workflow_gate.py
+
       - name: Set up Python 3.11
+        if: steps.gate.outputs.run == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Install dependencies
+        if: steps.gate.outputs.run == 'true'
         run: pip install -r requirements-scripts.txt
 
       - name: Run health alert dispatch
+        if: steps.gate.outputs.run == 'true'
         env:
           SUPABASE_URL:   ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY:   ${{ secrets.SUPABASE_KEY }}
@@ -49,9 +66,10 @@ jobs:
           FLOODSIGHT_API: ${{ secrets.FLOODSIGHT_API }}
           FLOODSIGHT_ENV: production
           HEALTH_DISPATCH_ENABLED: ${{ secrets.HEALTH_DISPATCH_ENABLED }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
         run: |
           DRY_RUN_FLAG=""
-          if [[ "${{ github.event.inputs.dry_run }}" == "true" ]]; then
+          if [[ "$DRY_RUN" == "true" ]]; then
             DRY_RUN_FLAG="--dry-run"
           fi
           python scripts/send_health_alerts.py $DRY_RUN_FLAG

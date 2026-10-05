@@ -47,7 +47,7 @@ def health_activity():
     return _health_rows("chew_responses", "parsed_action,cases_reported,lga_name,received_at", "received_at", 8)
 
 
-@router.get("/cases")
+@router.get("/cases", dependencies=[Depends(require_dispatch_secret)])
 def health_cases():
     return _health_rows("dhis2_malaria_cases", "lga_name,period,confirmed_cases", "period", 300)
 

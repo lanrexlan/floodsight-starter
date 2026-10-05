@@ -6,13 +6,31 @@ This release prepares a controlled advisory pilot. Public SMS and experimental d
 
 1. Run CI: tests, disposable PostgreSQL migration/concurrency checks, dependency scan, and Docker build. Local tests explicitly skip database checks without the test service.
 2. Provision an always-on paid host using `render.yaml`, or build `Dockerfile` on a Docker host. These files do not create or bill an account. The build prepares compact maps and street viewport tiles. Use one application worker; SMS limits and reservations are shared in PostgreSQL.
-3. Back up the intended Supabase database and inspect existing policies. Apply `scripts/sql/01_subscribers.sql` through `05_briefing_log.sql`, then `supabase/migrations/001_health_layer.sql` and `002_health_mel_upgrade.sql`, then `scripts/sql/06_delivery_reports.sql` and `07_release_hardening.sql`. Delivery tracking depends on `health_alerts`; do not apply 06 before the health tables exist. Creating these tables does not enable health messaging. The release migration restricts anonymous access to personal logs, reports and maintenance functions.
+3. Verify a backup and isolated restoration before any live schema upgrade. On a new empty database, bootstrap `scripts/sql/01_subscribers.sql` through `05_briefing_log.sql`, the health migrations, then release upgrades 06/07 in dependency order. On an existing database, inspect its actual schema and apply only the needed upgrades; do not replay baseline consent backfills or health-table resets. Delivery upgrade 06 requires `health_alerts`. Review and approve the specific upgrade plan before applying it. Creating tables does not enable messaging.
 4. Configure `.env.example` settings privately. Production requires Supabase, Africa's Talking, dispatch/webhook secrets, exact CORS origins, `REQUIRE_OTP=true`, a paid Open-Meteo key, and confirmed provider agreements. Set `DATA_PROVIDER_LICENSES_CONFIRMED=true` only after reviewing actual data/basemap/provider rights. Never put service-role or dispatch keys into HTML.
 5. Configure `/at/incoming?token=...` and `/at/delivery?token=...` callbacks. The legacy health callback also requires a token. Callback query strings contain secrets: the container disables access logs; the ingress proxy must redact these strings. Test confirmation, STOP, START, and delivery reports on approved numbers.
 6. Enable Supabase pg_cron and schedule `cleanup_personal_data()` daily using the migration's example. Verify the actual hosting region, privacy contact, processor agreements, deletion procedures, backups, and restore process. The operator must implement the described policy.
 7. Verify `/ready`, public pages, coverage rejection, private-route authentication, mobile layout, forecast freshness, and approved test-message delivery before activating public SMS.
 
 ## Pilot activation
+
+GitHub schedules now have an explicit per-channel approval gate. An absent or
+non-true approval secret produces a visible **paused** receipt without API calls,
+SMS or database writes. Manual runs default to read-only; live manual runs are
+blocked without approval. Keep GitHub `ALERT_DISPATCH_ENABLED`,
+`BRIEFING_DISPATCH_ENABLED` and `HEALTH_DISPATCH_ENABLED` unset/false until the
+corresponding acceptance decision. Resident sending additionally requires the
+server-side flag and dispatch credential. A paused green run is not proof of
+delivery or production readiness.
+
+Morning briefings require active records with consent, a working briefing ledger
+and the release-7 `claim_alert` RPC. They no longer fall back to `AT_RECIPIENTS`.
+Per-subscriber `Briefing` claims are reserved before provider contact. Retain claims
+after timeouts, partial claim failures or ledger-write errors; operators must inspect
+them before any retry. Claims are not handset-delivery evidence. Dry runs do not
+read private recipients. Health scoring rejects mismatched arrays rather than
+processing an overlapping prefix. No live scheduler switches were changed by
+these repository edits. See `UX_OPS_FIXES.md` for verification scope.
 
 Boundary-split source records had duplicate cell IDs, including conflicting LGA labels. The API preserves their geometry/order but assigns stable `@row=` suffixes to duplicate IDs. The packaged LGA index is tied to the source grid hash. Keep pre-release historical alert records separately identified; do not silently join old ambiguous IDs to new field reports. Regenerate assets and the index together after a grid change.
 

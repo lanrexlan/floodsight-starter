@@ -6,20 +6,39 @@
  * Reads from:
  *   /health/risk          — LGA outbreak probability scores
  *   /health/mel/summary   — KPI aggregates
- *   Supabase REST API     — DHIS2 cases + CHEW responses + MEL events
- *
- * Set SUPABASE_URL and SUPABASE_ANON_KEY below after deployment.
- * The anon/public key is safe to embed — Supabase RLS ensures health_alerts
- * and chew_subscribers (sensitive tables) require service_role.
+ *   Protected first-party API — cases, CHEW responses and MEL events.
+ * Never embed database credentials or store the operator token persistently.
  */
 
 // ---------------------------------------------------------------------------
 // Configuration — fill these in after Supabase project is set up
 // ---------------------------------------------------------------------------
 let operatorToken = '';
-function setOperatorToken() {
-  operatorToken = window.prompt('Enter operator access token (kept in memory until this tab closes):') || '';
+document.getElementById('operator-form').addEventListener('submit', event => {
+  event.preventDefault();
+  const input = document.getElementById('operator-token');
+  operatorToken = input.value.trim();
+  input.value = '';
+  clearPrivateReports();
+  document.getElementById('operator-status').textContent = 'Token loaded in memory. Each private report must still authenticate; this is not a login confirmation.';
   loadAll();
+});
+document.getElementById('operator-signout').addEventListener('click', () => {
+  operatorToken = '';
+  document.getElementById('operator-token').value = '';
+  clearPrivateReports();
+  document.getElementById('operator-status').textContent = 'Operator access cleared.';
+  loadAll();
+});
+function clearPrivateReports() {
+  if (casesChart) { casesChart.destroy(); casesChart = null; }
+  const canvas = document.getElementById('cases-chart');
+  const context = canvas.getContext('2d');
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  for (const id of ['chew-activity', 'mel-table-container']) {
+    document.getElementById(id).textContent = 'Private report unavailable until operator access is verified.';
+  }
+  document.getElementById('mel-badge').textContent = 'Operator access required';
 }
 function escapeHTML(value) {
   return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
@@ -28,7 +47,7 @@ function escapeHTML(value) {
 // API base auto-detects local dev vs. Render deployment (same as existing app.js)
 const API_BASE = location.protocol === 'file:'
   ? 'http://localhost:8000'
-  : (location.hostname === 'localhost' ? 'http://localhost:8000' : '');
+  : '';
 
 // MEL trial arms
 const TREATMENT_LGAS = new Set(['Alimosho','Ajeromi-Ifelodun','Kosofe','Oshodi-Isolo','Ikorodu']);
@@ -47,19 +66,23 @@ async function apiFetch(path) {
 }
 
 async function supabaseFetch(table, params = '') {
+  const requestToken = operatorToken;
+  if (!requestToken) throw new Error('Operator access required for private reports.');
   const routes = {dhis2_malaria_cases:'/health/cases', chew_responses:'/health/activity', mel_events:'/health/mel/events'};
   if (!routes[table]) throw new Error('Unknown reporting view.');
   const url = `${API_BASE}${routes[table]}`;
   const r = await fetch(url, {
     headers: {
-      'Authorization': `Bearer ${operatorToken}`,
+      'Authorization': `Bearer ${requestToken}`,
       'Accept':        'application/json',
     }
   });
   if (!r.ok) {
     throw new Error(r.status === 401 || r.status === 503 ? 'Operator access or reporting service unavailable. Use Operator access to sign in.' : `Reporting error ${r.status}`);
   }
-  return r.json();
+  const data = await r.json();
+  if (operatorToken !== requestToken) throw new Error('Operator access changed; stale report discarded.');
+  return data;
 }
 
 function tierBadge(tier) {
@@ -73,7 +96,7 @@ function probBar(prob) {
   else if (pct >= 55) fillClass = 'high';
   return `
     <div class="prob-wrap">
-      <span class="prob-pct">${pct}%</span>
+      <span class="prob-pct">${(pct / 100).toFixed(2)}</span>
       <div class="prob-bar">
         <div class="prob-fill ${fillClass}" style="width:${pct}%"></div>
       </div>
@@ -164,7 +187,7 @@ async function loadRiskTable() {
           <tr>
             <th>LGA</th>
             <th>Risk Tier</th>
-            <th>Probability</th>
+            <th>Research score (uncalibrated)</th>
             <th>At-risk grid area (proxy)</th>
             <th>Breeding Lag</th>
             <th>Outbreak Window</th>

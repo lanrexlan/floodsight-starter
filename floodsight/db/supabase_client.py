@@ -164,15 +164,15 @@ def add_subscriber(
 
 
 def get_active_subscribers() -> list[dict[str, Any]]:
-    """Return all rows from subscribers where active = TRUE."""
+    """Return active subscribers with recorded consent, never legacy unconsented rows."""
     client = _get_client()
     result = (
         client.table("subscribers")
-        .select("id, name, phone, lat, lon, area_name, risk_class")
+        .select("id, name, phone, lat, lon, area_name, risk_class, consent_at")
         .eq("active", True)
         .execute()
     )
-    return result.data or []
+    return [row for row in (result.data or []) if row.get("consent_at")]
 
 
 def get_subscriber_count() -> int:

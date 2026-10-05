@@ -1,10 +1,9 @@
 # FloodSight — Cowork Handoff Note
 
-> Current release status (4 October 2026): read `RELEASE_STATUS.md` and `DEPLOYMENT.md` first. They supersede earlier readiness, deployment, model accuracy, and launch assumptions below. Historical phase notes remain for provenance. Public dispatch and experimental depth are disabled by default in production.
+> Current release status (5 October 2026): read `RELEASE_STATUS.md`, `UX_OPS_FIXES.md`, `PILOT_ACCEPTANCE.md`, `SCIENTIFIC_VALIDATION.md` and `DEPLOYMENT.md` first. They supersede the historical phase notes below. Public dispatch and experimental depth remain disabled; local fixes are not deployed acceptance.
 
-Please read `README.md`, `ROADMAP.md`, and **`IMPROVEMENTS.md`** (the
-July 2026 prioritized review — it is the current work queue) before doing
-anything else.
+Read `README.md` for repository structure. `ROADMAP.md` and `IMPROVEMENTS.md`
+retain historical plans; neither is the current acceptance checklist.
 
 > This note was rewritten in July 2026. The previous version described the
 > Phase 5 state (616 rows, 3 LGAs, 30 m grid, R2=0.106) long after the repo

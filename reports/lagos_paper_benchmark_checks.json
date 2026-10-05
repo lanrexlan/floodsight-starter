@@ -1,0 +1,62 @@
+{
+  "status": "published_values_used_for_research_qc_not_validation_acceptance",
+  "source_doi": "10.1038/s41598-026-38544-1",
+  "basin_rows_checked": 7,
+  "published_peak_discharge_range_m3_s": [
+    0.4,
+    12.5
+  ],
+  "rainfall_loss_excess_identity_residuals_mm": [
+    {
+      "subbasin": 1,
+      "rain_minus_loss_minus_excess_mm": 0.0
+    },
+    {
+      "subbasin": 2,
+      "rain_minus_loss_minus_excess_mm": 0.49
+    },
+    {
+      "subbasin": 3,
+      "rain_minus_loss_minus_excess_mm": 0.0
+    },
+    {
+      "subbasin": 4,
+      "rain_minus_loss_minus_excess_mm": 0.0
+    },
+    {
+      "subbasin": 5,
+      "rain_minus_loss_minus_excess_mm": -0.09
+    },
+    {
+      "subbasin": 6,
+      "rain_minus_loss_minus_excess_mm": 0.0
+    },
+    {
+      "subbasin": 7,
+      "rain_minus_loss_minus_excess_mm": 0.0
+    }
+  ],
+  "values_to_query_not_automatically_correct": [
+    {
+      "subbasin": 2,
+      "rain_minus_loss_minus_excess_mm": 0.49
+    },
+    {
+      "subbasin": 5,
+      "rain_minus_loss_minus_excess_mm": -0.09
+    }
+  ],
+  "qc_screening_tolerance_mm": 0.05,
+  "qc_tolerance_meaning": "Screen for author clarification, not scientific accuracy or conservation threshold",
+  "floodsight_comparison": {
+    "numerical_error_computed": false,
+    "reason": "No matched catchment, event forcing or paired measured outcomes",
+    "authors_metrics_transferable_to_floodsight": false,
+    "modeled_runoff_mm_is_ground_referenced_depth": false,
+    "modeled_area_is_verified_wet_cell_truth": false
+  },
+  "independent_observed_depth_rows_added": 0,
+  "scientific_acceptance": false,
+  "depth_release_approved": false,
+  "input_sha256": "8a393035ed5f86b36cb7dc13f4bcd289e5f43da36225f52c8c2564aafb61dafa"
+}

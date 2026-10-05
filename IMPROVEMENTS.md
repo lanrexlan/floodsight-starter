@@ -1,5 +1,11 @@
 # FloodSight — Prioritized Review & Fix Plan (July 2026)
 
+> Historical development notes, not current readiness or acceptance. Read
+> `RELEASE_STATUS.md`, `UX_OPS_FIXES.md`, `PILOT_ACCEPTANCE.md` and
+> `SCIENTIFIC_VALIDATION.md` for the current evidence and open gates. “Fixed” below
+> records earlier implementation work; it does not certify deployment, delivery,
+> scientific validity or operational acceptance.
+
 Full-repo review: docs, pipeline, ML, API, alerts, deployment. Items are
 ordered by priority. Status column tracks what has been fixed in this
 session vs. what remains.
@@ -199,7 +205,8 @@ honest post-fix metrics and this document as the work queue.
     last saved results without re-fetching (network-safe). Re-run without
     `--cached` on a stable connection to refresh.
 
-    **Validation accuracy (July 2026 calibration):** 78% (14/18 events)
+    **Historical tuned-event coverage (July 2026):** 78% (14/18 events), not
+    independent validation accuracy or a measured false-alarm rate,
     with the following 4 structural failures that require institutional data:
     - Oct 2022 Dam-Release: Niger/Benue dams (not Ogun) — needs NIHSA gauge
       on the Niger at Lokoja; GloFAS at Isheri shows only 1.4 m³/s.
@@ -208,7 +215,7 @@ honest post-fix metrics and this document as the work queue.
     - Jul 2016 Coastal: same coastal signal gap.
     - Jul 2019 Localized Storm: hyper-local ~4 km convective cell — needs
       denser rain gauge network; ERA5/POWER miss it at 30–50 km resolution.
-    78% is the practical ceiling with freely available global APIs.
+    This result establishes no performance ceiling for open-data methods.
 16. Operator-dashboard synthetic fallbacks use "Red/Orange/Yellow" levels
     while the live system uses Watch/Warning — confusing in demos.
 17. Housekeeping: `data/processed/` has leftover `_test_write.gpkg`,

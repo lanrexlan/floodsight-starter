@@ -1,0 +1,47 @@
+{
+  "status": "research_candidates_not_validation_acceptance",
+  "source_record": "https://zenodo.org/records/18647054",
+  "source_md5": "cd1b5de6508f7aad8e1d1d0dd4cecea6",
+  "license": "CC BY 4.0",
+  "attribution": "Mayo, Zlydenko et al. (2026), Groundsource v1, Google Research; DOI 10.5281/zenodo.18647054",
+  "selection_bbox_wgs84": [
+    3.0,
+    6.3,
+    3.8,
+    6.8
+  ],
+  "selection": "Reported-place polygon intersects bounding box; not proof of flooding within service cells.",
+  "source_rows_scanned": 2646302,
+  "candidate_reports": 2870,
+  "exact_place_date_groups": 2870,
+  "repeat_reports_beyond_first_exact_place_date": 0,
+  "unique_flood_events": null,
+  "place_centroids_inside_bbox": 2798,
+  "start_date_range": [
+    "2001-02-01",
+    "2026-01-20"
+  ],
+  "quality_flag_report_counts": {
+    "manual_source_verification_required": 2870,
+    "not_measured_depth": 2870,
+    "reported_place_not_inundation_footprint": 2870,
+    "not_confirmed_service_coverage": 2870,
+    "broad_reported_place_over_4_km2": 1190,
+    "multi_day_interval": 329,
+    "place_centroid_outside_lagos_bbox": 72
+  },
+  "reviewed_reports": 0,
+  "independent_measured_lagos_depth_rows": 0,
+  "verified_dry_control_rows": 0,
+  "usable_for_depth_training": false,
+  "experimental_depth_release_approved": false,
+  "limitations": [
+    "News-derived and AI-extracted; location/timing require independent manual verification.",
+    "Geometries describe reported places, NOT observed water extents or exact sensor positions.",
+    "UUID/report counts and exact place/date groups are NOT counts of independent flood events.",
+    "No article URLs are present in the released columns inspected; corroboration needs external source lookup.",
+    "Unreported dates/places are unknown, not verified dry negatives.",
+    "Historical observed rainfall cannot establish forecast lead time; archived forecasts are required.",
+    "News coverage bias prevents interpreting changes in report counts as flood-frequency trends."
+  ]
+}

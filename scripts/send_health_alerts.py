@@ -56,6 +56,10 @@ def main(dry_run: bool = False) -> int:
     import os
     import requests
 
+    if not dry_run and os.getenv("HEALTH_DISPATCH_ENABLED", "").strip().lower() != "true":
+        log.error("Health dispatch is disabled; refusing API calls and database writes.")
+        return 1
+
     base_url = os.getenv("FLOODSIGHT_API", "https://floodsight-starter.onrender.com").rstrip("/")
     log.info("Fetching alert grid from %s/forecast/alerts", base_url)
 
@@ -102,14 +106,19 @@ def main(dry_run: bool = False) -> int:
     features = grid_geojson.get("features", [])
 
     if len(features) != len(alert_levels):
-        log.warning(
+        log.error(
             "Grid/alert length mismatch: %d features vs %d alert levels — "
-            "comparing the overlapping prefix only",
+            "refusing partial health scoring",
             len(features), len(alert_levels),
         )
+        return 1
+
+    if not features or any(level not in _RANK for level in alert_levels):
+        log.error("Empty grid or unknown alert level; refusing health scoring.")
+        return 1
 
     lga_highest: dict[str, str] = {}
-    for i in range(min(len(features), len(alert_levels))):
+    for i in range(len(features)):
         lga   = str(features[i].get("properties", {}).get("lga_name", "")).strip()
         level = alert_levels[i]
         if not lga or lga == "nan":

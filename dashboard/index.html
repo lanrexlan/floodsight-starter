@@ -37,10 +37,11 @@
           <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.6"/>
           <path d="M13 13l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
         </svg>
-        <input id="search-input" type="text" placeholder="Search an LGA: Kosofe, Surulere…" aria-label="Search an LGA" autocomplete="off" />
-        <button id="search-clear" class="search-clear" hidden>✕</button>
+        <input id="search-input" type="text" placeholder="Search an LGA: Kosofe, Surulere…" aria-label="Search an LGA" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="search-results" aria-expanded="false" />
+        <button id="search-clear" class="search-clear" aria-label="Clear search" hidden>✕</button>
       </div>
-      <ul id="search-results" class="search-dropdown" hidden></ul>
+      <ul id="search-results" class="search-dropdown" role="listbox" aria-label="Matching LGAs" hidden></ul>
+      <p id="search-status" class="hint" role="status"></p>
 
       <p class="hint" style="margin-top:12px">Or jump to an LGA:</p>
       <div class="lga-row">
@@ -67,18 +68,20 @@
       <h2>Rainfall scenario</h2>
       <div id="forecast-badge" class="forecast-badge" hidden></div>
       <p id="rainfall-hint" class="hint">Loading live forecast…</p>
+      <button id="reset-forecast" class="lga-btn" hidden>Return to live forecast</button>
+      <p id="map-mode" class="hint" role="status">Loading map…</p>
       <label class="slider-label">
         24h rainfall <span id="rain24-val" class="mono">— mm</span>
-        <input id="rain24" type="range" min="0" max="200" value="40" />
+        <input id="rain24" type="range" min="0" max="200" value="40" disabled />
       </label>
       <label class="slider-label">
         72h risk window <span id="rain72-val" class="mono">— mm</span>
-        <input id="rain72" type="range" min="0" max="300" value="60" />
+        <input id="rain72" type="range" min="0" max="300" value="60" disabled />
       </label>
     </section>
 
     <!-- Result -->
-    <section class="panel" id="result-panel" hidden>
+    <section class="panel" id="result-panel" aria-live="polite" aria-busy="false" hidden>
       <h2>Result</h2>
       <div id="result-location" class="result-location"></div>
       <div id="alert-nudge" class="alert-nudge" hidden></div>
@@ -132,8 +135,8 @@
         </span>
         <button id="swmm-toggle" class="lga-btn" hidden onclick="toggleSwmmLayer()" style="margin-top:6px;width:100%">Hide SWMM flood</button>
       </p>
-      <p class="hint" style="margin-top:10px">
-        Experimental ML depth — 150 mm rainfall scenario (not a validated return period).
+      <p class="hint" style="margin-top:10px" hidden>
+        <span id="depth-description">Experimental ML depth — 150 mm rainfall scenario (not a validated return period).</span>
         <span style="display:inline-block;margin-top:4px">
           <span style="color:#FFF176;font-weight:600">■</span> Low (&lt;0.3 m) &nbsp;
           <span style="color:#FF9800;font-weight:600">■</span> Medium (0.3–1 m) &nbsp;
@@ -148,6 +151,8 @@
 
     <footer class="api-footer">
       <span id="api-status" class="mono" role="status" aria-live="polite">connecting…</span>
+      <button id="refresh-forecast" class="lga-btn" disabled>Refresh forecast</button>
+      <a href="/floodsight.html#subscribe">Subscribe to SMS alerts</a>
     </footer>
   </aside>
 
@@ -160,6 +165,7 @@
 </div>
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-<script src="app.js"></script>
+<script src="bootstrap.js"></script>
+<noscript>FloodSight’s interactive map requires JavaScript. No live forecast is displayed.</noscript>
 </body>
 </html>
