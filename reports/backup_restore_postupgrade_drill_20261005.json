@@ -1,0 +1,173 @@
+{
+  "scope": "isolated local public-application restore; NOT full Supabase recovery",
+  "started_at_utc": "2026-10-05T15:52:22.353675+00:00",
+  "backup_sha256": "84F906D1C42044F6FC6AD79454D9B6949220707CDD88F1D1C37D05CA96DDC05E",
+  "backup_bytes": 75900,
+  "live_database_changed": false,
+  "messaging_connected": false,
+  "source_postgres": "17.6",
+  "target_postgres": "18.3",
+  "backup_already_release_version_7": true,
+  "application_tables_expected": 16,
+  "reconstructed_dependencies": [
+    "anon/authenticated/service_role/supabase_admin role names",
+    "auth.role() SQL helper read from source; Auth server NOT replicated"
+  ],
+  "supabase_admin_local_login": false,
+  "restore_adjustments": [
+    "reuse empty default public namespace; skip only its CREATE SCHEMA TOC entry"
+  ],
+  "base_restore_passed": true,
+  "migration_rehearsal_passed": null,
+  "restore_seconds": 0.703,
+  "archive_content_comparison": [
+    {
+      "table": "alert_claims",
+      "rows": 0,
+      "copy_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "table": "alert_log",
+      "rows": 0,
+      "copy_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "table": "briefing_log",
+      "rows": 83,
+      "copy_sha256": "501b9cf69606fcd0e5274e835a65cf857119ad6d73ab7e8f9118b4b268488ef4",
+      "match": true
+    },
+    {
+      "table": "chew_responses",
+      "rows": 0,
+      "copy_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "table": "chew_subscribers",
+      "rows": 0,
+      "copy_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "table": "dhis2_malaria_cases",
+      "rows": 0,
+      "copy_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "table": "dispatch_cells",
+      "rows": 0,
+      "copy_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "table": "entomology_observations",
+      "rows": 0,
+      "copy_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "table": "health_alerts",
+      "rows": 0,
+      "copy_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "table": "lga_health_risk",
+      "rows": 0,
+      "copy_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "table": "mel_events",
+      "rows": 0,
+      "copy_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "table": "pending_subscriptions",
+      "rows": 0,
+      "copy_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "table": "prediction_log",
+      "rows": 0,
+      "copy_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "table": "subscribers",
+      "rows": 2,
+      "copy_sha256": "796d81e2402f3604a1645a2e013edb3e15e6092c0d01f3927550fa09a126d5a3",
+      "match": true
+    },
+    {
+      "table": "subscription_attempts",
+      "rows": 0,
+      "copy_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "table": "verifications",
+      "rows": 0,
+      "copy_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    }
+  ],
+  "source_comparison": {
+    "source_observed_at": "2026-10-05T15:49:59.14839+00:00",
+    "export_synchronized": false,
+    "mismatched_sections": [],
+    "expected_differences": [
+      "database name",
+      "PostgreSQL 17.6 versus 18.3",
+      "observation time",
+      "PG18 NOT NULL catalog entries individually checked against source column nullability"
+    ]
+  },
+  "base_access_checks": {
+    "effective_private_select_denials": 28,
+    "server_reads": 14,
+    "function_permissions_checked": 6,
+    "function_role_permission_checks": 18,
+    "passed": true
+  },
+  "upgrade_access_checks": {
+    "effective_private_select_denials": 28,
+    "server_reads": 14,
+    "function_permissions_checked": 6,
+    "function_role_permission_checks": 18,
+    "passed": true
+  },
+  "delivery_view_security_invoker": true,
+  "migration_repetitions": 0,
+  "restored_release_schema_verified": true,
+  "release_schema_version": 7,
+  "original_columns_and_rows_preserved": true,
+  "database_regression_passed": true,
+  "database_regression_tests_passed": 8,
+  "source_archive_unchanged": true,
+  "local_server_stopped": true,
+  "elapsed_seconds": 15.594,
+  "finished_at_utc": "2026-10-05T15:52:37.944234+00:00",
+  "shutdown_verification": "New local test cluster postmaster.pid absent; existing PostgreSQL services were not modified.",
+  "old_preupgrade_archive_sha256_unchanged": "7FFDD0F3603777151399E7ADF810443887275BFBC4F581DC476B2ED432CCB8C2",
+  "wider_local_suite": {
+    "passed": 221,
+    "database_tests_skipped_in_wider_run": 8,
+    "database_tests_passed_separately_in_drill": 8,
+    "dependency_warnings": 10,
+    "synthetic_parser_comparison_tests": 6
+  },
+  "acceptance_limits": {
+    "full_supabase_recovery_verified": false,
+    "encrypted_offsite_copy_verified": false,
+    "recurring_backup_configured": false,
+    "owner_rto_rpo_approved": false,
+    "postgres17_target_drill": false
+  }
+}
