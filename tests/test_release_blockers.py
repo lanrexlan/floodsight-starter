@@ -77,6 +77,21 @@ def test_private_logs_and_webhooks_require_auth(client):
     assert 'HTTPBearer' in client.get('/openapi.json').json()['components']['securitySchemes']
 
 
+@pytest.mark.parametrize('path', ['/health/cases', '/health/activity', '/health/mel/events'])
+@pytest.mark.parametrize('token', [None, 'incorrect'])
+def test_private_health_reports_reject_before_reading_database(client, monkeypatch, path, token):
+    monkeypatch.setattr('api.routers.health._health_rows',
+                        lambda *args: pytest.fail('Unauthorised private report reached database'))
+    headers = {} if token is None else {'Authorization': f'Bearer {token}'}
+    assert client.get(path, headers=headers).status_code == 401
+
+
+@pytest.mark.parametrize('path', ['/health/cases', '/health/activity', '/health/mel/events'])
+def test_private_health_reports_allow_operator(client, monkeypatch, path):
+    monkeypatch.setattr('api.routers.health._health_rows', lambda *args: [])
+    assert client.get(path, headers={'Authorization': 'Bearer test-only'}).json() == []
+
+
 def test_verification_storage_failure_does_not_acknowledge_success(client, monkeypatch, tmp_path):
     monkeypatch.setenv('FLOODSIGHT_ENV','production')
     def unavailable(*args, **kwargs):

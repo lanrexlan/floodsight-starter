@@ -23,6 +23,8 @@ database mutations, real SMS, author outreach or public messaging activation.
 - Operator tokens use an inline password field, stay only in memory and are
   cleared from the field. Changed/cleared access discards old private responses.
   Health values are labelled uncalibrated research scores, not outbreak probabilities.
+  Case reports now require server-side operator authentication as well; deployed
+  main's public case-view gap was found in the read-only verification.
 - All three messaging schedules have explicit pause/read-only/live gates; manual
   runs default to read-only. Sending approval and credentials remain separate.
   Dry-run resident checks no longer require a dispatch secret. Job concurrency
@@ -38,7 +40,7 @@ database mutations, real SMS, author outreach or public messaging activation.
 
 ## Verification
 
-Local full Python suite: 206 passed, eight isolated-database tests skipped; that
+Local full Python suite: 215 passed, eight isolated-database tests skipped; that
 database was not running for this run. Earlier PostgreSQL evidence is historical,
 not a new execution of these changes. Hermetic JavaScript suite: 20 passed.
 All five workflows parsed successfully as YAML. Scientific freeze verification

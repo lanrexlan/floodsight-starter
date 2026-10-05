@@ -23,6 +23,8 @@ Bounded public GET checks after an initial 45-second timeout:
 | `/product-status` | 200, depth disabled, controlled pilot | Experimental depth remains off; not scientific approval |
 | `/dashboard/` and `/dashboard/app.js` | 200 | Previously merged assets served; not the pending UX changes |
 | `/risk/point?lat=6.52&lon=3.37` | 200, packaged pipeline cell/risk | Representative static lookup works; not a validation observation |
+| `/health/activity`, `/health/mel/events` without token | 401 | Protected reports reject anonymous access |
+| `/health/cases` without token | 200 | Deployed main still exposes this aggregate case view; fix branch adds operator protection and nine auth regressions |
 
 The initial timeout is consistent with a cold start but does not prove its cause
 or define latency/availability. These are smoke checks, not a load test, paid
