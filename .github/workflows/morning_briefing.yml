@@ -1,7 +1,7 @@
 name: FloodSight Morning Briefing SMS
 
 # Primary run:  05:00 UTC = 06:00 WAT
-# Backup run:   06:00 UTC = 07:00 WAT — fires only when primary runner failed
+# Backup run:   06:00 UTC = 07:00 WAT — checks whether the briefing is already logged
 # The script checks briefing_log in Supabase and exits early if already sent.
 on:
   schedule:
@@ -12,7 +12,16 @@ on:
       dry_run:
         description: 'Dry run (print message, do not send SMS)'
         required: false
-        default: 'false'
+        default: 'true'
+        type: choice
+        options: ['true', 'false']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: floodsight-morning-briefing
+  cancel-in-progress: false
 
 jobs:
   send-briefing:
@@ -20,18 +29,28 @@ jobs:
     timeout-minutes: 12   # 3 × 90 s timeout + 60 s retry gaps + overhead
 
     steps:
-      - name: Checkout
+      - name: Checkout for approval gate
         uses: actions/checkout@v4
 
+      - name: Check channel approval
+        id: gate
+        env:
+          CHANNEL_ENABLED: ${{ secrets.BRIEFING_DISPATCH_ENABLED }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: python3 scripts/workflow_gate.py
+
       - name: Set up Python
+        if: steps.gate.outputs.run == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: Install dependencies
+        if: steps.gate.outputs.run == 'true'
         run: pip install -r requirements-scripts.txt
 
       - name: Send morning briefing
+        if: steps.gate.outputs.run == 'true'
         env:
           AT_USERNAME:    ${{ secrets.AT_USERNAME }}
           AT_API_KEY:     ${{ secrets.AT_API_KEY }}
@@ -41,8 +60,8 @@ jobs:
           SUPABASE_KEY:   ${{ secrets.SUPABASE_KEY }}
           FLOODSIGHT_API: ${{ secrets.FLOODSIGHT_API }}
           BRIEFING_DISPATCH_ENABLED: ${{ secrets.BRIEFING_DISPATCH_ENABLED }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
         run: |
-          DRY_RUN="${{ github.event.inputs.dry_run }}"
           if [ "$DRY_RUN" = "true" ]; then
             python scripts/send_morning_briefing.py --dry-run
           else

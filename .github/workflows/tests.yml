@@ -60,6 +60,14 @@ jobs:
         # mock those boundaries rather than reach the network.
         run: pytest tests/ -q --maxfail=5
 
+      - name: Set up Node for hermetic UI regressions
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verify UI interactions without real providers
+        run: node --test tests/ui_regression.cjs
+
       - name: Dependency vulnerability check
         run: pip-audit
 

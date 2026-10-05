@@ -18,10 +18,7 @@ Environment variables (set in your shell, .env file, or GitHub Secrets):
     AT_USERNAME      Africa's Talking username (use 'sandbox' for testing)
     AT_API_KEY       Africa's Talking API key
     AT_SENDER_ID     Registered short-code / sender name (optional)
-    AT_RECIPIENTS    Comma-separated E.164 numbers (FALLBACK ONLY — when
-                     Supabase is configured, the briefing goes to all active
-                     subscribers instead; see resolve_recipients())
-    SUPABASE_URL     Supabase project URL (optional — enables subscriber send)
+    SUPABASE_URL     Supabase project URL (required for live subscriber sends)
     SUPABASE_KEY     Supabase service-role key
     FLOODSIGHT_API   Base URL of the deployed API
                      (default: https://floodsight-starter.onrender.com)
@@ -44,7 +41,7 @@ from pathlib import Path
 # Make `floodsight` importable when the script is run directly
 # (Python adds scripts/ to sys.path, not the project root)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 log = logging.getLogger(__name__)
@@ -106,24 +103,23 @@ def format_message(summary: dict) -> str:
     highest  = summary["highest_alert"]
 
     # Lagos time = UTC+1
-    now_utc  = datetime.now(timezone.utc)
-    date_str = now_utc.strftime("%d %b %Y")
+    now_wat = datetime.now(timezone(timedelta(hours=1)))
+    date_str = now_wat.strftime("%d %b %Y")
     r24      = round(fc["rain_24h_mm"])
     r72      = round(fc["rain_72h_mm"])
 
     if highest == "No Alert":
         msg = (
             f"FloodSight Lagos {date_str}\n"
-            f"STATUS: All Clear\n"
+            f"STATUS: No rule alert\n"
             f"Rain: {r24}mm/24h, {r72}mm/72h\n"
-            f"No active flood alerts across 15 LGAs. Stay prepared."
+            f"No rule alert; flooding is still possible. Stay prepared."
         )
     else:
         lines = [f"FloodSight Lagos {date_str}", f"STATUS: {highest.upper()}"]
 
         warn = counts.get("Warning", 0)
         watch = counts.get("Watch", 0)
-        total = warn + watch
         if warn:
             lines.append(f"WARNING: {warn:,} grid cells")
         if watch:
@@ -131,14 +127,10 @@ def format_message(summary: dict) -> str:
 
         lines.append(f"Rain: {r24}mm/24h, {r72}mm/72h")
 
-        # Mention likely-affected areas based on cell count magnitude
-        if total > 5000:
-            areas = f"{HIGH_DENSITY_AREAS} & others"
-        elif total > 1000:
-            areas = HIGH_DENSITY_AREAS
-        else:
-            areas = COASTAL_AREAS
-        lines.append(f"Areas: {areas}")
+        # Use actual alert-area data, never infer place names from cell counts.
+        areas = list((summary.get('lga_alerts') or {}).keys())[:3]
+        if areas:
+            lines.append(f"Alert areas: {', '.join(areas)}")
         lines.append("Avoid flooded roads. Stay safe.")
 
         msg = "\n".join(lines)
@@ -179,7 +171,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="FloodSight morning briefing sender")
     parser.add_argument(
         "--dry-run", action="store_true",
-        help="Print message and recipients without actually sending."
+        help="Print message without reading private recipients or sending."
     )
     parser.add_argument(
         "--api",
@@ -203,34 +195,35 @@ def main() -> None:
                          "This backup run is not needed.")
                 return
         except Exception as exc:
-            log.warning("Could not check briefing_log (%s) — proceeding anyway.", exc)
+            log.error("Could not check briefing ledger; refusing possible duplicate send.")
+            sys.exit(1)
 
-    # Resolve recipients: Supabase subscriber base first (P2 item 11 —
-    # the briefing previously went only to a hardcoded AT_RECIPIENTS list,
-    # bypassing every resident who subscribed via the dashboard).
+    # Live recipient discovery must use active subscribers with recorded consent.
+    # Dry runs deliberately do not read private recipients.
     recipients: list[str] = []
-    recipients_source = "AT_RECIPIENTS"
-    if os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_KEY"):
+    subscribers: list[dict] = []
+    recipients_source = "none (read-only)" if args.dry_run else "active subscribers with recorded consent"
+    if not args.dry_run and os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_KEY"):
         try:
             from floodsight.db.supabase_client import get_active_subscribers
 
-            recipients = [s["phone"] for s in get_active_subscribers() if s.get("phone")]
+            subscribers = get_active_subscribers()
+            if any(not s.get('id') or not s.get('phone') or not s.get('consent_at') for s in subscribers):
+                raise RuntimeError('Subscriber identity or consent missing')
+            recipients = [s["phone"] for s in subscribers]
             recipients_source = f"supabase ({len(recipients)} active subscribers)"
         except Exception as exc:
-            log.warning("Supabase subscriber fetch failed (%s) — falling back "
-                        "to AT_RECIPIENTS", exc)
-
-    if not recipients:
-        recipients_raw = os.environ.get("AT_RECIPIENTS", "")
-        recipients = [r.strip() for r in recipients_raw.split(",") if r.strip()]
+            log.error("Subscriber lookup failed; refusing fallback recipients.")
+            sys.exit(1)
+    elif not args.dry_run:
+        log.error("Durable subscriber store is required; refusing fallback recipients.")
+        sys.exit(1)
 
     log.info("Recipients source: %s", recipients_source)
 
     if not recipients and not args.dry_run:
-        log.error(
-            "No recipients: Supabase returned none and AT_RECIPIENTS is not set."
-        )
-        sys.exit(1)
+        log.info("No active subscribers with recorded consent; no briefing sent.")
+        return
 
     # Fetch forecast
     try:
@@ -254,7 +247,7 @@ def main() -> None:
     print(f"MESSAGE ({len(message)} chars):")
     print(message)
     print(f"{'='*50}")
-    print(f"RECIPIENTS: {recipients if recipients else '(none — dry run)'}")
+    print(f"RECIPIENT COUNT: {len(recipients)} (phone numbers omitted)")
     print()
 
     # Send
@@ -262,12 +255,24 @@ def main() -> None:
         log.info("Dry run — no message sent.")
         return
 
+    # Reuse the durable claim RPC with a separate Briefing namespace. Claim
+    # before contacting the provider; retain claims even on ambiguous failures.
+    # A failed ledger write or a backup run cannot automatically resend them.
+    try:
+        recipients = reserve_briefing_recipients(subscribers)
+    except Exception:
+        log.error("Could not reserve briefing recipients. No provider call made; inspect partial claims before retry.")
+        sys.exit(1)
+    if not recipients:
+        log.info("All briefing recipients already reserved today; no provider call made.")
+        return
+
     from floodsight.notifications.africastalking import send_sms
     try:
-        result = send_sms(message, recipients)
-        log.info("Send result: %s", result)
+        send_sms(message, recipients)
+        log.info("Provider request completed; final handset delivery remains unverified.")
     except (ValueError, RuntimeError) as exc:
-        log.error("Send failed: %s", exc)
+        log.error("Provider call failed. Retain briefing claims and review provider outcomes before retry.")
         sys.exit(1)
 
     # Log the send so backup cron runs don't double-send
@@ -276,7 +281,15 @@ def main() -> None:
             from floodsight.db.supabase_client import log_briefing_sent
             log_briefing_sent(len(recipients), dry_run=False)
         except Exception as exc:
-            log.warning("Could not write to briefing_log (%s) — not fatal.", exc)
+            log.error("Provider request completed but briefing ledger write failed. Operator review required before any retry.")
+            sys.exit(1)
+
+
+def reserve_briefing_recipients(subscribers: list[dict]) -> list[str]:
+    from floodsight.db.supabase_client import claim_alert, today_lagos
+    event_date = today_lagos()
+    return [subscriber['phone'] for subscriber in subscribers
+            if claim_alert(subscriber['id'], event_date, 'Briefing')]
 
 
 if __name__ == "__main__":
