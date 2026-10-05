@@ -1,5 +1,9 @@
 # FloodSight Roadmap — From Susceptibility Map to Flood Depth Platform
 
+> Historical June 2026 roadmap, not current deployment or validation status.
+> Current evidence: `RELEASE_STATUS.md`, `UX_OPS_FIXES.md`, `PILOT_ACCEPTANCE.md`
+> and `SCIENTIFIC_VALIDATION.md`. The targets below are not achieved claims.
+
 **Status as of June 2026:** Open-data flood *susceptibility* prototype (QGIS-based) for three Lagos LGAs. No flood depth prediction, no trained ML model, no live data pipeline, no deployed application yet.
 
 **Target:** What the pitch deck describes — an AI flood-depth prediction platform (meters of inundation, 72-hour lead time) with a community-facing alert layer, deployed and validated.

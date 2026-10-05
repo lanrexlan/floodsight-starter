@@ -1,0 +1,406 @@
+{
+  "review_date": "2026-10-05",
+  "candidate_reports": 2870,
+  "corroborated_community_level_cases": 3,
+  "individual_polygons_verified": 0,
+  "independent_measured_depth_rows": 0,
+  "verified_dry_rows": 0,
+  "scientific_acceptance": false,
+  "experimental_depth_release_approved": false,
+  "allocations": {
+    "unallocated_review_only": 1675,
+    "quarantine_known_training_or_tuning_month": 1031,
+    "reserved_historical_challenge_not_pristine_holdout": 164
+  },
+  "service_geometry_context": {
+    "reported_place_intersects_grid_not_observed_wet": 2110,
+    "outside_service_grid": 760
+  },
+  "temporal_case_overlap_counts_not_verified_polygon_counts": {
+    "lagos_river_assessment_2024_10": 16,
+    "ikorodu_rain_flood_2025_08": 60,
+    "lagos_rain_flood_2025_09": 33
+  },
+  "provisional_review_groups_not_unique_events": 2381,
+  "grouping_parameters": {
+    "place_area_max_km2": 4,
+    "distance_m": 500,
+    "gap_days": 1
+  },
+  "known_training_and_tuning_months": {
+    "2011-07": [
+      "AUGMENT_EVENTS:2011_07",
+      "FLOOD_EVENTS:2011_07",
+      "training:2011_07:synthetic_augmented"
+    ],
+    "2012-07": [
+      "AUGMENT_EVENTS:2012_07",
+      "FLOOD_EVENTS:2012_07",
+      "training:2012_07:synthetic_augmented"
+    ],
+    "2015-07": [
+      "AUGMENT_EVENTS:2015_07",
+      "FLOOD_EVENTS:2015_07",
+      "training:2015_07:synthetic_augmented"
+    ],
+    "2016-07": [
+      "AUGMENT_EVENTS:2016_07",
+      "FLOOD_EVENTS:2016_07",
+      "training:2016_07:synthetic_augmented"
+    ],
+    "2017-06": [
+      "AUGMENT_EVENTS:2017_06",
+      "FLOOD_EVENTS:2017_06",
+      "training:2017_06:synthetic_augmented"
+    ],
+    "2018-06": [
+      "AUGMENT_EVENTS:2018_06",
+      "FLOOD_EVENTS:2018_06",
+      "training:2018_06:synthetic_augmented"
+    ],
+    "2019-07": [
+      "AUGMENT_EVENTS:2019_07",
+      "FLOOD_EVENTS:2019_07",
+      "training:2019_07:synthetic_augmented"
+    ],
+    "2019-10": [
+      "FLOOD_EVENTS:2019_10"
+    ],
+    "2020-06": [
+      "AUGMENT_EVENTS:2020_06",
+      "FLOOD_EVENTS:2020_06",
+      "training:2020_06:synthetic_augmented"
+    ],
+    "2021-07": [
+      "AUGMENT_EVENTS:2021_07a",
+      "AUGMENT_EVENTS:2021_07b",
+      "FLOOD_EVENTS:2021_07a",
+      "FLOOD_EVENTS:2021_07b",
+      "training:2021_07a:synthetic_augmented",
+      "training:2021_07b:synthetic_augmented",
+      "training:lekki_2021_07_12:sar_fwdet"
+    ],
+    "2022-06": [
+      "AUGMENT_EVENTS:2022_06",
+      "FLOOD_EVENTS:2022_06",
+      "training:2022_06:synthetic_augmented"
+    ],
+    "2022-07": [
+      "AUGMENT_EVENTS:2022_07",
+      "FLOOD_EVENTS:2022_07",
+      "training:2022_07:synthetic_augmented"
+    ],
+    "2022-10": [
+      "FLOOD_EVENTS:2022_10"
+    ],
+    "2023-06": [
+      "AUGMENT_EVENTS:2023_06",
+      "FLOOD_EVENTS:2023_06",
+      "training:2023_06:synthetic_augmented"
+    ],
+    "2023-09": [
+      "AUGMENT_EVENTS:2023_09",
+      "FLOOD_EVENTS:2023_09",
+      "training:2023_09:synthetic_augmented"
+    ],
+    "2024-06": [
+      "AUGMENT_EVENTS:2024_06",
+      "FLOOD_EVENTS:2024_06",
+      "training:2024_06:synthetic_augmented"
+    ],
+    "2024-07": [
+      "FLOOD_EVENTS:2024_07",
+      "training:2024_07b:synthetic_augmented",
+      "training:lekki_2024_07_03:sar_fwdet"
+    ]
+  },
+  "training_strata": [
+    {
+      "event_id": "2011_07",
+      "label_source": "synthetic_augmented",
+      "rows": 120
+    },
+    {
+      "event_id": "2012_07",
+      "label_source": "synthetic_augmented",
+      "rows": 120
+    },
+    {
+      "event_id": "2015_07",
+      "label_source": "synthetic_augmented",
+      "rows": 120
+    },
+    {
+      "event_id": "2016_07",
+      "label_source": "synthetic_augmented",
+      "rows": 120
+    },
+    {
+      "event_id": "2017_06",
+      "label_source": "synthetic_augmented",
+      "rows": 120
+    },
+    {
+      "event_id": "2018_06",
+      "label_source": "synthetic_augmented",
+      "rows": 120
+    },
+    {
+      "event_id": "2019_07",
+      "label_source": "synthetic_augmented",
+      "rows": 120
+    },
+    {
+      "event_id": "2020_06",
+      "label_source": "synthetic_augmented",
+      "rows": 120
+    },
+    {
+      "event_id": "2021_07a",
+      "label_source": "synthetic_augmented",
+      "rows": 120
+    },
+    {
+      "event_id": "2021_07b",
+      "label_source": "synthetic_augmented",
+      "rows": 120
+    },
+    {
+      "event_id": "2022_06",
+      "label_source": "synthetic_augmented",
+      "rows": 120
+    },
+    {
+      "event_id": "2022_07",
+      "label_source": "synthetic_augmented",
+      "rows": 120
+    },
+    {
+      "event_id": "2023_06",
+      "label_source": "synthetic_augmented",
+      "rows": 120
+    },
+    {
+      "event_id": "2023_09",
+      "label_source": "synthetic_augmented",
+      "rows": 120
+    },
+    {
+      "event_id": "2024_06",
+      "label_source": "synthetic_augmented",
+      "rows": 120
+    },
+    {
+      "event_id": "2024_07b",
+      "label_source": "synthetic_augmented",
+      "rows": 120
+    },
+    {
+      "event_id": "lekki_2021_07_12",
+      "label_source": "sar_fwdet",
+      "rows": 89
+    },
+    {
+      "event_id": "lekki_2024_07_03",
+      "label_source": "sar_fwdet",
+      "rows": 527
+    }
+  ],
+  "reserved_months": [
+    "2025-08",
+    "2025-09"
+  ],
+  "reserved_source_uuids": [
+    "034fe965aa964ac594db1d1076a8ab18",
+    "037994ae72b948df8f913322342a4642",
+    "0395be96b93b47c69828ac0641e563f7",
+    "0420ed301a714114abcfc47aa824051e",
+    "057b87f90d614953a5e586d80768ee43",
+    "05efac4a7efb4f16b0dbdf4d737dc879",
+    "08c321123d9d42868ca339c1a3eaf6d2",
+    "0fa81b9c96454a589c5229aa4ba9b03e",
+    "10083ba4961e427583484d545a6dbba5",
+    "11329a2049664b179c771032bc244d02",
+    "11b063bcf7e34b05b605d2d7cbceaa5a",
+    "15e210af726e49229932924e1d643ed7",
+    "16f5f86a944245d685c2cf9c43d0a776",
+    "17d01ee8870a4c098f91f3ee5a002f0d",
+    "1883d79fdba2430bbcda0300a072a62f",
+    "191fd080c8424b5bb1c389dea571a17b",
+    "1ec578de09094db496f61da3556d4e55",
+    "212389fe57c74adbbcbe46eea9deb9e7",
+    "229f78a07d3b44a2b73e9980c8a09211",
+    "23ac092eedaf4c3db3e02d3534b14739",
+    "24501eaeef724a05a64f94f172bf0b67",
+    "246064c0c58f49ee98266fab50f54bb4",
+    "248f01c62a4a4a5898dd6f437d9964d8",
+    "26efd06859f74f5cb73123dd53e90498",
+    "27a456645eaa4775a6f83e994aee3e85",
+    "27ce40176fa3465daa6b07bfbfc7dc16",
+    "2c7475dd0ed9447daafe4b3d300af917",
+    "2ed8348979ff40f1879902a7f095c1f2",
+    "3167c3308ed740acb0fe8181e121d5b4",
+    "32dcbd4c9443451aab22c09342abd365",
+    "34d0267013c948b6840649296044111e",
+    "3825f436e751427f845665433b23f764",
+    "3888b89320e849f9b4ba3c3ae90b27bc",
+    "3942a4a9d04643ac98d4ec0b99f002f8",
+    "3975742d2e4c44e5af05dc37a56cadf3",
+    "3f677e6613ee4925b40bb9f90ce1fb84",
+    "3f9f9d69394644948622bf2e731358b1",
+    "4157298a42a0443994d42c144ff89ec2",
+    "4201c5aacca34e759a00fe6d0b5e1428",
+    "44ca16a5911c48d2afd9f34604979263",
+    "45f3782f7d474c50ad27ff3bb2a50e57",
+    "465852534b344a4abccdd4a8ea9f301d",
+    "474ff40519e44650ad67928afd7f4aa0",
+    "49f543f3dd154e308355d6798dfef53d",
+    "4a9ccda46ba148c381d183f082b3175b",
+    "4d1de7b0b1b84491b00a3431bbdd5215",
+    "4d86a72f7bec4e27b1c043d910a6691e",
+    "4dba7b3f9c3e4972945d48f50796c2ae",
+    "4dbb9d0d07b349aba7fa9123fbbceba0",
+    "4f5db5d688c94d2f907a662eb359d5b8",
+    "520e78314dd2425e8515eef057544ea6",
+    "52b6796b26c34de5ae4af3bb4db65b58",
+    "535d2bfb40104a64903fd23fde18f42c",
+    "54a5a03e695b4a9085f8c67f7f0e5a64",
+    "54de704bf3c346879c70d927b35f36e8",
+    "55b43df6bd4e4dcd9f287e5ae09fdf01",
+    "55cbe5fdbd6d49859b63478c6b148354",
+    "56f66f5e4ea74f40b0e0802b16677da6",
+    "5acc1b3023c941b5a5067217e9bcfab0",
+    "5c2a528503ce427abda4103f929f8266",
+    "5cb9436001a64b179d69a137c21e4583",
+    "5d3f6f9d2d894679b81c60e350fd9b9d",
+    "5e8093e6be1b426292847f7966a6f88e",
+    "60fb72ff9cf749a0a58442748629ed47",
+    "615d16426cfc4263bf82519ef5cb612e",
+    "6578db3fd842438d951aae6a948f5b70",
+    "69b82b264877468296cfcaf324096660",
+    "6d9edf640b014810bb6d7397a8821e63",
+    "6e8922b92650477696de8277fccb61d0",
+    "6f104d7e606f4d1796c52a63183adf7e",
+    "718c40607b654db0a8d8e4698bf70631",
+    "734408fda08b4374b8ee6087985713d1",
+    "76c35baa4ea64da299efb77642e3db1b",
+    "7736a192b34e4a6d990d02242af4531e",
+    "7aa8b09859fd4a58b0efd8926621e0bf",
+    "7d16e8bb767146928bb693508b3ce34c",
+    "7e5d3aaaaee24a559526635bc1b2fddc",
+    "7ea8a49b9f1c431ba3994f4bd8118854",
+    "833b574d50384601aa75a999bb2387e6",
+    "844de116c8d64ae08848beedacb77f93",
+    "84e90a142eb04fa0b24dcb0080da13d0",
+    "853de1f51fa84dda8660b97bbbbb090c",
+    "87c036a3a3f543b981455484508baba9",
+    "87f9b19a5b2940138738339be251e628",
+    "8a1137270fdc4e339c12124c49619f35",
+    "8a159b22438546769158c9892431493d",
+    "8a16d524cec34d76855d794c667b71ae",
+    "8ce5262e40934547acf2704a605b25db",
+    "8ef55de6e8b34ce5bf03e189738eee6c",
+    "9323233ad39b468c952af4f2f25b1abc",
+    "974b795f8606407e8508dfac9f6955bb",
+    "975b79a04cbc433d903768c43c465856",
+    "98a70a1a3127413694de17b1900a07e9",
+    "9c2cef96f1554c9c99b7ffb1bfcb9414",
+    "9c3ed6efedaa470bb00ca194e123e297",
+    "9e527db95de34f5fa1ef713b54fda155",
+    "9f90e10ec08745bba9f95e32f4d69917",
+    "a102ae09791a4621843e7ca6854950a5",
+    "a2466e512fb84a12845c9a9f7dfc1891",
+    "a60aada489614c82aa12b26b440ed003",
+    "a83ea8f196a545a0a50b8021d2b763a1",
+    "a91e723847fc40268c4891d68525e550",
+    "abb3e98e566b4477818b06518371fc75",
+    "abe753278ee94f41a79df007df2614de",
+    "ad038fbe21d641eca295860e3eafbf48",
+    "ad0c49cc54914966a4fa94eef3217f5b",
+    "b02b69a8fc18435093fa6cf956785a93",
+    "b0b3797ec74f44e1aa06fbf8ef1dc30c",
+    "b28ca31e068e447a801c41dfb04a1f70",
+    "b3687933ae884950a21820a9c705822e",
+    "b3d0a8ae71c9456493896ad7cee1c666",
+    "b40cf3ab342343bcbc934ac7651e52fb",
+    "b7a0867371a4411c9944939ec6790c40",
+    "b86feb1b9351482c84d50bb9da0e305d",
+    "b8f4f5d428424cbdab3af2b15a6de9fc",
+    "ba05b7bf3ed64cf68872f5981899a5ce",
+    "bba167747a4a4efd9cd6badf4eb79ae5",
+    "bc3941de7b654fb49ba75cf8e5bbec6a",
+    "bc4a38f3878a48aa9af3ed73bc5f682e",
+    "bd21ec50cdc447b9ad285a0e57d25bfb",
+    "bd7ffc1860344918acdcfcba9c7ff565",
+    "bed2524131144da180f226cdb27834a1",
+    "bf7e0bc5d5bb4aec8a10d2eb87186814",
+    "c52708c85ffd4e54a8873a66ce1f0d78",
+    "c5efaec805764ddaa0defdecd5f6785e",
+    "c87b1017208445a793c52e1db6c609e2",
+    "c8a6d4a126a34deba0aa615dc581be57",
+    "c902783d0f5e40649d6f8ac7c0bb3649",
+    "c927309f53db46a1942400102b8b7817",
+    "c979288468134ae29df95375290706ae",
+    "c9ff336b435a4563abdead05c80073ea",
+    "cbfc26fb3f114d5386deaa67631763d9",
+    "ce9d542f580f4d4bafaff6c6b4e13cb5",
+    "d212e08d8a954c598b5886fb22b170d6",
+    "d402f98290a948568bc2678e0cedbece",
+    "d4a353b77ac1457793afe5bbcfc7b67f",
+    "d7565c77d4fd4a32ac1cfa747851b695",
+    "d8cc23b5a19045798ebe6c2bfeec580f",
+    "da3846241a4d47f5a6d9b28d5a83275f",
+    "da3ca7573699468cb0c6567b9fd452e8",
+    "da6ae39f5e5d40e7b0d6a0b6757301f9",
+    "dd09021ebf04465c830cd1cb17718751",
+    "ddb1a259820641a5a9d66cfb8d9b93ba",
+    "de6c23faf1c14260be021ec803401efd",
+    "e2ac3065352e407a9cbf640eeeb03c5c",
+    "e46946cb647b48eaa6c460fd05db7206",
+    "e47a11b7ccc24b0c81de831b2e21a74f",
+    "e55fbd1ac6c54ef3ab053650a7c4cd2d",
+    "e86a56c01d364083958fda911eea8be6",
+    "eb34cc587eb34cfa85df9419acc0574e",
+    "eb68f3903c02459b89dcda2f6d5fde6f",
+    "ed806600c35343aebf99f6f5120add21",
+    "ed88dbd381b24935a1d9943a855badbc",
+    "f2078b888e0c4b229da033f30062be86",
+    "f217c2c5e29d43da83237d4e9976cfc4",
+    "f5c4406c19394c7c91e428e5128ab47f",
+    "f5cf816b907a45438e158a08d4920cb6",
+    "f73127877ae5409e81565e6940012e04",
+    "f854f0bb384a43e0a0a6b405206ba7f4",
+    "f8b5fb8f744c48e69d6cfa678faa3642",
+    "fa39716b5b014f879198b8b62e66cfad",
+    "fbdb7f9e1f14416cb1cadf39ed834287",
+    "fe914bd96ac941e2b4dbbf6ad09841bd",
+    "fea12c97a0ec4b3aa6a11675943c475e"
+  ],
+  "input_sha256": {
+    "data/raw/scientific/groundsource_lagos_candidates.geojson": "03c8821da8e12de77fc91fc0840d8f27ae6e49585db4119eda613497af0346df",
+    "data/validation/reviewed_event_sources.json": "72493cc77e462111c5c248feea1e9fa8087517ab04e1016a851c14a81917b984",
+    "reports/groundsource_lagos_inventory.json": "b1f9c0f2693a1d5d264c83eb6cf53a34122fa32d1432161dc043de56e5683c8a",
+    "scripts/review_groundsource.py": "78e317c8a1d10359765c6f81da84d7f4f26bb10eefbb7471bc51cc347dff5ebe",
+    "data/processed/real_training_dataset.csv": "0bb6ee565497e890b849c5d0ca771f58294c0d1c3b467c065b028a7c2c3f8e66",
+    "data/processed/scored_grid.gpkg": "13dcd850bb0c6a953fbd3bad925d5afe8629ab49fc7259b32c488c8fadd497f1",
+    "data/models/depth_model.joblib": "d27cb5fd372df8fa042e5e21b3972382dc18eb41dcd3c4f1aea757153bd66ee0",
+    "api/routers/validate.py": "b1c352d29eed5de1af3e6cffacd5aa3bb6624bc364e0ce7aecef712da7e25f57",
+    "scripts/10_augment_training_data.py": "f359645a6232a0d57eddea3183e4be0325447db4e21941a7d72554aa1c2b2849",
+    "scripts/calibrate_coastal_threshold.py": "836f3f1c004dd57b7bb15d512846e4a707e0b038be08bbbdabda0bcb3c94eaa9",
+    "floodsight/forecast/marine.py": "d03395494ce8504da021296c3dcf56362f8dde927e2e32df1e11462811f626fe",
+    "floodsight/config.py": "fea37f524a0793bf64004683da150ad1abe87be3b01a546451b5259d5dc0a5f6"
+  },
+  "predictions_computed": false,
+  "model_performance_used_for_selection": false,
+  "holdout_status": "Proposed new-label historical challenge; NOT pristine whole-system or prospective validation",
+  "limitations": [
+    "Source pages are references, not licensed article datasets; no full articles/media reproduced or imported for training",
+    "Different reports may share observers; corroboration is not proof of statistically independent observations",
+    "No verified dry controls or numerical depth labels created",
+    "Proposed reserve is a new-label historical challenge set, not a pristine whole-system or prospective holdout",
+    "Owner must confirm omitted external training/presentation history; site leakage cannot be audited from a coordinate-free CSV"
+  ],
+  "output_sha256": {
+    "data/raw/scientific/groundsource_review_queue.csv": "fee930ae46d09994ff926138f63789338cb990f4a3db519e048150c0a48486f9"
+  }
+}
