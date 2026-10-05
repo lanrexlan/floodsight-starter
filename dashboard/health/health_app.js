@@ -19,15 +19,27 @@ document.getElementById('operator-form').addEventListener('submit', event => {
   const input = document.getElementById('operator-token');
   operatorToken = input.value.trim();
   input.value = '';
+  clearPrivateReports();
   document.getElementById('operator-status').textContent = 'Token loaded in memory. Each private report must still authenticate; this is not a login confirmation.';
   loadAll();
 });
 document.getElementById('operator-signout').addEventListener('click', () => {
   operatorToken = '';
   document.getElementById('operator-token').value = '';
+  clearPrivateReports();
   document.getElementById('operator-status').textContent = 'Operator access cleared.';
   loadAll();
 });
+function clearPrivateReports() {
+  if (casesChart) { casesChart.destroy(); casesChart = null; }
+  const canvas = document.getElementById('cases-chart');
+  const context = canvas.getContext('2d');
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  for (const id of ['chew-activity', 'mel-table-container']) {
+    document.getElementById(id).textContent = 'Private report unavailable until operator access is verified.';
+  }
+  document.getElementById('mel-badge').textContent = 'Operator access required';
+}
 function escapeHTML(value) {
   return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
 }

@@ -21,7 +21,8 @@ database mutations, real SMS, author outreach or public messaging activation.
   keyboard-operable, with duplicate-submission protection, cancellation and wrong-
   code retries without another SMS request. Only `subscribed` confirms success.
 - Operator tokens use an inline password field, stay only in memory and are
-  cleared from the field. Changed/cleared access discards old private responses.
+  cleared from the field. Changed/cleared access discards old private responses
+  and immediately clears previously rendered private charts/reports.
   Health values are labelled uncalibrated research scores, not outbreak probabilities.
   Case reports now require server-side operator authentication as well; deployed
   main's public case-view gap was found in the read-only verification.
@@ -42,7 +43,7 @@ database mutations, real SMS, author outreach or public messaging activation.
 
 Local full Python suite: 215 passed, eight isolated-database tests skipped; that
 database was not running for this run. Earlier PostgreSQL evidence is historical,
-not a new execution of these changes. Hermetic JavaScript suite: 20 passed.
+not a new execution of these changes. Hermetic JavaScript suite: 21 passed.
 All five workflows parsed successfully as YAML. Scientific freeze verification
 passed; no research holdout or experimental model settings were changed.
 

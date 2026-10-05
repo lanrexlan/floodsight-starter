@@ -1,6 +1,10 @@
 # Lagos historical evidence review
 
 Review date: 2026-10-05. **Scientific acceptance is still open.**
+The freeze hashes refer to the original local byte-level snapshot, including
+line endings and ignored research inputs. Git may normalize text line endings;
+a fresh checkout is not a substitute for that retained snapshot. Verification
+must reject missing/changed bytes, not silently recreate the proposal after tuning.
 This is a research-only desk review. Production settings, depth models, hosting,
 real alert dispatch and external accounts were not changed.
 

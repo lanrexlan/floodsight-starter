@@ -188,3 +188,12 @@ test('clearing operator access discards in-flight private responses',async()=>{
   const result=h.c.supabaseFetch('chew_responses'); h.run("operatorToken=''");
   resolve(response([{private:'test'}])); await assert.rejects(result,/stale report discarded/);
 });
+test('changing operator access clears already rendered private reports',()=>{
+  const h=harness('dashboard/health/health_app.js'); let cleared=false,destroyed=false;
+  h.el('cases-chart').getContext=()=>({clearRect(){cleared=true;}});
+  h.c.testChart={destroy(){destroyed=true;}}; h.run('casesChart=testChart');
+  h.el('chew-activity').textContent='Old private report';
+  h.c.clearPrivateReports();
+  assert.equal(cleared,true); assert.equal(destroyed,true); assert.equal(h.run('casesChart'),null);
+  assert.doesNotMatch(h.el('chew-activity').textContent,/Old private/);
+});
