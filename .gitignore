@@ -41,6 +41,11 @@ data/models/**
 # scripts/sql/03_logs.sql). May contain reporter PII; never commit.
 data/logs/
 
+# Private database recovery artifacts must never enter Git.
+data/backups/
+*.dump
+*.pgpass
+
 .pytest_cache/
 .release-venv/
 .test-tmp*/

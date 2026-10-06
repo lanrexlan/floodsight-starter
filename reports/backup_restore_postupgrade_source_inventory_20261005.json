@@ -1,0 +1,3882 @@
+{
+  "scope": "public application schema; not a full Supabase project backup",
+  "views": [
+    {
+      "name": "alert_delivery_stats",
+      "owner": "postgres",
+      "definition": " SELECT event_date,\n    alert_level,\n    count(*) AS submitted,\n    count(*) FILTER (WHERE (delivered_at IS NOT NULL)) AS delivered,\n    count(*) FILTER (WHERE (at_status = ANY (ARRAY['Failed'::text, 'Rejected'::text]))) AS failed,\n    count(*) FILTER (WHERE ((delivered_at IS NULL) AND (COALESCE(at_status, ''::text) <> ALL (ARRAY['Failed'::text, 'Rejected'::text])))) AS pending,\n    round(((count(*) FILTER (WHERE (delivered_at IS NOT NULL)))::numeric / (NULLIF(count(*) FILTER (WHERE ((delivered_at IS NOT NULL) OR (at_status = ANY (ARRAY['Failed'::text, 'Rejected'::text])))), 0))::numeric), 4) AS delivery_rate\n   FROM alert_log\n  GROUP BY event_date, alert_level\n  ORDER BY event_date DESC, alert_level;"
+    }
+  ],
+  "tables": [
+    {
+      "rls": true,
+      "name": "alert_claims",
+      "rows": 0,
+      "content_md5": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "rls": true,
+      "name": "alert_log",
+      "rows": 0,
+      "content_md5": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "rls": true,
+      "name": "briefing_log",
+      "rows": 83,
+      "content_md5": "4e52b6a6fd8250f26ddaa6c7bc6af63f"
+    },
+    {
+      "rls": true,
+      "name": "chew_responses",
+      "rows": 0,
+      "content_md5": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "rls": true,
+      "name": "chew_subscribers",
+      "rows": 0,
+      "content_md5": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "rls": true,
+      "name": "dhis2_malaria_cases",
+      "rows": 0,
+      "content_md5": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "rls": true,
+      "name": "dispatch_cells",
+      "rows": 0,
+      "content_md5": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "rls": true,
+      "name": "entomology_observations",
+      "rows": 0,
+      "content_md5": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "rls": true,
+      "name": "health_alerts",
+      "rows": 0,
+      "content_md5": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "rls": true,
+      "name": "lga_health_risk",
+      "rows": 0,
+      "content_md5": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "rls": true,
+      "name": "mel_events",
+      "rows": 0,
+      "content_md5": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "rls": true,
+      "name": "pending_subscriptions",
+      "rows": 0,
+      "content_md5": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "rls": true,
+      "name": "prediction_log",
+      "rows": 0,
+      "content_md5": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "rls": true,
+      "name": "subscribers",
+      "rows": 2,
+      "content_md5": "a8146f5a536e1d23f86a29358550a2e4"
+    },
+    {
+      "rls": true,
+      "name": "subscription_attempts",
+      "rows": 0,
+      "content_md5": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "rls": true,
+      "name": "verifications",
+      "rows": 0,
+      "content_md5": "d41d8cd98f00b204e9800998ecf8427e"
+    }
+  ],
+  "columns": [
+    {
+      "type": "pg_catalog.uuid",
+      "table": "alert_claims",
+      "column": "subscriber_id",
+      "default": null,
+      "ordinal": 1,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.date",
+      "table": "alert_claims",
+      "column": "event_date",
+      "default": null,
+      "ordinal": 2,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "alert_claims",
+      "column": "alert_level",
+      "default": null,
+      "ordinal": 3,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.timestamptz",
+      "table": "alert_claims",
+      "column": "reserved_at",
+      "default": "now()",
+      "ordinal": 4,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.date",
+      "table": "alert_delivery_stats",
+      "column": "event_date",
+      "default": null,
+      "ordinal": 1,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "alert_delivery_stats",
+      "column": "alert_level",
+      "default": null,
+      "ordinal": 2,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int8",
+      "table": "alert_delivery_stats",
+      "column": "submitted",
+      "default": null,
+      "ordinal": 3,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int8",
+      "table": "alert_delivery_stats",
+      "column": "delivered",
+      "default": null,
+      "ordinal": 4,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int8",
+      "table": "alert_delivery_stats",
+      "column": "failed",
+      "default": null,
+      "ordinal": 5,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int8",
+      "table": "alert_delivery_stats",
+      "column": "pending",
+      "default": null,
+      "ordinal": 6,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.numeric",
+      "table": "alert_delivery_stats",
+      "column": "delivery_rate",
+      "default": null,
+      "ordinal": 7,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.uuid",
+      "table": "alert_log",
+      "column": "id",
+      "default": "gen_random_uuid()",
+      "ordinal": 1,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.uuid",
+      "table": "alert_log",
+      "column": "subscriber_id",
+      "default": null,
+      "ordinal": 2,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "alert_log",
+      "column": "alert_level",
+      "default": null,
+      "ordinal": 3,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.timestamptz",
+      "table": "alert_log",
+      "column": "sent_at",
+      "default": "now()",
+      "ordinal": 4,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.date",
+      "table": "alert_log",
+      "column": "event_date",
+      "default": null,
+      "ordinal": 5,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "alert_log",
+      "column": "at_message_id",
+      "default": null,
+      "ordinal": 6,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "alert_log",
+      "column": "at_status",
+      "default": null,
+      "ordinal": 7,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "alert_log",
+      "column": "at_cost",
+      "default": null,
+      "ordinal": 8,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.timestamptz",
+      "table": "alert_log",
+      "column": "delivered_at",
+      "default": null,
+      "ordinal": 9,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "alert_log",
+      "column": "failure_reason",
+      "default": null,
+      "ordinal": 10,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int8",
+      "table": "briefing_log",
+      "column": "id",
+      "default": null,
+      "ordinal": 1,
+      "identity": "YES",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.date",
+      "table": "briefing_log",
+      "column": "sent_date",
+      "default": "CURRENT_DATE",
+      "ordinal": 2,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.timestamptz",
+      "table": "briefing_log",
+      "column": "sent_at",
+      "default": "now()",
+      "ordinal": 3,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int4",
+      "table": "briefing_log",
+      "column": "recipient_count",
+      "default": "0",
+      "ordinal": 4,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.bool",
+      "table": "briefing_log",
+      "column": "dry_run",
+      "default": "false",
+      "ordinal": 5,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int8",
+      "table": "chew_responses",
+      "column": "id",
+      "default": "nextval('chew_responses_id_seq'::regclass)",
+      "ordinal": 1,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "chew_responses",
+      "column": "phone",
+      "default": null,
+      "ordinal": 2,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int8",
+      "table": "chew_responses",
+      "column": "chew_id",
+      "default": null,
+      "ordinal": 3,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "chew_responses",
+      "column": "raw_message",
+      "default": null,
+      "ordinal": 4,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "chew_responses",
+      "column": "parsed_action",
+      "default": null,
+      "ordinal": 5,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int4",
+      "table": "chew_responses",
+      "column": "cases_reported",
+      "default": null,
+      "ordinal": 6,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "chew_responses",
+      "column": "lga_name",
+      "default": null,
+      "ordinal": 7,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.timestamptz",
+      "table": "chew_responses",
+      "column": "received_at",
+      "default": "now()",
+      "ordinal": 8,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int8",
+      "table": "chew_subscribers",
+      "column": "id",
+      "default": "nextval('chew_subscribers_id_seq'::regclass)",
+      "ordinal": 1,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "chew_subscribers",
+      "column": "phone",
+      "default": null,
+      "ordinal": 2,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "chew_subscribers",
+      "column": "name",
+      "default": null,
+      "ordinal": 3,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "chew_subscribers",
+      "column": "lga_name",
+      "default": null,
+      "ordinal": 4,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "chew_subscribers",
+      "column": "facility_name",
+      "default": null,
+      "ordinal": 5,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "chew_subscribers",
+      "column": "role",
+      "default": "'CHEW'::text",
+      "ordinal": 6,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "chew_subscribers",
+      "column": "ward",
+      "default": null,
+      "ordinal": 7,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.bool",
+      "table": "chew_subscribers",
+      "column": "active",
+      "default": "true",
+      "ordinal": 8,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.timestamptz",
+      "table": "chew_subscribers",
+      "column": "enrolled_at",
+      "default": "now()",
+      "ordinal": 9,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "chew_subscribers",
+      "column": "enrolled_by",
+      "default": null,
+      "ordinal": 10,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int8",
+      "table": "dhis2_malaria_cases",
+      "column": "id",
+      "default": "nextval('dhis2_malaria_cases_id_seq'::regclass)",
+      "ordinal": 1,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "dhis2_malaria_cases",
+      "column": "lga_name",
+      "default": null,
+      "ordinal": 2,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "dhis2_malaria_cases",
+      "column": "period",
+      "default": null,
+      "ordinal": 3,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int4",
+      "table": "dhis2_malaria_cases",
+      "column": "confirmed_cases",
+      "default": null,
+      "ordinal": 4,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int4",
+      "table": "dhis2_malaria_cases",
+      "column": "suspected_cases",
+      "default": null,
+      "ordinal": 5,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int4",
+      "table": "dhis2_malaria_cases",
+      "column": "rdt_positive",
+      "default": null,
+      "ordinal": 6,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int4",
+      "table": "dhis2_malaria_cases",
+      "column": "treatment_started",
+      "default": null,
+      "ordinal": 7,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "dhis2_malaria_cases",
+      "column": "data_element_id",
+      "default": null,
+      "ordinal": 8,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "dhis2_malaria_cases",
+      "column": "org_unit_id",
+      "default": null,
+      "ordinal": 9,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.timestamptz",
+      "table": "dhis2_malaria_cases",
+      "column": "pulled_at",
+      "default": "now()",
+      "ordinal": 10,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int8",
+      "table": "dispatch_cells",
+      "column": "id",
+      "default": null,
+      "ordinal": 1,
+      "identity": "YES",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.timestamptz",
+      "table": "dispatch_cells",
+      "column": "created_at",
+      "default": "now()",
+      "ordinal": 2,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.date",
+      "table": "dispatch_cells",
+      "column": "event_date",
+      "default": null,
+      "ordinal": 3,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "dispatch_cells",
+      "column": "cell_id",
+      "default": null,
+      "ordinal": 4,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.float8",
+      "table": "dispatch_cells",
+      "column": "lat",
+      "default": null,
+      "ordinal": 5,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.float8",
+      "table": "dispatch_cells",
+      "column": "lon",
+      "default": null,
+      "ordinal": 6,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "dispatch_cells",
+      "column": "alert_level",
+      "default": null,
+      "ordinal": 7,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int8",
+      "table": "entomology_observations",
+      "column": "id",
+      "default": "nextval('entomology_observations_id_seq'::regclass)",
+      "ordinal": 1,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "entomology_observations",
+      "column": "lga_name",
+      "default": null,
+      "ordinal": 2,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "entomology_observations",
+      "column": "ward",
+      "default": null,
+      "ordinal": 3,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.float8",
+      "table": "entomology_observations",
+      "column": "lat",
+      "default": null,
+      "ordinal": 4,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.float8",
+      "table": "entomology_observations",
+      "column": "lon",
+      "default": null,
+      "ordinal": 5,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.date",
+      "table": "entomology_observations",
+      "column": "survey_date",
+      "default": null,
+      "ordinal": 6,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int8",
+      "table": "entomology_observations",
+      "column": "alert_id",
+      "default": null,
+      "ordinal": 7,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "entomology_observations",
+      "column": "flood_event_id",
+      "default": null,
+      "ordinal": 8,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int4",
+      "table": "entomology_observations",
+      "column": "days_since_flood",
+      "default": null,
+      "ordinal": 9,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "entomology_observations",
+      "column": "water_type",
+      "default": null,
+      "ordinal": 10,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "entomology_observations",
+      "column": "habitat_notes",
+      "default": null,
+      "ordinal": 11,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int4",
+      "table": "entomology_observations",
+      "column": "dips_taken",
+      "default": null,
+      "ordinal": 12,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int4",
+      "table": "entomology_observations",
+      "column": "anopheles_larvae",
+      "default": "0",
+      "ordinal": 13,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int4",
+      "table": "entomology_observations",
+      "column": "culex_larvae",
+      "default": "0",
+      "ordinal": 14,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int4",
+      "table": "entomology_observations",
+      "column": "aedes_larvae",
+      "default": "0",
+      "ordinal": 15,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.bool",
+      "table": "entomology_observations",
+      "column": "anopheles_confirmed",
+      "default": "false",
+      "ordinal": 16,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "entomology_observations",
+      "column": "species_id_method",
+      "default": null,
+      "ordinal": 17,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "entomology_observations",
+      "column": "surveyed_by",
+      "default": null,
+      "ordinal": 18,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.timestamptz",
+      "table": "entomology_observations",
+      "column": "recorded_at",
+      "default": "now()",
+      "ordinal": 19,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int8",
+      "table": "health_alerts",
+      "column": "id",
+      "default": "nextval('health_alerts_id_seq'::regclass)",
+      "ordinal": 1,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int8",
+      "table": "health_alerts",
+      "column": "chew_id",
+      "default": null,
+      "ordinal": 2,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int8",
+      "table": "health_alerts",
+      "column": "lga_health_risk_id",
+      "default": null,
+      "ordinal": 3,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "health_alerts",
+      "column": "lga_name",
+      "default": null,
+      "ordinal": 4,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "health_alerts",
+      "column": "phone",
+      "default": null,
+      "ordinal": 5,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "health_alerts",
+      "column": "message_text",
+      "default": null,
+      "ordinal": 6,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "health_alerts",
+      "column": "at_message_id",
+      "default": null,
+      "ordinal": 7,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "health_alerts",
+      "column": "at_status",
+      "default": null,
+      "ordinal": 8,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "health_alerts",
+      "column": "at_cost",
+      "default": null,
+      "ordinal": 9,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.timestamptz",
+      "table": "health_alerts",
+      "column": "sent_at",
+      "default": "now()",
+      "ordinal": 10,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.timestamptz",
+      "table": "health_alerts",
+      "column": "delivered_at",
+      "default": null,
+      "ordinal": 11,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "health_alerts",
+      "column": "idempotency_key",
+      "default": null,
+      "ordinal": 12,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "health_alerts",
+      "column": "risk_tier",
+      "default": null,
+      "ordinal": 13,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.date",
+      "table": "health_alerts",
+      "column": "outbreak_window_start",
+      "default": null,
+      "ordinal": 14,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.date",
+      "table": "health_alerts",
+      "column": "outbreak_window_end",
+      "default": null,
+      "ordinal": 15,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "health_alerts",
+      "column": "failure_reason",
+      "default": null,
+      "ordinal": 16,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int8",
+      "table": "lga_health_risk",
+      "column": "id",
+      "default": "nextval('lga_health_risk_id_seq'::regclass)",
+      "ordinal": 1,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "lga_health_risk",
+      "column": "lga_name",
+      "default": null,
+      "ordinal": 2,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.timestamptz",
+      "table": "lga_health_risk",
+      "column": "computed_at",
+      "default": "now()",
+      "ordinal": 3,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "lga_health_risk",
+      "column": "flood_event_id",
+      "default": null,
+      "ordinal": 4,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.numeric",
+      "table": "lga_health_risk",
+      "column": "inundation_area_km2",
+      "default": null,
+      "ordinal": 5,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.numeric",
+      "table": "lga_health_risk",
+      "column": "peak_susceptibility",
+      "default": null,
+      "ordinal": 6,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.numeric",
+      "table": "lga_health_risk",
+      "column": "temp_celsius",
+      "default": null,
+      "ordinal": 7,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int4",
+      "table": "lga_health_risk",
+      "column": "breeding_lag_days",
+      "default": null,
+      "ordinal": 8,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.date",
+      "table": "lga_health_risk",
+      "column": "outbreak_window_start",
+      "default": null,
+      "ordinal": 9,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.date",
+      "table": "lga_health_risk",
+      "column": "outbreak_window_end",
+      "default": null,
+      "ordinal": 10,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.numeric",
+      "table": "lga_health_risk",
+      "column": "outbreak_probability",
+      "default": null,
+      "ordinal": 11,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "lga_health_risk",
+      "column": "risk_tier",
+      "default": null,
+      "ordinal": 12,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.bool",
+      "table": "lga_health_risk",
+      "column": "alert_sent",
+      "default": "false",
+      "ordinal": 13,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.timestamptz",
+      "table": "lga_health_risk",
+      "column": "alert_sent_at",
+      "default": null,
+      "ordinal": 14,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int8",
+      "table": "mel_events",
+      "column": "id",
+      "default": "nextval('mel_events_id_seq'::regclass)",
+      "ordinal": 1,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "mel_events",
+      "column": "lga_name",
+      "default": null,
+      "ordinal": 2,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "mel_events",
+      "column": "event_type",
+      "default": null,
+      "ordinal": 3,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int4",
+      "table": "mel_events",
+      "column": "quantity",
+      "default": null,
+      "ordinal": 4,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "mel_events",
+      "column": "unit",
+      "default": null,
+      "ordinal": 5,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "mel_events",
+      "column": "reported_by",
+      "default": null,
+      "ordinal": 6,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "mel_events",
+      "column": "facility_name",
+      "default": null,
+      "ordinal": 7,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "mel_events",
+      "column": "ward",
+      "default": null,
+      "ordinal": 8,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.date",
+      "table": "mel_events",
+      "column": "event_date",
+      "default": null,
+      "ordinal": 9,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "mel_events",
+      "column": "notes",
+      "default": null,
+      "ordinal": 10,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int8",
+      "table": "mel_events",
+      "column": "alert_id",
+      "default": null,
+      "ordinal": 11,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.timestamptz",
+      "table": "mel_events",
+      "column": "recorded_at",
+      "default": "now()",
+      "ordinal": 12,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "pending_subscriptions",
+      "column": "phone",
+      "default": null,
+      "ordinal": 1,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "pending_subscriptions",
+      "column": "code_hash",
+      "default": null,
+      "ordinal": 2,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.jsonb",
+      "table": "pending_subscriptions",
+      "column": "payload",
+      "default": null,
+      "ordinal": 3,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int4",
+      "table": "pending_subscriptions",
+      "column": "attempts",
+      "default": "0",
+      "ordinal": 4,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.timestamptz",
+      "table": "pending_subscriptions",
+      "column": "created_at",
+      "default": "now()",
+      "ordinal": 5,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.timestamptz",
+      "table": "pending_subscriptions",
+      "column": "expires_at",
+      "default": null,
+      "ordinal": 6,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int8",
+      "table": "prediction_log",
+      "column": "id",
+      "default": null,
+      "ordinal": 1,
+      "identity": "YES",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.timestamptz",
+      "table": "prediction_log",
+      "column": "ts",
+      "default": "now()",
+      "ordinal": 2,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.float8",
+      "table": "prediction_log",
+      "column": "lat",
+      "default": null,
+      "ordinal": 3,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.float8",
+      "table": "prediction_log",
+      "column": "lon",
+      "default": null,
+      "ordinal": 4,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "prediction_log",
+      "column": "cell_id",
+      "default": null,
+      "ordinal": 5,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.jsonb",
+      "table": "prediction_log",
+      "column": "features",
+      "default": null,
+      "ordinal": 6,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.float8",
+      "table": "prediction_log",
+      "column": "predicted_depth_m",
+      "default": null,
+      "ordinal": 7,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.uuid",
+      "table": "subscribers",
+      "column": "id",
+      "default": "gen_random_uuid()",
+      "ordinal": 1,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "subscribers",
+      "column": "name",
+      "default": null,
+      "ordinal": 2,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "subscribers",
+      "column": "phone",
+      "default": null,
+      "ordinal": 3,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.float8",
+      "table": "subscribers",
+      "column": "lat",
+      "default": null,
+      "ordinal": 4,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.float8",
+      "table": "subscribers",
+      "column": "lon",
+      "default": null,
+      "ordinal": 5,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "subscribers",
+      "column": "area_name",
+      "default": null,
+      "ordinal": 6,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "subscribers",
+      "column": "risk_class",
+      "default": null,
+      "ordinal": 7,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.timestamptz",
+      "table": "subscribers",
+      "column": "created_at",
+      "default": "now()",
+      "ordinal": 8,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.bool",
+      "table": "subscribers",
+      "column": "active",
+      "default": "true",
+      "ordinal": 9,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.timestamptz",
+      "table": "subscribers",
+      "column": "consent_at",
+      "default": "now()",
+      "ordinal": 10,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.timestamptz",
+      "table": "subscribers",
+      "column": "deactivated_at",
+      "default": null,
+      "ordinal": 11,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "subscription_attempts",
+      "column": "key",
+      "default": null,
+      "ordinal": 1,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.timestamptz",
+      "table": "subscription_attempts",
+      "column": "starts_at",
+      "default": null,
+      "ordinal": 2,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int4",
+      "table": "subscription_attempts",
+      "column": "attempts",
+      "default": null,
+      "ordinal": 3,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.int8",
+      "table": "verifications",
+      "column": "id",
+      "default": null,
+      "ordinal": 1,
+      "identity": "YES",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "verifications",
+      "column": "verification_id",
+      "default": null,
+      "ordinal": 2,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.timestamptz",
+      "table": "verifications",
+      "column": "ts",
+      "default": "now()",
+      "ordinal": 3,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.float8",
+      "table": "verifications",
+      "column": "lat",
+      "default": null,
+      "ordinal": 4,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.float8",
+      "table": "verifications",
+      "column": "lon",
+      "default": null,
+      "ordinal": 5,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.date",
+      "table": "verifications",
+      "column": "event_date",
+      "default": null,
+      "ordinal": 6,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.bool",
+      "table": "verifications",
+      "column": "observed_flooded",
+      "default": null,
+      "ordinal": 7,
+      "identity": "NO",
+      "nullable": "NO",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.float8",
+      "table": "verifications",
+      "column": "observed_depth_m",
+      "default": null,
+      "ordinal": 8,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "verifications",
+      "column": "reporter",
+      "default": null,
+      "ordinal": 9,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    },
+    {
+      "type": "pg_catalog.text",
+      "table": "verifications",
+      "column": "notes",
+      "default": null,
+      "ordinal": 10,
+      "identity": "NO",
+      "nullable": "YES",
+      "generated": "NEVER"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "alert_claims_pkey",
+      "table": "alert_claims",
+      "definition": "CREATE UNIQUE INDEX alert_claims_pkey ON public.alert_claims USING btree (subscriber_id, event_date, alert_level)"
+    },
+    {
+      "name": "alert_log_at_message_id_idx",
+      "table": "alert_log",
+      "definition": "CREATE UNIQUE INDEX alert_log_at_message_id_idx ON public.alert_log USING btree (at_message_id) WHERE (at_message_id IS NOT NULL)"
+    },
+    {
+      "name": "alert_log_at_status_idx",
+      "table": "alert_log",
+      "definition": "CREATE INDEX alert_log_at_status_idx ON public.alert_log USING btree (at_status) WHERE (at_status IS NOT NULL)"
+    },
+    {
+      "name": "alert_log_pkey",
+      "table": "alert_log",
+      "definition": "CREATE UNIQUE INDEX alert_log_pkey ON public.alert_log USING btree (id)"
+    },
+    {
+      "name": "alert_log_unique_day",
+      "table": "alert_log",
+      "definition": "CREATE UNIQUE INDEX alert_log_unique_day ON public.alert_log USING btree (subscriber_id, event_date, alert_level)"
+    },
+    {
+      "name": "briefing_log_pkey",
+      "table": "briefing_log",
+      "definition": "CREATE UNIQUE INDEX briefing_log_pkey ON public.briefing_log USING btree (id)"
+    },
+    {
+      "name": "briefing_log_sent_date_idx",
+      "table": "briefing_log",
+      "definition": "CREATE INDEX briefing_log_sent_date_idx ON public.briefing_log USING btree (sent_date DESC)"
+    },
+    {
+      "name": "briefing_log_unique_day",
+      "table": "briefing_log",
+      "definition": "CREATE UNIQUE INDEX briefing_log_unique_day ON public.briefing_log USING btree (sent_date, dry_run)"
+    },
+    {
+      "name": "chew_responses_pkey",
+      "table": "chew_responses",
+      "definition": "CREATE UNIQUE INDEX chew_responses_pkey ON public.chew_responses USING btree (id)"
+    },
+    {
+      "name": "chew_subscribers_phone_key",
+      "table": "chew_subscribers",
+      "definition": "CREATE UNIQUE INDEX chew_subscribers_phone_key ON public.chew_subscribers USING btree (phone)"
+    },
+    {
+      "name": "chew_subscribers_pkey",
+      "table": "chew_subscribers",
+      "definition": "CREATE UNIQUE INDEX chew_subscribers_pkey ON public.chew_subscribers USING btree (id)"
+    },
+    {
+      "name": "idx_chew_lga",
+      "table": "chew_subscribers",
+      "definition": "CREATE INDEX idx_chew_lga ON public.chew_subscribers USING btree (lga_name) WHERE (active = true)"
+    },
+    {
+      "name": "dhis2_malaria_cases_lga_name_period_key",
+      "table": "dhis2_malaria_cases",
+      "definition": "CREATE UNIQUE INDEX dhis2_malaria_cases_lga_name_period_key ON public.dhis2_malaria_cases USING btree (lga_name, period)"
+    },
+    {
+      "name": "dhis2_malaria_cases_pkey",
+      "table": "dhis2_malaria_cases",
+      "definition": "CREATE UNIQUE INDEX dhis2_malaria_cases_pkey ON public.dhis2_malaria_cases USING btree (id)"
+    },
+    {
+      "name": "dispatch_cells_event_cell_idx",
+      "table": "dispatch_cells",
+      "definition": "CREATE UNIQUE INDEX dispatch_cells_event_cell_idx ON public.dispatch_cells USING btree (event_date, cell_id)"
+    },
+    {
+      "name": "dispatch_cells_event_date_idx",
+      "table": "dispatch_cells",
+      "definition": "CREATE INDEX dispatch_cells_event_date_idx ON public.dispatch_cells USING btree (event_date)"
+    },
+    {
+      "name": "dispatch_cells_pkey",
+      "table": "dispatch_cells",
+      "definition": "CREATE UNIQUE INDEX dispatch_cells_pkey ON public.dispatch_cells USING btree (id)"
+    },
+    {
+      "name": "entomology_observations_pkey",
+      "table": "entomology_observations",
+      "definition": "CREATE UNIQUE INDEX entomology_observations_pkey ON public.entomology_observations USING btree (id)"
+    },
+    {
+      "name": "idx_ento_alert",
+      "table": "entomology_observations",
+      "definition": "CREATE INDEX idx_ento_alert ON public.entomology_observations USING btree (alert_id)"
+    },
+    {
+      "name": "idx_ento_lga_date",
+      "table": "entomology_observations",
+      "definition": "CREATE INDEX idx_ento_lga_date ON public.entomology_observations USING btree (lga_name, survey_date DESC)"
+    },
+    {
+      "name": "health_alerts_at_message_id_idx",
+      "table": "health_alerts",
+      "definition": "CREATE UNIQUE INDEX health_alerts_at_message_id_idx ON public.health_alerts USING btree (at_message_id) WHERE (at_message_id IS NOT NULL)"
+    },
+    {
+      "name": "health_alerts_idempotency_key_key",
+      "table": "health_alerts",
+      "definition": "CREATE UNIQUE INDEX health_alerts_idempotency_key_key ON public.health_alerts USING btree (idempotency_key)"
+    },
+    {
+      "name": "health_alerts_pkey",
+      "table": "health_alerts",
+      "definition": "CREATE UNIQUE INDEX health_alerts_pkey ON public.health_alerts USING btree (id)"
+    },
+    {
+      "name": "idx_health_alerts_chew",
+      "table": "health_alerts",
+      "definition": "CREATE INDEX idx_health_alerts_chew ON public.health_alerts USING btree (chew_id)"
+    },
+    {
+      "name": "idx_health_alerts_lga",
+      "table": "health_alerts",
+      "definition": "CREATE INDEX idx_health_alerts_lga ON public.health_alerts USING btree (lga_name, sent_at DESC)"
+    },
+    {
+      "name": "idx_lga_health_risk_date",
+      "table": "lga_health_risk",
+      "definition": "CREATE INDEX idx_lga_health_risk_date ON public.lga_health_risk USING btree (computed_at DESC)"
+    },
+    {
+      "name": "idx_lga_health_risk_lga",
+      "table": "lga_health_risk",
+      "definition": "CREATE INDEX idx_lga_health_risk_lga ON public.lga_health_risk USING btree (lga_name)"
+    },
+    {
+      "name": "idx_lga_health_risk_win",
+      "table": "lga_health_risk",
+      "definition": "CREATE INDEX idx_lga_health_risk_win ON public.lga_health_risk USING btree (outbreak_window_start)"
+    },
+    {
+      "name": "lga_health_risk_pkey",
+      "table": "lga_health_risk",
+      "definition": "CREATE UNIQUE INDEX lga_health_risk_pkey ON public.lga_health_risk USING btree (id)"
+    },
+    {
+      "name": "idx_mel_lga_date",
+      "table": "mel_events",
+      "definition": "CREATE INDEX idx_mel_lga_date ON public.mel_events USING btree (lga_name, event_date DESC)"
+    },
+    {
+      "name": "mel_events_pkey",
+      "table": "mel_events",
+      "definition": "CREATE UNIQUE INDEX mel_events_pkey ON public.mel_events USING btree (id)"
+    },
+    {
+      "name": "pending_subscriptions_pkey",
+      "table": "pending_subscriptions",
+      "definition": "CREATE UNIQUE INDEX pending_subscriptions_pkey ON public.pending_subscriptions USING btree (phone)"
+    },
+    {
+      "name": "prediction_log_pkey",
+      "table": "prediction_log",
+      "definition": "CREATE UNIQUE INDEX prediction_log_pkey ON public.prediction_log USING btree (id)"
+    },
+    {
+      "name": "prediction_log_ts_idx",
+      "table": "prediction_log",
+      "definition": "CREATE INDEX prediction_log_ts_idx ON public.prediction_log USING btree (ts DESC)"
+    },
+    {
+      "name": "subscribers_active_idx",
+      "table": "subscribers",
+      "definition": "CREATE INDEX subscribers_active_idx ON public.subscribers USING btree (active) WHERE (active = true)"
+    },
+    {
+      "name": "subscribers_consent_at_idx",
+      "table": "subscribers",
+      "definition": "CREATE INDEX subscribers_consent_at_idx ON public.subscribers USING btree (consent_at)"
+    },
+    {
+      "name": "subscribers_phone_key",
+      "table": "subscribers",
+      "definition": "CREATE UNIQUE INDEX subscribers_phone_key ON public.subscribers USING btree (phone)"
+    },
+    {
+      "name": "subscribers_pkey",
+      "table": "subscribers",
+      "definition": "CREATE UNIQUE INDEX subscribers_pkey ON public.subscribers USING btree (id)"
+    },
+    {
+      "name": "subscription_attempts_pkey",
+      "table": "subscription_attempts",
+      "definition": "CREATE UNIQUE INDEX subscription_attempts_pkey ON public.subscription_attempts USING btree (key)"
+    },
+    {
+      "name": "verifications_event_date_idx",
+      "table": "verifications",
+      "definition": "CREATE INDEX verifications_event_date_idx ON public.verifications USING btree (event_date)"
+    },
+    {
+      "name": "verifications_pkey",
+      "table": "verifications",
+      "definition": "CREATE UNIQUE INDEX verifications_pkey ON public.verifications USING btree (id)"
+    },
+    {
+      "name": "verifications_verification_id_key",
+      "table": "verifications",
+      "definition": "CREATE UNIQUE INDEX verifications_verification_id_key ON public.verifications USING btree (verification_id)"
+    }
+  ],
+  "database": "postgres",
+  "policies": [
+    {
+      "name": "service only chew_responses",
+      "roles": [
+        "service_role"
+      ],
+      "table": "chew_responses",
+      "using": "true",
+      "command": "ALL",
+      "with_check": "true"
+    },
+    {
+      "name": "service only chew_subscribers",
+      "roles": [
+        "service_role"
+      ],
+      "table": "chew_subscribers",
+      "using": "true",
+      "command": "ALL",
+      "with_check": "true"
+    },
+    {
+      "name": "public read dhis2_malaria_cases",
+      "roles": [
+        "public"
+      ],
+      "table": "dhis2_malaria_cases",
+      "using": "true",
+      "command": "SELECT",
+      "with_check": null
+    },
+    {
+      "name": "ento_public_read",
+      "roles": [
+        "public"
+      ],
+      "table": "entomology_observations",
+      "using": "true",
+      "command": "SELECT",
+      "with_check": null
+    },
+    {
+      "name": "service only health_alerts",
+      "roles": [
+        "service_role"
+      ],
+      "table": "health_alerts",
+      "using": "true",
+      "command": "ALL",
+      "with_check": "true"
+    },
+    {
+      "name": "public read lga_health_risk",
+      "roles": [
+        "public"
+      ],
+      "table": "lga_health_risk",
+      "using": "true",
+      "command": "SELECT",
+      "with_check": null
+    },
+    {
+      "name": "service only mel_events",
+      "roles": [
+        "service_role"
+      ],
+      "table": "mel_events",
+      "using": "true",
+      "command": "ALL",
+      "with_check": "true"
+    }
+  ],
+  "triggers": [
+    {
+      "name": "subscriber_deactivation",
+      "table": "subscribers",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER subscriber_deactivation BEFORE UPDATE ON public.subscribers FOR EACH ROW EXECUTE FUNCTION mark_deactivation()"
+    }
+  ],
+  "functions": [
+    {
+      "name": "claim_alert",
+      "arguments": "p_subscriber uuid, p_date date, p_level text",
+      "anon_execute": false,
+      "configuration": [
+        "search_path=public"
+      ],
+      "definition_md5": "6206866e64aa59cb63184b9ee4ac7e56",
+      "security_definer": true,
+      "service_role_execute": true,
+      "authenticated_execute": false
+    },
+    {
+      "name": "cleanup_personal_data",
+      "arguments": "",
+      "anon_execute": false,
+      "configuration": [
+        "search_path=public"
+      ],
+      "definition_md5": "2665a231f489f823ed31e9ea238eac3b",
+      "security_definer": true,
+      "service_role_execute": true,
+      "authenticated_execute": false
+    },
+    {
+      "name": "consume_pending_subscription",
+      "arguments": "p_phone text, p_hash text",
+      "anon_execute": false,
+      "configuration": [
+        "search_path=public"
+      ],
+      "definition_md5": "34bf00c96b7a75f271953e1c7e6194a5",
+      "security_definer": true,
+      "service_role_execute": true,
+      "authenticated_execute": false
+    },
+    {
+      "name": "consume_subscription_attempt",
+      "arguments": "phone_key text, ip_key text",
+      "anon_execute": false,
+      "configuration": [
+        "search_path=public"
+      ],
+      "definition_md5": "71001ee4b84d34c4b31169b8ef2bc570",
+      "security_definer": true,
+      "service_role_execute": true,
+      "authenticated_execute": false
+    },
+    {
+      "name": "deactivate_stale_subscribers",
+      "arguments": "",
+      "anon_execute": false,
+      "configuration": [
+        "search_path=public"
+      ],
+      "definition_md5": "cede90388ba9d308213d0dde9da792c4",
+      "security_definer": true,
+      "service_role_execute": true,
+      "authenticated_execute": false
+    },
+    {
+      "name": "mark_deactivation",
+      "arguments": "",
+      "anon_execute": true,
+      "configuration": [
+        "search_path=public"
+      ],
+      "definition_md5": "e41b64563cc56012530cdc639a8552b7",
+      "security_definer": false,
+      "service_role_execute": true,
+      "authenticated_execute": true
+    },
+    {
+      "name": "release_schema_version",
+      "arguments": "",
+      "anon_execute": false,
+      "configuration": [
+        "search_path=public"
+      ],
+      "definition_md5": "cf75146191a29040e08dbaa6369e6ad9",
+      "security_definer": false,
+      "service_role_execute": true,
+      "authenticated_execute": false
+    }
+  ],
+  "sequences": [
+    {
+      "name": "briefing_log_id_seq",
+      "type": "bigint",
+      "cache": "1",
+      "cycle": false,
+      "owner": "postgres",
+      "start": "1",
+      "maximum": "9223372036854775807",
+      "minimum": "1",
+      "increment": "1",
+      "last_value": "83"
+    },
+    {
+      "name": "chew_responses_id_seq",
+      "type": "bigint",
+      "cache": "1",
+      "cycle": false,
+      "owner": "postgres",
+      "start": "1",
+      "maximum": "9223372036854775807",
+      "minimum": "1",
+      "increment": "1",
+      "last_value": null
+    },
+    {
+      "name": "chew_subscribers_id_seq",
+      "type": "bigint",
+      "cache": "1",
+      "cycle": false,
+      "owner": "postgres",
+      "start": "1",
+      "maximum": "9223372036854775807",
+      "minimum": "1",
+      "increment": "1",
+      "last_value": null
+    },
+    {
+      "name": "dhis2_malaria_cases_id_seq",
+      "type": "bigint",
+      "cache": "1",
+      "cycle": false,
+      "owner": "postgres",
+      "start": "1",
+      "maximum": "9223372036854775807",
+      "minimum": "1",
+      "increment": "1",
+      "last_value": null
+    },
+    {
+      "name": "dispatch_cells_id_seq",
+      "type": "bigint",
+      "cache": "1",
+      "cycle": false,
+      "owner": "postgres",
+      "start": "1",
+      "maximum": "9223372036854775807",
+      "minimum": "1",
+      "increment": "1",
+      "last_value": null
+    },
+    {
+      "name": "entomology_observations_id_seq",
+      "type": "bigint",
+      "cache": "1",
+      "cycle": false,
+      "owner": "postgres",
+      "start": "1",
+      "maximum": "9223372036854775807",
+      "minimum": "1",
+      "increment": "1",
+      "last_value": null
+    },
+    {
+      "name": "health_alerts_id_seq",
+      "type": "bigint",
+      "cache": "1",
+      "cycle": false,
+      "owner": "postgres",
+      "start": "1",
+      "maximum": "9223372036854775807",
+      "minimum": "1",
+      "increment": "1",
+      "last_value": null
+    },
+    {
+      "name": "lga_health_risk_id_seq",
+      "type": "bigint",
+      "cache": "1",
+      "cycle": false,
+      "owner": "postgres",
+      "start": "1",
+      "maximum": "9223372036854775807",
+      "minimum": "1",
+      "increment": "1",
+      "last_value": null
+    },
+    {
+      "name": "mel_events_id_seq",
+      "type": "bigint",
+      "cache": "1",
+      "cycle": false,
+      "owner": "postgres",
+      "start": "1",
+      "maximum": "9223372036854775807",
+      "minimum": "1",
+      "increment": "1",
+      "last_value": null
+    },
+    {
+      "name": "prediction_log_id_seq",
+      "type": "bigint",
+      "cache": "1",
+      "cycle": false,
+      "owner": "postgres",
+      "start": "1",
+      "maximum": "9223372036854775807",
+      "minimum": "1",
+      "increment": "1",
+      "last_value": null
+    },
+    {
+      "name": "verifications_id_seq",
+      "type": "bigint",
+      "cache": "1",
+      "cycle": false,
+      "owner": "postgres",
+      "start": "1",
+      "maximum": "9223372036854775807",
+      "minimum": "1",
+      "increment": "1",
+      "last_value": null
+    }
+  ],
+  "role_flags": [
+    {
+      "name": "anon",
+      "login": false,
+      "bypass_rls": false
+    },
+    {
+      "name": "authenticated",
+      "login": false,
+      "bypass_rls": false
+    },
+    {
+      "name": "service_role",
+      "login": false,
+      "bypass_rls": true
+    }
+  ],
+  "schema_acl": "{pg_database_owner=UC/pg_database_owner,=U/pg_database_owner,postgres=U/pg_database_owner,anon=U/pg_database_owner,authenticated=U/pg_database_owner,service_role=U/pg_database_owner}",
+  "captured_at": "2026-10-05T15:49:59.14839+00:00",
+  "constraints": [
+    {
+      "kind": "p",
+      "name": "alert_claims_pkey",
+      "table": "alert_claims",
+      "validated": true,
+      "definition": "PRIMARY KEY (subscriber_id, event_date, alert_level)"
+    },
+    {
+      "kind": "f",
+      "name": "alert_claims_subscriber_id_fkey",
+      "table": "alert_claims",
+      "validated": true,
+      "definition": "FOREIGN KEY (subscriber_id) REFERENCES subscribers(id) ON DELETE CASCADE"
+    },
+    {
+      "kind": "c",
+      "name": "alert_log_alert_level_check",
+      "table": "alert_log",
+      "validated": true,
+      "definition": "CHECK ((alert_level = ANY (ARRAY['Watch'::text, 'Warning'::text, 'All Clear'::text])))"
+    },
+    {
+      "kind": "p",
+      "name": "alert_log_pkey",
+      "table": "alert_log",
+      "validated": true,
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "kind": "f",
+      "name": "alert_log_subscriber_id_fkey",
+      "table": "alert_log",
+      "validated": true,
+      "definition": "FOREIGN KEY (subscriber_id) REFERENCES subscribers(id) ON DELETE CASCADE"
+    },
+    {
+      "kind": "p",
+      "name": "briefing_log_pkey",
+      "table": "briefing_log",
+      "validated": true,
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "kind": "u",
+      "name": "briefing_log_unique_day",
+      "table": "briefing_log",
+      "validated": true,
+      "definition": "UNIQUE (sent_date, dry_run) DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "kind": "f",
+      "name": "chew_responses_chew_id_fkey",
+      "table": "chew_responses",
+      "validated": true,
+      "definition": "FOREIGN KEY (chew_id) REFERENCES chew_subscribers(id)"
+    },
+    {
+      "kind": "p",
+      "name": "chew_responses_pkey",
+      "table": "chew_responses",
+      "validated": true,
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "kind": "u",
+      "name": "chew_subscribers_phone_key",
+      "table": "chew_subscribers",
+      "validated": true,
+      "definition": "UNIQUE (phone)"
+    },
+    {
+      "kind": "p",
+      "name": "chew_subscribers_pkey",
+      "table": "chew_subscribers",
+      "validated": true,
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "kind": "c",
+      "name": "chew_subscribers_role_check",
+      "table": "chew_subscribers",
+      "validated": true,
+      "definition": "CHECK ((role = ANY (ARRAY['CHEW'::text, 'PHC_MANAGER'::text, 'LGA_OFFICER'::text, 'SPHCDA'::text])))"
+    },
+    {
+      "kind": "u",
+      "name": "dhis2_malaria_cases_lga_name_period_key",
+      "table": "dhis2_malaria_cases",
+      "validated": true,
+      "definition": "UNIQUE (lga_name, period)"
+    },
+    {
+      "kind": "p",
+      "name": "dhis2_malaria_cases_pkey",
+      "table": "dhis2_malaria_cases",
+      "validated": true,
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "kind": "c",
+      "name": "dispatch_cells_alert_level_check",
+      "table": "dispatch_cells",
+      "validated": true,
+      "definition": "CHECK ((alert_level = ANY (ARRAY['Watch'::text, 'Warning'::text])))"
+    },
+    {
+      "kind": "p",
+      "name": "dispatch_cells_pkey",
+      "table": "dispatch_cells",
+      "validated": true,
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "kind": "f",
+      "name": "entomology_observations_alert_id_fkey",
+      "table": "entomology_observations",
+      "validated": true,
+      "definition": "FOREIGN KEY (alert_id) REFERENCES health_alerts(id)"
+    },
+    {
+      "kind": "p",
+      "name": "entomology_observations_pkey",
+      "table": "entomology_observations",
+      "validated": true,
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "kind": "c",
+      "name": "entomology_observations_water_type_check",
+      "table": "entomology_observations",
+      "validated": true,
+      "definition": "CHECK ((water_type = ANY (ARRAY['clean_temporary'::text, 'turbid'::text, 'polluted_drain'::text, 'tidal'::text, 'canal'::text, 'other'::text])))"
+    },
+    {
+      "kind": "f",
+      "name": "health_alerts_chew_id_fkey",
+      "table": "health_alerts",
+      "validated": true,
+      "definition": "FOREIGN KEY (chew_id) REFERENCES chew_subscribers(id)"
+    },
+    {
+      "kind": "u",
+      "name": "health_alerts_idempotency_key_key",
+      "table": "health_alerts",
+      "validated": true,
+      "definition": "UNIQUE (idempotency_key)"
+    },
+    {
+      "kind": "f",
+      "name": "health_alerts_lga_health_risk_id_fkey",
+      "table": "health_alerts",
+      "validated": true,
+      "definition": "FOREIGN KEY (lga_health_risk_id) REFERENCES lga_health_risk(id)"
+    },
+    {
+      "kind": "p",
+      "name": "health_alerts_pkey",
+      "table": "health_alerts",
+      "validated": true,
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "kind": "p",
+      "name": "lga_health_risk_pkey",
+      "table": "lga_health_risk",
+      "validated": true,
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "kind": "c",
+      "name": "lga_health_risk_risk_tier_check",
+      "table": "lga_health_risk",
+      "validated": true,
+      "definition": "CHECK ((risk_tier = ANY (ARRAY['Low'::text, 'Moderate'::text, 'High'::text, 'Critical'::text])))"
+    },
+    {
+      "kind": "f",
+      "name": "mel_events_alert_id_fkey",
+      "table": "mel_events",
+      "validated": true,
+      "definition": "FOREIGN KEY (alert_id) REFERENCES health_alerts(id)"
+    },
+    {
+      "kind": "c",
+      "name": "mel_events_event_type_check",
+      "table": "mel_events",
+      "validated": true,
+      "definition": "CHECK ((event_type = ANY (ARRAY['NETS_DISTRIBUTED'::text, 'RDT_KITS_PREPOSITIONED'::text, 'IRS_CONDUCTED'::text, 'COMMUNITY_SENSITIZATION'::text, 'CASE_MANAGEMENT_TRAINING'::text, 'STOCK_PREPOSITIONING'::text, 'LARVAL_SOURCE_MANAGEMENT'::text, 'ALERT_ACKNOWLEDGED'::text, 'LARVAL_SURVEY_CONDUCTED'::text, 'ANOPHELES_CONFIRMED'::text, 'CULEX_ONLY'::text, 'NO_LARVAE'::text])))"
+    },
+    {
+      "kind": "p",
+      "name": "mel_events_pkey",
+      "table": "mel_events",
+      "validated": true,
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "kind": "p",
+      "name": "pending_subscriptions_pkey",
+      "table": "pending_subscriptions",
+      "validated": true,
+      "definition": "PRIMARY KEY (phone)"
+    },
+    {
+      "kind": "p",
+      "name": "prediction_log_pkey",
+      "table": "prediction_log",
+      "validated": true,
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "kind": "u",
+      "name": "subscribers_phone_key",
+      "table": "subscribers",
+      "validated": true,
+      "definition": "UNIQUE (phone)"
+    },
+    {
+      "kind": "p",
+      "name": "subscribers_pkey",
+      "table": "subscribers",
+      "validated": true,
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "kind": "p",
+      "name": "subscription_attempts_pkey",
+      "table": "subscription_attempts",
+      "validated": true,
+      "definition": "PRIMARY KEY (key)"
+    },
+    {
+      "kind": "p",
+      "name": "verifications_pkey",
+      "table": "verifications",
+      "validated": true,
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "kind": "u",
+      "name": "verifications_verification_id_key",
+      "table": "verifications",
+      "validated": true,
+      "definition": "UNIQUE (verification_id)"
+    }
+  ],
+  "table_grants": [
+    {
+      "role": "postgres",
+      "table": "alert_claims",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "postgres",
+      "table": "alert_claims",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "postgres",
+      "table": "alert_claims",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "postgres",
+      "table": "alert_claims",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "postgres",
+      "table": "alert_claims",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "postgres",
+      "table": "alert_claims",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "postgres",
+      "table": "alert_claims",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "service_role",
+      "table": "alert_claims",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "service_role",
+      "table": "alert_claims",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "service_role",
+      "table": "alert_claims",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "service_role",
+      "table": "alert_claims",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "service_role",
+      "table": "alert_claims",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "service_role",
+      "table": "alert_claims",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "service_role",
+      "table": "alert_claims",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "postgres",
+      "table": "alert_delivery_stats",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "postgres",
+      "table": "alert_delivery_stats",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "postgres",
+      "table": "alert_delivery_stats",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "postgres",
+      "table": "alert_delivery_stats",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "postgres",
+      "table": "alert_delivery_stats",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "postgres",
+      "table": "alert_delivery_stats",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "postgres",
+      "table": "alert_delivery_stats",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "service_role",
+      "table": "alert_delivery_stats",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "service_role",
+      "table": "alert_delivery_stats",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "service_role",
+      "table": "alert_delivery_stats",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "service_role",
+      "table": "alert_delivery_stats",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "service_role",
+      "table": "alert_delivery_stats",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "service_role",
+      "table": "alert_delivery_stats",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "service_role",
+      "table": "alert_delivery_stats",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "postgres",
+      "table": "alert_log",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "postgres",
+      "table": "alert_log",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "postgres",
+      "table": "alert_log",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "postgres",
+      "table": "alert_log",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "postgres",
+      "table": "alert_log",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "postgres",
+      "table": "alert_log",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "postgres",
+      "table": "alert_log",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "service_role",
+      "table": "alert_log",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "service_role",
+      "table": "alert_log",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "service_role",
+      "table": "alert_log",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "service_role",
+      "table": "alert_log",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "service_role",
+      "table": "alert_log",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "service_role",
+      "table": "alert_log",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "service_role",
+      "table": "alert_log",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "postgres",
+      "table": "briefing_log",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "postgres",
+      "table": "briefing_log",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "postgres",
+      "table": "briefing_log",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "postgres",
+      "table": "briefing_log",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "postgres",
+      "table": "briefing_log",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "postgres",
+      "table": "briefing_log",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "postgres",
+      "table": "briefing_log",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "service_role",
+      "table": "briefing_log",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "service_role",
+      "table": "briefing_log",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "service_role",
+      "table": "briefing_log",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "service_role",
+      "table": "briefing_log",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "service_role",
+      "table": "briefing_log",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "service_role",
+      "table": "briefing_log",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "service_role",
+      "table": "briefing_log",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "postgres",
+      "table": "chew_responses",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "postgres",
+      "table": "chew_responses",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "postgres",
+      "table": "chew_responses",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "postgres",
+      "table": "chew_responses",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "postgres",
+      "table": "chew_responses",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "postgres",
+      "table": "chew_responses",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "postgres",
+      "table": "chew_responses",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "service_role",
+      "table": "chew_responses",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "service_role",
+      "table": "chew_responses",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "service_role",
+      "table": "chew_responses",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "service_role",
+      "table": "chew_responses",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "service_role",
+      "table": "chew_responses",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "service_role",
+      "table": "chew_responses",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "service_role",
+      "table": "chew_responses",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "postgres",
+      "table": "chew_subscribers",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "postgres",
+      "table": "chew_subscribers",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "postgres",
+      "table": "chew_subscribers",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "postgres",
+      "table": "chew_subscribers",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "postgres",
+      "table": "chew_subscribers",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "postgres",
+      "table": "chew_subscribers",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "postgres",
+      "table": "chew_subscribers",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "service_role",
+      "table": "chew_subscribers",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "service_role",
+      "table": "chew_subscribers",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "service_role",
+      "table": "chew_subscribers",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "service_role",
+      "table": "chew_subscribers",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "service_role",
+      "table": "chew_subscribers",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "service_role",
+      "table": "chew_subscribers",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "service_role",
+      "table": "chew_subscribers",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "anon",
+      "table": "dhis2_malaria_cases",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "anon",
+      "table": "dhis2_malaria_cases",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "anon",
+      "table": "dhis2_malaria_cases",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "anon",
+      "table": "dhis2_malaria_cases",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "anon",
+      "table": "dhis2_malaria_cases",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "anon",
+      "table": "dhis2_malaria_cases",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "anon",
+      "table": "dhis2_malaria_cases",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "authenticated",
+      "table": "dhis2_malaria_cases",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "authenticated",
+      "table": "dhis2_malaria_cases",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "authenticated",
+      "table": "dhis2_malaria_cases",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "authenticated",
+      "table": "dhis2_malaria_cases",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "authenticated",
+      "table": "dhis2_malaria_cases",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "authenticated",
+      "table": "dhis2_malaria_cases",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "authenticated",
+      "table": "dhis2_malaria_cases",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "postgres",
+      "table": "dhis2_malaria_cases",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "postgres",
+      "table": "dhis2_malaria_cases",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "postgres",
+      "table": "dhis2_malaria_cases",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "postgres",
+      "table": "dhis2_malaria_cases",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "postgres",
+      "table": "dhis2_malaria_cases",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "postgres",
+      "table": "dhis2_malaria_cases",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "postgres",
+      "table": "dhis2_malaria_cases",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "service_role",
+      "table": "dhis2_malaria_cases",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "service_role",
+      "table": "dhis2_malaria_cases",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "service_role",
+      "table": "dhis2_malaria_cases",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "service_role",
+      "table": "dhis2_malaria_cases",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "service_role",
+      "table": "dhis2_malaria_cases",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "service_role",
+      "table": "dhis2_malaria_cases",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "service_role",
+      "table": "dhis2_malaria_cases",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "postgres",
+      "table": "dispatch_cells",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "postgres",
+      "table": "dispatch_cells",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "postgres",
+      "table": "dispatch_cells",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "postgres",
+      "table": "dispatch_cells",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "postgres",
+      "table": "dispatch_cells",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "postgres",
+      "table": "dispatch_cells",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "postgres",
+      "table": "dispatch_cells",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "service_role",
+      "table": "dispatch_cells",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "service_role",
+      "table": "dispatch_cells",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "service_role",
+      "table": "dispatch_cells",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "service_role",
+      "table": "dispatch_cells",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "service_role",
+      "table": "dispatch_cells",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "service_role",
+      "table": "dispatch_cells",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "service_role",
+      "table": "dispatch_cells",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "anon",
+      "table": "entomology_observations",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "anon",
+      "table": "entomology_observations",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "anon",
+      "table": "entomology_observations",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "anon",
+      "table": "entomology_observations",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "anon",
+      "table": "entomology_observations",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "anon",
+      "table": "entomology_observations",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "anon",
+      "table": "entomology_observations",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "authenticated",
+      "table": "entomology_observations",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "authenticated",
+      "table": "entomology_observations",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "authenticated",
+      "table": "entomology_observations",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "authenticated",
+      "table": "entomology_observations",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "authenticated",
+      "table": "entomology_observations",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "authenticated",
+      "table": "entomology_observations",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "authenticated",
+      "table": "entomology_observations",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "postgres",
+      "table": "entomology_observations",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "postgres",
+      "table": "entomology_observations",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "postgres",
+      "table": "entomology_observations",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "postgres",
+      "table": "entomology_observations",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "postgres",
+      "table": "entomology_observations",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "postgres",
+      "table": "entomology_observations",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "postgres",
+      "table": "entomology_observations",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "service_role",
+      "table": "entomology_observations",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "service_role",
+      "table": "entomology_observations",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "service_role",
+      "table": "entomology_observations",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "service_role",
+      "table": "entomology_observations",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "service_role",
+      "table": "entomology_observations",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "service_role",
+      "table": "entomology_observations",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "service_role",
+      "table": "entomology_observations",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "postgres",
+      "table": "health_alerts",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "postgres",
+      "table": "health_alerts",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "postgres",
+      "table": "health_alerts",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "postgres",
+      "table": "health_alerts",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "postgres",
+      "table": "health_alerts",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "postgres",
+      "table": "health_alerts",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "postgres",
+      "table": "health_alerts",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "service_role",
+      "table": "health_alerts",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "service_role",
+      "table": "health_alerts",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "service_role",
+      "table": "health_alerts",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "service_role",
+      "table": "health_alerts",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "service_role",
+      "table": "health_alerts",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "service_role",
+      "table": "health_alerts",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "service_role",
+      "table": "health_alerts",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "anon",
+      "table": "lga_health_risk",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "anon",
+      "table": "lga_health_risk",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "anon",
+      "table": "lga_health_risk",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "anon",
+      "table": "lga_health_risk",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "anon",
+      "table": "lga_health_risk",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "anon",
+      "table": "lga_health_risk",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "anon",
+      "table": "lga_health_risk",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "authenticated",
+      "table": "lga_health_risk",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "authenticated",
+      "table": "lga_health_risk",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "authenticated",
+      "table": "lga_health_risk",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "authenticated",
+      "table": "lga_health_risk",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "authenticated",
+      "table": "lga_health_risk",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "authenticated",
+      "table": "lga_health_risk",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "authenticated",
+      "table": "lga_health_risk",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "postgres",
+      "table": "lga_health_risk",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "postgres",
+      "table": "lga_health_risk",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "postgres",
+      "table": "lga_health_risk",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "postgres",
+      "table": "lga_health_risk",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "postgres",
+      "table": "lga_health_risk",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "postgres",
+      "table": "lga_health_risk",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "postgres",
+      "table": "lga_health_risk",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "service_role",
+      "table": "lga_health_risk",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "service_role",
+      "table": "lga_health_risk",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "service_role",
+      "table": "lga_health_risk",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "service_role",
+      "table": "lga_health_risk",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "service_role",
+      "table": "lga_health_risk",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "service_role",
+      "table": "lga_health_risk",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "service_role",
+      "table": "lga_health_risk",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "postgres",
+      "table": "mel_events",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "postgres",
+      "table": "mel_events",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "postgres",
+      "table": "mel_events",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "postgres",
+      "table": "mel_events",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "postgres",
+      "table": "mel_events",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "postgres",
+      "table": "mel_events",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "postgres",
+      "table": "mel_events",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "service_role",
+      "table": "mel_events",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "service_role",
+      "table": "mel_events",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "service_role",
+      "table": "mel_events",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "service_role",
+      "table": "mel_events",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "service_role",
+      "table": "mel_events",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "service_role",
+      "table": "mel_events",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "service_role",
+      "table": "mel_events",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "postgres",
+      "table": "pending_subscriptions",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "postgres",
+      "table": "pending_subscriptions",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "postgres",
+      "table": "pending_subscriptions",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "postgres",
+      "table": "pending_subscriptions",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "postgres",
+      "table": "pending_subscriptions",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "postgres",
+      "table": "pending_subscriptions",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "postgres",
+      "table": "pending_subscriptions",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "service_role",
+      "table": "pending_subscriptions",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "service_role",
+      "table": "pending_subscriptions",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "service_role",
+      "table": "pending_subscriptions",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "service_role",
+      "table": "pending_subscriptions",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "service_role",
+      "table": "pending_subscriptions",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "service_role",
+      "table": "pending_subscriptions",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "service_role",
+      "table": "pending_subscriptions",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "postgres",
+      "table": "prediction_log",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "postgres",
+      "table": "prediction_log",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "postgres",
+      "table": "prediction_log",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "postgres",
+      "table": "prediction_log",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "postgres",
+      "table": "prediction_log",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "postgres",
+      "table": "prediction_log",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "postgres",
+      "table": "prediction_log",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "service_role",
+      "table": "prediction_log",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "service_role",
+      "table": "prediction_log",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "service_role",
+      "table": "prediction_log",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "service_role",
+      "table": "prediction_log",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "service_role",
+      "table": "prediction_log",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "service_role",
+      "table": "prediction_log",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "service_role",
+      "table": "prediction_log",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "postgres",
+      "table": "subscribers",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "postgres",
+      "table": "subscribers",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "postgres",
+      "table": "subscribers",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "postgres",
+      "table": "subscribers",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "postgres",
+      "table": "subscribers",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "postgres",
+      "table": "subscribers",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "postgres",
+      "table": "subscribers",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "service_role",
+      "table": "subscribers",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "service_role",
+      "table": "subscribers",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "service_role",
+      "table": "subscribers",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "service_role",
+      "table": "subscribers",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "service_role",
+      "table": "subscribers",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "service_role",
+      "table": "subscribers",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "service_role",
+      "table": "subscribers",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "postgres",
+      "table": "subscription_attempts",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "postgres",
+      "table": "subscription_attempts",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "postgres",
+      "table": "subscription_attempts",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "postgres",
+      "table": "subscription_attempts",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "postgres",
+      "table": "subscription_attempts",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "postgres",
+      "table": "subscription_attempts",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "postgres",
+      "table": "subscription_attempts",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "service_role",
+      "table": "subscription_attempts",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "service_role",
+      "table": "subscription_attempts",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "service_role",
+      "table": "subscription_attempts",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "service_role",
+      "table": "subscription_attempts",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "service_role",
+      "table": "subscription_attempts",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "service_role",
+      "table": "subscription_attempts",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "service_role",
+      "table": "subscription_attempts",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "postgres",
+      "table": "verifications",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "postgres",
+      "table": "verifications",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "postgres",
+      "table": "verifications",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "postgres",
+      "table": "verifications",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "postgres",
+      "table": "verifications",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "postgres",
+      "table": "verifications",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "postgres",
+      "table": "verifications",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "service_role",
+      "table": "verifications",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "service_role",
+      "table": "verifications",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "service_role",
+      "table": "verifications",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "service_role",
+      "table": "verifications",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "service_role",
+      "table": "verifications",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "service_role",
+      "table": "verifications",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "service_role",
+      "table": "verifications",
+      "privilege": "UPDATE"
+    }
+  ],
+  "postgres_version": "17.6"
+}

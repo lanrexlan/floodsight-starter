@@ -1,0 +1,171 @@
+{
+  "scope": "approved live Supabase delivery-tracking and release-hardening upgrade, not production acceptance",
+  "project_ref": "buwwsplrhsfgnkulhkpc",
+  "source_postgres": "17.6",
+  "migration": {
+    "version": "20261005152719",
+    "name": "approved_delivery_tracking_and_release_hardening"
+  },
+  "before_observed_at_utc": "2026-10-05T15:25:10.084672+00:00",
+  "after_observed_at_utc": "2026-10-05T15:28:20.984154+00:00",
+  "backup": {
+    "scope": "pre-upgrade public application schema",
+    "bytes": 60139,
+    "sha256": "7FFDD0F3603777151399E7ADF810443887275BFBC4F581DC476B2ED432CCB8C2",
+    "local_restore_passed": true,
+    "full_supabase_recovery_verified": false,
+    "post_upgrade_export_created": false
+  },
+  "execution": {
+    "atomic_single_do_statement": true,
+    "lock_timeout": "5s",
+    "statement_timeout": "60s",
+    "before_after_original_record_guards": true
+  },
+  "scripts": {
+    "upgrade06_sha256": "C32E280351920E8E2CC65C46EB20199018B07699893EE3D427052F5883C69E85",
+    "upgrade07_sha256": "949F0C4AE510A43CEDB32B4FB5B68079073D920D4FDAAAE04F96523D1E8B7080",
+    "applied_wrapper_sha256": "0C425174527E8E3C35A04A645B6A41E80481EA22F8A860421750DB665AE9EF2D"
+  },
+  "verification": {
+    "release_schema_version": 7,
+    "original_columns": 138,
+    "original_columns_preserved": true,
+    "original_sequences": 11,
+    "original_sequences_preserved": true,
+    "original_indexes_preserved": true,
+    "original_constraints_preserved": true,
+    "original_record_comparisons": [
+      {
+        "name": "alert_log",
+        "rows": 0,
+        "content_md5": "d41d8cd98f00b204e9800998ecf8427e",
+        "match": true
+      },
+      {
+        "name": "briefing_log",
+        "rows": 83,
+        "content_md5": "4e52b6a6fd8250f26ddaa6c7bc6af63f",
+        "match": true
+      },
+      {
+        "name": "chew_responses",
+        "rows": 0,
+        "content_md5": "d41d8cd98f00b204e9800998ecf8427e",
+        "match": true
+      },
+      {
+        "name": "chew_subscribers",
+        "rows": 0,
+        "content_md5": "d41d8cd98f00b204e9800998ecf8427e",
+        "match": true
+      },
+      {
+        "name": "dhis2_malaria_cases",
+        "rows": 0,
+        "content_md5": "d41d8cd98f00b204e9800998ecf8427e",
+        "match": true
+      },
+      {
+        "name": "dispatch_cells",
+        "rows": 0,
+        "content_md5": "d41d8cd98f00b204e9800998ecf8427e",
+        "match": true
+      },
+      {
+        "name": "entomology_observations",
+        "rows": 0,
+        "content_md5": "d41d8cd98f00b204e9800998ecf8427e",
+        "match": true
+      },
+      {
+        "name": "health_alerts",
+        "rows": 0,
+        "content_md5": "d41d8cd98f00b204e9800998ecf8427e",
+        "match": true
+      },
+      {
+        "name": "lga_health_risk",
+        "rows": 0,
+        "content_md5": "d41d8cd98f00b204e9800998ecf8427e",
+        "match": true
+      },
+      {
+        "name": "mel_events",
+        "rows": 0,
+        "content_md5": "d41d8cd98f00b204e9800998ecf8427e",
+        "match": true
+      },
+      {
+        "name": "pending_subscriptions",
+        "rows": 0,
+        "content_md5": "d41d8cd98f00b204e9800998ecf8427e",
+        "match": true
+      },
+      {
+        "name": "prediction_log",
+        "rows": 0,
+        "content_md5": "d41d8cd98f00b204e9800998ecf8427e",
+        "match": true
+      },
+      {
+        "name": "subscribers",
+        "rows": 2,
+        "content_md5": "ffefc6981cc94d176b6371beafde3262",
+        "match": true
+      },
+      {
+        "name": "verifications",
+        "rows": 0,
+        "content_md5": "d41d8cd98f00b204e9800998ecf8427e",
+        "match": true
+      }
+    ],
+    "rls_enabled_application_tables": 16,
+    "private_access": {
+      "passed": true,
+      "actual_private_select_denials": 28,
+      "actual_server_reads": 14,
+      "function_role_permission_checks": 18,
+      "mutating_functions_invoked": false
+    },
+    "delivery_view_security_invoker": true,
+    "delivery_indexes_verified": 3,
+    "health_policies_service_role_only": 4,
+    "subscriber_deactivation_trigger_present": true
+  },
+  "security_advisor": {
+    "warn": 0,
+    "error": 0,
+    "info_deny_by_default_tables": 9,
+    "observed_at_utc": "2026-10-05T15:29:19.007Z",
+    "explanation": "https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy"
+  },
+  "boundaries": {
+    "baseline_or_consent_backfill_replayed": false,
+    "cleanup_or_stale_subscriber_functions_invoked": false,
+    "cleanup_scheduled": false,
+    "messages_sent": false,
+    "hosting_purchased": false,
+    "experimental_depth_enabled": false,
+    "production_mode_enabled": false
+  },
+  "deployment_checks": {
+    "health_http": 200,
+    "ready_http": 200,
+    "ready_mode": "development",
+    "protected_health_routes_http": 401,
+    "experimental_depth_http": 503,
+    "initial_probe_read_timeout_seconds": 40,
+    "subsequent_probe_passed": true,
+    "application_database_connectivity_proven_by_development_readiness": false
+  },
+  "remaining_acceptance": [
+    "post-upgrade backup and encrypted off-site recurring backups",
+    "same-version/full Supabase recovery and approved RTO/RPO",
+    "approved-number SMS/OTP/STOP/START and delivery callbacks",
+    "production configuration, hosting, load and operator procedures",
+    "independent scientific/prospective validation"
+  ],
+  "github_receipt_pushed_at_upgrade": false
+}
