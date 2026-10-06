@@ -45,6 +45,8 @@ data/logs/
 data/backups/
 *.dump
 *.pgpass
+*.fernet-key
+*.zip.fernet
 
 .pytest_cache/
 .release-venv/
