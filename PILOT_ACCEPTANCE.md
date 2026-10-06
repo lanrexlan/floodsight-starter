@@ -2,11 +2,11 @@
 
 Infrastructure access is not scientific or operational acceptance. This checklist does not approve autonomous public warnings or market accuracy guarantees.
 
-## Evidence — updated 5 October 2026
+## Evidence — updated 6 October 2026
 
-- Fresh Render verification (5 October): confirmed workspace's free Python service is live at merged main `38d688416d1db1a7f217ed5a53c960773b623671`. Health, assets and point lookup respond successfully; readiness reports development mode, not production acceptance. See `DEPLOYMENT_VERIFICATION.md`. The UX/scheduler fix branch is not deployed.
+- Render verification (6 October): confirmed workspace's free Python service reports merged PR #4 commit `28e84134a957628b5d13e50fea9e42c5947d22e2` live. Health and readiness returned 200 during the rollout, but readiness reported development mode, not production acceptance. UX/scheduler fixes are merged through PR #3; the newer encryption helper/evidence is a separate review branch, not deployed.
 - Supabase project: `buwwsplrhsfgnkulhkpc`. The owner-approved access restriction was applied and verified. Four exposed tables now have RLS, private tables deny anonymous/signed-in access, and the maintenance function is server-only with a fixed search path. The security advisor has no WARN/ERROR findings. INFO notices for intentional deny-by-default tables remain.
-- The release schema upgrade is NOT applied. A live backup is not verified. Do not run cleanup or baseline consent backfills on live records as a shortcut.
+- The separately approved 06/07 schema upgrades were applied and verified on 5 October: version 7 with original records preserved and private access controls checked. Pre- and post-upgrade application archives passed isolated local restores. A one-off encrypted Drive copy passed download/decryption checksum verification; independent key custody was owner-confirmed on 6 October but the external key copy has not been recovery-tested. See `BACKUP_RESTORE_VERIFICATION.md` and `OFFSITE_BACKUP_VERIFICATION.md`. Do not run cleanup or baseline consent backfills on live records as a shortcut.
 - Historical local database receipt: 159 passed with eight isolated PostgreSQL 18 checks. Merged main passed [PostgreSQL 17/Linux/container CI](https://github.com/lanrexlan/floodsight-starter/actions/runs/37242113178). Current local UX/operational changes: 215 Python tests and 21 hermetic UI tests passed; eight database checks skipped in this run. Browser checks used mocked APIs/map rendering. New changes still need branch CI and deployment; restoration remains separate.
 - The owner confirmed provider key and agreement availability. Key installation and live-provider behavior are unverified. Never put credentials in this document.
 - Depth model acceptance remains blocked: only two SAR/FwDET-derived events, both observed-only holdouts have negative R² and worse RMSE than the mean baseline.
@@ -53,8 +53,8 @@ For each test record date, release SHA, environment, operator, expected/actual o
 | Weather | Paid authentication, freshness, coverage and degraded behavior | Key available; installation/live behavior unverified |
 | Load/devices | Approved workload/duration; p95/p99, errors, CPU/RAM, transfers; mobile/low-bandwidth/accessibility checks | Pending; do not stress current free live service |
 | UX interactions | Scenario/live distinction, keyboard selection, inline OTP, explicit covered location and private operator access | Local hermetic/browser checks pass; actual map/device/accessibility acceptance pending |
-| Schedules | Separate channel approval, missing credentials, read-only behavior, pre-send reservations and ambiguous-outcome review | Implemented/tested locally; not deployed or activated |
-| Restore | Real backup restored to isolated target, integrity/permissions checked, recovery objectives measured | Backup confirmation/target pending |
+| Schedules | Separate channel approval, missing credentials, read-only behavior, pre-send reservations and ambiguous-outcome review | Gates merged/deployed through PR #3; live messaging channels not accepted or activated |
+| Restore | Real backup restored to isolated target, integrity/permissions checked, recovery objectives measured | Application restores and one-off encrypted Drive verification passed; recurring backups, external-key recovery, full-platform/PG17 recovery and approved recovery objectives pending |
 | Operations | Named on-call owner; monitoring/scheduler; weather/SMS/storage outage, opt-out, escalation and rollback rehearsal | Procedures documented; approval/rehearsal pending |
 
 Agree numerical acceptance limits and recovery objectives with the owner/customer before testing, not after observing favorable results.

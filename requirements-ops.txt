@@ -1,0 +1,3 @@
+# Optional local recovery tools; not deployment or application runtime changes.
+cryptography==50.0.2
+psycopg[binary]==3.3.6

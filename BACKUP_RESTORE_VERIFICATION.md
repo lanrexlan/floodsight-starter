@@ -81,9 +81,12 @@ This is not a same-version or full Supabase project-recovery test.
    Auth/Storage/Vault were empty at preflight, not a guarantee they remain empty.
    [Provider recovery guidance](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore)
    requires separate handling of those recovery components where applicable.
-2. An encrypted off-site backup, recurring schedule, retention/disposal decision,
-   and owner-approved recovery-time/data-loss limits. A private local copy alone
-   is not disaster recovery if this computer is lost.
+2. Recovery testing with the independently saved key, a recurring backup schedule, retention/
+   disposal decision, and owner-approved recovery-time/data-loss limits. A one-off
+   encrypted Drive copy has now passed download/decryption verification; see
+   `OFFSITE_BACKUP_VERIFICATION.md`. The owner confirmed independent key custody
+   on 2026-10-06; recovery using that external key copy is not yet tested, so
+   recovery after computer loss is not fully accepted.
 3. Real approved-number SMS/OTP/STOP/START, production configuration/load checks,
    operator procedures and scientific validation. This drill does not close them.
 
@@ -126,22 +129,26 @@ inventory: `reports/backup_restore_postupgrade_source_inventory_20261005.json`.
 The backup receipt remains marked restore-unverified because it is an immutable
 export-time record; the separate drill receipt supplies subsequent verification.
 
-This closes the fresh version-7 application-export/local-restore step, **not full
+At completion of this drill, this closed the fresh version-7 application-export/local-restore step, **not full
 Supabase disaster recovery**. The same managed-schema, migration-history,
 PostgreSQL 17 target, encrypted off-site, recurring-backup and owner-approved
 recovery-limit gaps listed above remain. Backups and copied personal records
-have not been uploaded to GitHub or any off-site destination.
+had not been uploaded to GitHub or any off-site destination. The subsequent
+encrypted Drive verification is recorded below; plaintext backups and keys
+remain excluded from GitHub and Drive.
 
 ### What off-site storage means
 
-The two private backups currently live on this computer. If it is lost, stolen
-or damaged, those backups may be lost with it. Off-site storage is a second copy
+The two original private backups live on this computer. If it is lost, stolen
+or damaged, those originals may be lost with it. Off-site storage is a second copy
 kept somewhere independent, such as an approved private cloud-storage account.
 Encrypt that copy before uploading it, keep its recovery key separately, and
 verify that it can be downloaded, decrypted and restored. Agree on a recurring
-schedule and how long copies are kept. No provider account, upload, purchase or
-schedule has been configured yet. GitHub holds the code and aggregate evidence,
-not the database backups or copied personal records.
+schedule and how long copies are kept. The owner-approved one-off encrypted copy
+is now verified in a private Drive folder. Independent key custody was owner-confirmed
+on 2026-10-06, but that external key copy has not been recovery-tested. No recurring
+schedule or purchase has been completed. GitHub holds code and aggregate evidence, not the
+database backups, encryption keys or copied personal records.
 
 ## Approved live upgrade — completed
 
